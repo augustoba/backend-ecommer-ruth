@@ -172,6 +172,7 @@ Base: `/api`. Errores → cuerpo `ApiError` (`{timestamp, status, error, message
 |---|---|
 | **account** | `GET /api/admin/account` → `{username, hasRecoveryPhrase}` · `PUT /account/password` `{currentPassword, newPassword}` · `PUT /account/recovery` `{currentPassword, recoveryPhrase}` |
 | **settings** | `GET /api/admin/settings` · `PUT /api/admin/settings` `{storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?}` (misma respuesta que el GET público) |
+| **metrics** | `GET /api/admin/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=grp-tipo` → totales, serie mensual, top/bottom productos y desglose por grupo de parametría. Ver §6bis. |
 | **products** | `GET` (todos, incl. inactivos) · `POST` · `GET/PUT/DELETE /{id}` · `PATCH /{id}/active` `{active}` · `PATCH /{id}/stock` `{size, stock}` |
 | **param-groups** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `POST /{id}/options` · `PUT/DELETE /{id}/options/{optionId}` |
 | **size-scales** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `PUT /{id}/values` `{values}` (reemplaza la lista) |
@@ -193,6 +194,23 @@ Base: `/api`. Errores → cuerpo `ApiError` (`{timestamp, status, error, message
 
 Lo usan `POST /api/orders` (al crear) — `confirm` no recalcula, solo descuenta
 stock.
+
+### 6bis. Métricas de ventas (`MetricsService`)
+
+`GET /api/admin/metrics` — se calcula sobre las **líneas aceptadas** de los
+pedidos **`PROCESADO`**, ubicando cada venta por `processedAt` (la fecha en que
+se confirmó). `revenue` = `unitPrice × quantity` (precio de lista; **no** aplica
+el descuento del pedido, que es a nivel total).
+
+- **Parámetros** (todos opcionales): `from`, `to` (ISO date, inclusivos; por
+  defecto primer día de hace 11 meses → hoy), `groupBy` (id de `ParamGroup`
+  para el desglose; por defecto `grp-tipo`).
+- **Respuesta** (`MetricsDtos.MetricsResponse`): `totals {revenue, units, orders}`,
+  `byMonth[]` (serie **continua**, meses sin ventas en 0), `topProducts[]` (más
+  vendidos por unidades, máx. 10), `bottomProducts[]` (menos vendidos —
+  **incluye productos activos con 0 ventas**, máx. 10), `byGroup {groupId,
+  groupName, rows[]}` (unidades y facturación por opción del grupo).
+- Rango inválido (`from` > `to`) → 400.
 
 ---
 
@@ -294,8 +312,9 @@ regenerarlo).
 - Perfil `prod` (`application-prod.yml`) + pipeline de deploy.
 - Rate-limiting / lockout en el login.
 - Multi-admin (hoy hay uno solo; el modelo `AdminUser` ya lo soporta).
-- Pantalla / endpoints de métricas (ventas por talle / proveedor / parametría),
-  leyendo `Order` + `OrderLine` (la data ya está estructurada para eso).
+- Métricas: falta el desglose por **talle** y por **proveedor** (hoy están
+  totales, serie mensual, top/bottom productos y desglose por parametría —
+  §6bis). También: aplicar el descuento del pedido a la facturación.
 - Subida de imágenes a storage en vez de data-URI en la base.
 
 ---
@@ -321,3 +340,7 @@ regenerarlo).
    `GET`/`PUT /api/admin/settings`. La crea `DataSeeder` con los valores actuales
    por defecto. Permite cambiar nombre de tienda, WhatsApp y redes sin
    redesplegar. Tabla `site_settings` sumada a los scripts SQL.
+8. **Métricas de ventas** (2026-09-08, §6bis): `GET /api/admin/metrics`
+   (`MetricsService`) — totales, serie mensual continua, top/bottom productos y
+   desglose por grupo de parametría, sobre los pedidos PROCESADO en un rango de
+   fechas. Sin cambios de esquema (sólo lectura de `Order`/`OrderLine`).

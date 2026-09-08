@@ -5,6 +5,7 @@ import com.estilospequenos.model.OrderStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.Instant;
 import java.util.List;
 
 public interface OrderRepository extends JpaRepository<Order, String> {
@@ -12,6 +13,10 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     List<Order> findAllByOrderByCreatedAtDesc();
 
     long countByStatus(OrderStatus status);
+
+    /** Pedidos de un estado con `processedAt` dentro del rango [from, to). Para métricas. */
+    List<Order> findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
+            OrderStatus status, Instant from, Instant to);
 
     @Query("select coalesce(max(o.number), 0) from Order o")
     long maxNumber();
