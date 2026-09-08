@@ -129,6 +129,7 @@ DTO en el service y desactivarlo.
 | Entidad | Campos clave | Notas |
 |---|---|---|
 | **AdminUser** | `id, username (unique), passwordHash, recoveryHash?, enabled, createdAt` | Contraseña y frase de recuperación **hasheadas con BCrypt**. Un solo registro en la práctica. |
+| **SiteSettings** | fila única `id='config'`, `storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?` | Datos del local editables desde el panel. `whatsappNumber` valida `\d{8,15}`. `instagram` se guarda sin `@`. |
 | **Product** | `id, name, description, price, ageRange, imageUrl (MEDIUMTEXT), active, createdAt, sizeScaleId?, supplierId?, costPrice?` | `imageUrl` admite data URI. `supplierId`/`costPrice` = info interna, **no** se exponen en el catálogo público. |
 | — `sizeStocks` | `List<SizeStock{size, stock}>` (`@ElementCollection` → `product_size_stock`) | stock por talle |
 | — `params` | `Set<ProductParam{groupId, optionId}>` (`@ElementCollection` → `product_param`) | en el DTO se expone como `Map<String,List<String>>` |
@@ -162,6 +163,7 @@ Base: `/api`. Errores → cuerpo `ApiError` (`{timestamp, status, error, message
 | `GET` | `/api/size-scales` | escalas de talle |
 | `GET` | `/api/hero-slides` | carrusel |
 | `GET` | `/api/discounts` | `{discounts, combineMode}` — para el preview del descuento en el carrito |
+| `GET` | `/api/settings` | datos del local: `{storeName, whatsappNumber, aboutText, instagram, facebookUrl}` — los usan header, footer, home y el armado del mensaje de WhatsApp |
 | `POST` | `/api/orders` | crea el pedido desde el carrito: `{customerName, items:[{productId, size, quantity}]}` → calcula `code`, descuentos y totales |
 
 ### Admin (`/api/admin/**` — requieren `Authorization: Bearer <jwt>`)
@@ -169,6 +171,7 @@ Base: `/api`. Errores → cuerpo `ApiError` (`{timestamp, status, error, message
 | Recurso | Endpoints |
 |---|---|
 | **account** | `GET /api/admin/account` → `{username, hasRecoveryPhrase}` · `PUT /account/password` `{currentPassword, newPassword}` · `PUT /account/recovery` `{currentPassword, recoveryPhrase}` |
+| **settings** | `GET /api/admin/settings` · `PUT /api/admin/settings` `{storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?}` (misma respuesta que el GET público) |
 | **products** | `GET` (todos, incl. inactivos) · `POST` · `GET/PUT/DELETE /{id}` · `PATCH /{id}/active` `{active}` · `PATCH /{id}/stock` `{size, stock}` |
 | **param-groups** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `POST /{id}/options` · `PUT/DELETE /{id}/options/{optionId}` |
 | **size-scales** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `PUT /{id}/values` `{values}` (reemplaza la lista) |
@@ -202,7 +205,7 @@ stock.
   si es válido setea un `Authentication` con authority `ROLE_ADMIN`.
 - **`SecurityConfig`**: stateless, CSRF off, CORS por `app.cors.allowed-origins`.
   `/api/admin/**` → `hasRole('ADMIN')`; `/api/auth/**`, los GET del catálogo,
-  `GET /api/discounts`, `POST /api/orders` y Swagger → `permitAll`.
+  `GET /api/discounts`, `GET /api/settings`, `POST /api/orders` y Swagger → `permitAll`.
   401 y 403 responden con `ApiError` en JSON.
 
 ### Admin inicial y recuperación
@@ -229,8 +232,9 @@ stock.
 
 ## 8. DataSeeder
 
-`config/DataSeeder.java` (`CommandLineRunner`). El admin inicial se crea
-**siempre**; el resto solo si `SEED_ENABLED=true` **y** la tabla está vacía:
+`config/DataSeeder.java` (`CommandLineRunner`). El admin inicial y la fila de
+`site_settings` se crean **siempre** (get-or-create con los valores por defecto);
+el resto solo si `SEED_ENABLED=true` **y** la tabla está vacía:
 
 - **ParamGroups**: `grp-publico` (system) Bebé/Nena/Nene/Unisex, `grp-tipo`
   9 opciones, `grp-estacion` (multiple) 5 opciones — mismos ids que el front.
@@ -250,7 +254,7 @@ app no genera duplicados.
 
 | Archivo | Qué hace |
 |---|---|
-| `setup.sql` | **todo junto**: crea la base + las 14 tablas + la config base (admin, parametrías, escalas, descuentos). Es el de deploy. |
+| `setup.sql` | **todo junto**: crea la base + las 15 tablas + la config base (admin, `site_settings`, parametrías, escalas, descuentos). Es el de deploy. |
 | `schema.sql` | solo las tablas |
 | `seed.sql` | solo la config base (idempotente, `INSERT ... ON DUPLICATE KEY UPDATE`) |
 | `reset.sql` | drop + create de la base vacía |
@@ -312,3 +316,8 @@ regenerarlo).
    `AdminUser`, `POST /api/auth/recover` (frase de recuperación, sin email),
    `PUT /api/admin/account/password` y `/recovery`. Frase inicial
    `frase-de-recuperacion-cambiar`.
+7. **Datos del local configurables** (2026-09-08): entidad `SiteSettings` (fila
+   única `id='config'`), `GET /api/settings` (público) +
+   `GET`/`PUT /api/admin/settings`. La crea `DataSeeder` con los valores actuales
+   por defecto. Permite cambiar nombre de tienda, WhatsApp y redes sin
+   redesplegar. Tabla `site_settings` sumada a los scripts SQL.
