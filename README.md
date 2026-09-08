@@ -43,9 +43,22 @@ Credenciales del admin (para el login): por defecto `admin` / `cambiar-esta-clav
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-Al primer arranque, Hibernate crea el esquema y el `DataSeeder` carga
-parametrías, escalas de talle, descuentos y 10 productos de ejemplo.
-Para no sembrar: `SEED_ENABLED=false`.
+Al primer arranque, Hibernate crea el esquema (`ddl-auto=update`) y el
+`DataSeeder` carga parametrías, escalas de talle, descuentos y 10 productos de
+ejemplo. Para no sembrar: `SEED_ENABLED=false`.
+
+### Crear el esquema con scripts SQL (en vez de dejarlo a Hibernate)
+
+En `database/` hay scripts para armar la base a mano — útil para producción o
+para no depender de `ddl-auto`:
+
+```bash
+mysql -u root -p < database/schema.sql                    # crea la base + todas las tablas
+mysql -u root -p estilos_pequenos < database/seed.sql     # carga parametrías/escalas/descuentos
+```
+
+Si usás los scripts, corré la app con `--spring.jpa.hibernate.ddl-auto=validate`
+(chequea que el esquema coincida) o `none`. Ver `database/README.md`.
 
 ## Probar
 

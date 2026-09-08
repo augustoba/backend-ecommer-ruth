@@ -24,3 +24,7 @@ Thumbs.db
 
 ### Logs ###
 *.log
+
+### DB — schema crudo generado por Hibernate (usar schema.sql, el curado) ###
+database/schema.gen.sql
+database/*.local.sql
