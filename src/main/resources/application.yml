@@ -33,9 +33,10 @@ app:
     # En produccion: definir JWT_SECRET (>= 32 chars). El default es solo para desarrollo local.
     secret: ${JWT_SECRET:dev-secret-estilos-pequenos-cambiar-en-produccion-1234567890}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:720}
+  # Admin inicial: se siembra en la tabla admin_user (hasheado) si no hay ninguno.
   admin:
     username: ${ADMIN_USER:admin}
-    password: ${ADMIN_PASSWORD:cambiar-esta-clave}
+    password: ${ADMIN_PASSWORD:ruth123}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200,http://localhost:4300}
   seed:

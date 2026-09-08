@@ -2,12 +2,14 @@
 --  Estilos Pequeños — instalación completa de la base (MySQL 8)
 -- =============================================================================
 --  UN SOLO script: crea la base `estilos_pequenos`, todas las tablas y la
---  config base (parametrías, escalas de talle, descuentos). Es lo que se corre
---  en un servidor nuevo al desplegar.
+--  config base (admin, parametrías, escalas de talle, descuentos). Es lo que se
+--  corre en un servidor nuevo al desplegar.
 --
 --    mysql -u root -p < database/setup.sql
 --
 --  (o abrirlo en MySQL Workbench y ejecutarlo con el rayo ⚡)
+--
+--  Admin inicial:  usuario `admin`  /  contraseña `ruth123`  (hash BCrypt).
 --
 --  Es la concatenación de `schema.sql` + `seed.sql`. Si editás alguno de esos,
 --  regenerá este archivo:
@@ -42,6 +44,19 @@ CREATE DATABASE IF NOT EXISTS estilos_pequenos
 USE estilos_pequenos;
 
 SET FOREIGN_KEY_CHECKS = 0;
+
+-- ---------------------------------------------------------------------------
+--  Usuario del panel de administración (contraseña hasheada con BCrypt)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin_user (
+    id            VARCHAR(255) NOT NULL,
+    username      VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    enabled       BIT          NOT NULL,
+    created_at    DATETIME(6)  NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_admin_user_username UNIQUE (username)
+) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
 --  Parametrías (clasificación de prendas: público, tipo, estación…)
@@ -224,6 +239,17 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- =============================================================================
 
 USE estilos_pequenos;
+
+-- ---------------------------------------------------------------------------
+--  Admin inicial  →  usuario: admin   contraseña: ruth123
+--  El hash es BCrypt (cost 10). Para cambiar la clave: generá otro hash
+--  (ej. con la app: PasswordEncoder.encode("nueva")) y actualizá esta fila,
+--  o cambiala desde el panel cuando exista esa pantalla.
+-- ---------------------------------------------------------------------------
+INSERT INTO admin_user (id, username, password_hash, enabled, created_at) VALUES
+  ('seed-admin', 'admin',
+   '$2a$10$ZFLQwovN0/tK/ii7RXNC4eM9BIQNgqFdSysjNaSM6pK4CRMXeOL/G', 1, NOW(6))
+ON DUPLICATE KEY UPDATE username = username;
 
 -- ---------------------------------------------------------------------------
 --  Parametrías

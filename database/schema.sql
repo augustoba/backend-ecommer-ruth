@@ -26,6 +26,19 @@ USE estilos_pequenos;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ---------------------------------------------------------------------------
+--  Usuario del panel de administración (contraseña hasheada con BCrypt)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin_user (
+    id            VARCHAR(255) NOT NULL,
+    username      VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    enabled       BIT          NOT NULL,
+    created_at    DATETIME(6)  NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_admin_user_username UNIQUE (username)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
 --  Parametrías (clasificación de prendas: público, tipo, estación…)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS param_group (

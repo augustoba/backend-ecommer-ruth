@@ -16,6 +16,17 @@
 USE estilos_pequenos;
 
 -- ---------------------------------------------------------------------------
+--  Admin inicial  →  usuario: admin   contraseña: ruth123
+--  El hash es BCrypt (cost 10). Para cambiar la clave: generá otro hash
+--  (ej. con la app: PasswordEncoder.encode("nueva")) y actualizá esta fila,
+--  o cambiala desde el panel cuando exista esa pantalla.
+-- ---------------------------------------------------------------------------
+INSERT INTO admin_user (id, username, password_hash, enabled, created_at) VALUES
+  ('seed-admin', 'admin',
+   '$2a$10$ZFLQwovN0/tK/ii7RXNC4eM9BIQNgqFdSysjNaSM6pK4CRMXeOL/G', 1, NOW(6))
+ON DUPLICATE KEY UPDATE username = username;
+
+-- ---------------------------------------------------------------------------
 --  Parametrías
 -- ---------------------------------------------------------------------------
 INSERT INTO param_group (id, name, multiple, show_in_catalog, `system`, created_at) VALUES

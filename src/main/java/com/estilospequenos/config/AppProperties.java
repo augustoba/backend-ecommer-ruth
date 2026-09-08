@@ -24,11 +24,16 @@ public class AppProperties {
         private long expirationMinutes = 720;
     }
 
+    /**
+     * Credenciales del admin INICIAL: solo se usan para sembrar el primer
+     * usuario en la tabla `admin_user` (con la contraseña hasheada) si todavía
+     * no hay ninguno. Después el login valida contra la tabla, no contra esto.
+     */
     @Getter
     @Setter
     public static class Admin {
         private String username = "admin";
-        private String password = "cambiar-esta-clave";
+        private String password = "ruth123";
     }
 
     @Getter

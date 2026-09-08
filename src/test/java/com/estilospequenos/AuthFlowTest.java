@@ -1,5 +1,7 @@
 package com.estilospequenos;
 
+import com.estilospequenos.model.AdminUser;
+import com.estilospequenos.repository.AdminUserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -8,6 +10,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -20,6 +23,15 @@ class AuthFlowTest {
     MockMvc mvc;
     @Autowired
     ObjectMapper mapper;
+    @Autowired
+    AdminUserRepository adminUsers;
+
+    @Test
+    void adminUserIsSeededWithBcryptHash() {
+        AdminUser admin = adminUsers.findByUsername("admin").orElseThrow();
+        assertThat(admin.getPasswordHash()).startsWith("$2");           // BCrypt
+        assertThat(admin.getPasswordHash()).isNotEqualTo("test-pass");  // no en texto plano
+    }
 
     @Test
     void adminEndpointRequiresToken() throws Exception {

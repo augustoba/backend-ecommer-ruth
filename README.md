@@ -32,8 +32,18 @@ export JWT_SECRET=un-secreto-largo-de-al-menos-32-caracteres
 `src/main/resources/application-local.yml`, completá los valores, y corré con
 `-Dspring-boot.run.profiles=local`.
 
-Credenciales del admin (para el login): por defecto `admin` / `cambiar-esta-clave`
-(igual que el frontend). Override con `ADMIN_USER` / `ADMIN_PASSWORD`.
+### Usuario admin
+
+El login (`POST /api/auth/login`) valida contra la tabla **`admin_user`**, con la
+contraseña **hasheada con BCrypt**. Al primer arranque (o corriendo `setup.sql`)
+se siembra el admin inicial:
+
+- usuario: **`admin`**  ·  contraseña: **`ruth123`**
+
+Las variables `ADMIN_USER` / `ADMIN_PASSWORD` (o `app.admin.*`) **solo** definen
+ese usuario inicial: si la tabla ya tiene alguno, no se toca. Para cambiar la
+clave después: generá otro hash BCrypt y actualizá la fila (o desde el panel
+cuando exista esa pantalla).
 
 ## Correr
 
@@ -68,7 +78,7 @@ curl http://localhost:8080/api/products
 # login → token
 TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"cambiar-esta-clave"}' | jq -r .token)
+  -d '{"username":"admin","password":"ruth123"}' | jq -r .token)
 
 # endpoint admin con token
 curl http://localhost:8080/api/admin/products -H "Authorization: Bearer $TOKEN"
