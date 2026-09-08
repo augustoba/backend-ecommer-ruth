@@ -44,6 +44,7 @@ public class SecurityConfig {
                                 "/api/param-groups/**",
                                 "/api/size-scales/**",
                                 "/api/hero-slides/**",
+                                "/api/discounts",
                                 "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
                                 "/error"
                         ).permitAll()

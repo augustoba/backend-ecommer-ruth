@@ -41,6 +41,12 @@ public final class DiscountDtos {
         }
     }
 
+    /** Reglas de descuento para el catálogo público (calcula el preview del carrito). */
+    public record PublicDiscounts(
+            List<DiscountResponse> discounts,
+            DiscountConfig.CombineMode combineMode
+    ) {}
+
     /** Detalle de un descuento aplicado a un carrito. */
     public record BreakdownLine(String label, BigDecimal amount) {}
 
