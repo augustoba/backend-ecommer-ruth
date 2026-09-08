@@ -9,7 +9,9 @@
 --
 --  (o abrirlo en MySQL Workbench y ejecutarlo con el rayo ⚡)
 --
---  Admin inicial:  usuario `admin`  /  contraseña `ruth123`  (hash BCrypt).
+--  Admin inicial:  usuario `admin`  /  contraseña `ruth123`
+--                  frase de recuperación `frase-de-recuperacion-cambiar`
+--                  (todo cambiable desde /admin/cuenta)
 --
 --  Es la concatenación de `schema.sql` + `seed.sql`. Si editás alguno de esos,
 --  regenerá este archivo:
@@ -52,6 +54,7 @@ CREATE TABLE IF NOT EXISTS admin_user (
     id            VARCHAR(255) NOT NULL,
     username      VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    recovery_hash VARCHAR(255),                -- frase de recuperación (BCrypt)
     enabled       BIT          NOT NULL,
     created_at    DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
@@ -241,14 +244,16 @@ SET FOREIGN_KEY_CHECKS = 1;
 USE estilos_pequenos;
 
 -- ---------------------------------------------------------------------------
---  Admin inicial  →  usuario: admin   contraseña: ruth123
---  El hash es BCrypt (cost 10). Para cambiar la clave: generá otro hash
---  (ej. con la app: PasswordEncoder.encode("nueva")) y actualizá esta fila,
---  o cambiala desde el panel cuando exista esa pantalla.
+--  Admin inicial
+--    usuario: admin
+--    contraseña: ruth123
+--    frase de recuperación: frase-de-recuperacion-cambiar
+--  Los hash son BCrypt (cost 10). Cambiá contraseña y frase desde /admin/cuenta.
 -- ---------------------------------------------------------------------------
-INSERT INTO admin_user (id, username, password_hash, enabled, created_at) VALUES
+INSERT INTO admin_user (id, username, password_hash, recovery_hash, enabled, created_at) VALUES
   ('seed-admin', 'admin',
-   '$2a$10$ZFLQwovN0/tK/ii7RXNC4eM9BIQNgqFdSysjNaSM6pK4CRMXeOL/G', 1, NOW(6))
+   '$2a$10$ZFLQwovN0/tK/ii7RXNC4eM9BIQNgqFdSysjNaSM6pK4CRMXeOL/G',
+   '$2a$10$.eOoZ23Uu4k.1DEj1NpOLekpl.PdGxt9NRMaxGN8J.DPQcIgBdbaW', 1, NOW(6))
 ON DUPLICATE KEY UPDATE username = username;
 
 -- ---------------------------------------------------------------------------

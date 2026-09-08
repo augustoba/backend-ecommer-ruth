@@ -6,8 +6,9 @@ API REST del catálogo público y del panel de administración de **Estilos Pequ
 - Autenticación **JWT** para los endpoints del admin (`/api/admin/**`)
 - Docs interactivas: **Swagger UI** en `http://localhost:8080/swagger-ui.html`
 
-> El frontend Angular **todavía no está conectado** a este backend (sigue con
-> `localStorage`). Conectarlo es un paso aparte.
+> **Documento de detalle:** `PROYECTO.md` (entidades, endpoints, auth,
+> seeder, deploy, pendientes). Este README es el quick-start.
+> El frontend Angular consume esta API vía `/api/*` (proxy del dev-server).
 
 ## Requisitos
 
@@ -34,16 +35,21 @@ export JWT_SECRET=un-secreto-largo-de-al-menos-32-caracteres
 
 ### Usuario admin
 
-El login (`POST /api/auth/login`) valida contra la tabla **`admin_user`**, con la
+El login (`POST /api/auth/login`) valida contra la tabla **`admin_user`**, con
 contraseña **hasheada con BCrypt**. Al primer arranque (o corriendo `setup.sql`)
 se siembra el admin inicial:
 
-- usuario: **`admin`**  ·  contraseña: **`ruth123`**
+- usuario: **`admin`**  ·  contraseña: **`ruth123`**  ·  frase de recuperación: **`frase-de-recuperacion-cambiar`**
 
-Las variables `ADMIN_USER` / `ADMIN_PASSWORD` (o `app.admin.*`) **solo** definen
-ese usuario inicial: si la tabla ya tiene alguno, no se toca. Para cambiar la
-clave después: generá otro hash BCrypt y actualizá la fila (o desde el panel
-cuando exista esa pantalla).
+**Cambiá los tres** desde el panel (`/admin/cuenta`), o por env vars
+(`ADMIN_USER` / `ADMIN_PASSWORD` / `ADMIN_RECOVERY`) antes del primer arranque.
+
+- Si te olvidás la contraseña: `POST /api/auth/recover` con `{username,
+  recoveryPhrase, newPassword}` (pantalla `/admin/recuperar` en el front).
+- Si te olvidás las dos cosas: actualizá `password_hash`/`recovery_hash` de la
+  fila en la base con un hash BCrypt nuevo, o volvé a correr `database/seed.sql`.
+
+Detalle en `PROYECTO.md` §7.
 
 ## Correr
 

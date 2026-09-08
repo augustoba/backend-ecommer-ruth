@@ -1,6 +1,7 @@
 package com.estilospequenos.controller;
 
 import com.estilospequenos.config.JwtService;
+import com.estilospequenos.dto.AccountDtos.RecoverRequest;
 import com.estilospequenos.dto.LoginRequest;
 import com.estilospequenos.dto.TokenResponse;
 import com.estilospequenos.service.AuthService;
@@ -25,6 +26,17 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest req) {
         JwtService.TokenData data = authService.login(req.username(), req.password());
+        return ResponseEntity.ok(TokenResponse.bearer(data.token(), data.expiresAt()));
+    }
+
+    /**
+     * Recuperar la cuenta con la frase de recuperación. Setea la contraseña
+     * nueva y devuelve un JWT (queda logueado).
+     */
+    @PostMapping("/recover")
+    public ResponseEntity<TokenResponse> recover(@Valid @RequestBody RecoverRequest req) {
+        JwtService.TokenData data =
+                authService.recover(req.username(), req.recoveryPhrase(), req.newPassword());
         return ResponseEntity.ok(TokenResponse.bearer(data.token(), data.expiresAt()));
     }
 }

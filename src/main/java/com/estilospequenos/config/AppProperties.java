@@ -34,6 +34,8 @@ public class AppProperties {
     public static class Admin {
         private String username = "admin";
         private String password = "ruth123";
+        /** Frase de recuperación inicial (cambiala desde /admin/cuenta). */
+        private String recoveryPhrase = "frase-de-recuperacion-cambiar";
     }
 
     @Getter

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS admin_user (
     id            VARCHAR(255) NOT NULL,
     username      VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    recovery_hash VARCHAR(255),                -- frase de recuperación (BCrypt)
     enabled       BIT          NOT NULL,
     created_at    DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
