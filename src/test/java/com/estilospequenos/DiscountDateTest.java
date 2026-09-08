@@ -89,4 +89,50 @@ class DiscountDateTest {
                                 + "\"startsAt\":\"2026-12-01\",\"endsAt\":\"2026-01-01\"}"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void paymentDiscountAndFreeShippingAndStacking() throws Exception {
+        String jwt = token();
+        String scaleId = mapper.readTree(mvc.perform(get("/api/size-scales"))
+                .andReturn().getResponse().getContentAsString()).get(0).get("id").asText();
+        String productId = mapper.readTree(mvc.perform(post("/api/admin/products")
+                        .header("Authorization", "Bearer " + jwt).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"P pago\",\"description\":\"prueba pago\",\"price\":10000,"
+                                + "\"ageRange\":\"1\",\"images\":[\"https://x/a.jpg\"],\"sizeScaleId\":\"" + scaleId
+                                + "\",\"params\":{},\"sizeStocks\":[{\"size\":\"RN\",\"stock\":50}]}"))
+                .andReturn().getResponse().getContentAsString()).get("id").asText();
+
+        // descuento por pago: efectivo 10%, NO acumulable
+        mvc.perform(post("/api/admin/discounts").header("Authorization", "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"kind\":\"PAGO\",\"discountPercent\":10,\"paymentMethods\":[\"CASH\"],\"stackable\":false}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.kind").value("PAGO"))
+                .andExpect(jsonPath("$.paymentMethods[0]").value("CASH"));
+
+        // envío gratis a partir de $50.000, con detalle
+        mvc.perform(post("/api/admin/discounts").header("Authorization", "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"kind\":\"ENVIO_GRATIS\",\"discountPercent\":0,\"minAmount\":50000,"
+                                + "\"detail\":\"solo microcentro\"}"))
+                .andExpect(status().isCreated());
+
+        String items = "\"items\":[{\"productId\":\"" + productId + "\",\"size\":\"RN\",\"quantity\":10}]"; // subtotal 100.000
+
+        // sin elegir efectivo → no aplica el 10%
+        JsonNode noPay = mapper.readTree(mvc.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"customerName\":\"X\"," + items + "}"))
+                .andReturn().getResponse().getContentAsString());
+        assert noPay.get("discountAmount").asInt() == 20000
+                : "solo el descuento por monto ($100k → 20%)"; // seed-monto-100k
+
+        // efectivo + envío → 10% de pago gana al 20%? no: el de monto (20% de 100k = 20.000) es mayor.
+        // como el de pago es NO acumulable, se aplica el que más ahorra → 20.000. Y envío gratis va en la nota.
+        JsonNode paid = mapper.readTree(mvc.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"customerName\":\"X\"," + items + ",\"deliveryMethod\":\"SHIPPING\","
+                                + "\"shippingAddress\":\"Calle 1\",\"paymentMethod\":\"CASH\"}"))
+                .andReturn().getResponse().getContentAsString());
+        assert paid.get("discountAmount").asInt() == 20000 : "gana el mejor descuento (monto 20%)";
+        assert paid.get("freeShippingNote").asText().contains("microcentro") : "la nota de envío gratis";
+    }
 }

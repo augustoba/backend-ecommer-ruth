@@ -73,6 +73,12 @@ public class ProductService {
         return repo.save(p);
     }
 
+    public Product setDiscontinued(String id, boolean discontinued) {
+        Product p = get(id);
+        p.setDiscontinued(discontinued);
+        return repo.save(p);
+    }
+
     public Product setStock(String id, String size, int stock) {
         Product p = get(id);
         int clamped = Math.max(0, stock);
@@ -113,6 +119,7 @@ public class ProductService {
         }
 
         p.setActive(req.active() == null || req.active());
+        p.setDiscontinued(req.discontinued() != null && req.discontinued());
         p.setSizeScaleId(blankToNull(req.sizeScaleId()));
         p.setSupplierId(blankToNull(req.supplierId()));
         p.setCostPrice(req.costPrice() != null && req.costPrice().signum() > 0 ? req.costPrice() : null);

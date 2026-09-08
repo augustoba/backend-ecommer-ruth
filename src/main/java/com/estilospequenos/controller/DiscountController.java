@@ -1,7 +1,5 @@
 package com.estilospequenos.controller;
 
-import com.estilospequenos.dto.DiscountDtos.ConfigRequest;
-import com.estilospequenos.dto.DiscountDtos.ConfigResponse;
 import com.estilospequenos.dto.DiscountDtos.DiscountRequest;
 import com.estilospequenos.dto.DiscountDtos.DiscountResponse;
 import com.estilospequenos.dto.DiscountDtos.PublicDiscounts;
@@ -24,9 +22,7 @@ public class DiscountController {
     /** Público: reglas de descuento para el preview del carrito. */
     @GetMapping("/api/discounts")
     public PublicDiscounts publicDiscounts() {
-        return new PublicDiscounts(
-                service.findAll().stream().map(DiscountResponse::from).toList(),
-                service.getConfig().getCombineMode());
+        return new PublicDiscounts(service.findAll().stream().map(DiscountResponse::from).toList());
     }
 
     // --- Admin ---
@@ -50,15 +46,5 @@ public class DiscountController {
     public ResponseEntity<Void> delete(@PathVariable String id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/api/admin/discounts/config")
-    public ConfigResponse getConfig() {
-        return ConfigResponse.from(service.getConfig());
-    }
-
-    @PutMapping("/api/admin/discounts/config")
-    public ConfigResponse setConfig(@Valid @RequestBody ConfigRequest req) {
-        return ConfigResponse.from(service.setConfig(req));
     }
 }

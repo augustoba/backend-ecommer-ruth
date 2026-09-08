@@ -48,6 +48,15 @@ public class Product {
     @Column(nullable = false)
     private boolean active = true;
 
+    /**
+     * true = el dueño/a decidió no reponer más este producto. Se sigue vendiendo
+     * mientras tenga stock (no cambia `active`), pero deja de aparecer en las
+     * alertas de "por reponer". Se cambia desde la lista de reposición del panel
+     * o editando el producto.
+     */
+    @Column(nullable = false)
+    private boolean discontinued = false;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 

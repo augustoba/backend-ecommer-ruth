@@ -29,6 +29,8 @@ public final class ProductDtos {
             /** Fotos del producto, en orden. La primera es la portada. Al menos una. */
             @NotEmpty List<@NotBlank String> images,
             Boolean active,
+            /** true = no se repone más (deja de aparecer en "por reponer"). */
+            Boolean discontinued,
             String sizeScaleId,
             String supplierId,
             BigDecimal costPrice,
@@ -42,6 +44,8 @@ public final class ProductDtos {
 
     public record ActivePatch(@NotNull Boolean active) {}
 
+    public record DiscontinuedPatch(@NotNull Boolean discontinued) {}
+
     public record ProductResponse(
             String id,
             String name,
@@ -53,6 +57,7 @@ public final class ProductDtos {
             /** Todas las fotos, en orden. */
             List<String> images,
             boolean active,
+            boolean discontinued,
             Instant createdAt,
             String sizeScaleId,
             String supplierId,
@@ -71,9 +76,9 @@ public final class ProductDtos {
                     .toList();
             return new ProductResponse(
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
-                    p.getImageUrl(), List.copyOf(p.getImages()), p.isActive(), p.getCreatedAt(),
-                    p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(), p.getLowStockThreshold(),
-                    params, stocks);
+                    p.getImageUrl(), List.copyOf(p.getImages()), p.isActive(), p.isDiscontinued(),
+                    p.getCreatedAt(), p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(),
+                    p.getLowStockThreshold(), params, stocks);
         }
     }
 }

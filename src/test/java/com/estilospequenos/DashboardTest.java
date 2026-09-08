@@ -59,4 +59,36 @@ class DashboardTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
     }
+
+    @Test
+    void discontinuedProductDropsOutOfLowStock() throws Exception {
+        String jwt = token();
+
+        String body = "{\"name\":\"Prenda a discontinuar\",\"description\":\"Descripcion de prueba\","
+                + "\"price\":9999,\"ageRange\":\"2 a 4\",\"images\":[\"https://x/a.jpg\"],"
+                + "\"params\":{},\"sizeStocks\":[{\"size\":\"2\",\"stock\":1}]}";
+        String created = mvc.perform(post("/api/admin/products").header("Authorization", "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String id = mapper.readTree(created).get("id").asText();
+
+        // stock 1 <= 3 → aparece en la lista de reposición
+        String before = mvc.perform(get("/api/admin/low-stock").header("Authorization", "Bearer " + jwt))
+                .andReturn().getResponse().getContentAsString();
+        assert before.contains(id);
+
+        // marcar "no reponer"
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/admin/products/" + id + "/discontinued")
+                        .header("Authorization", "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"discontinued\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.discontinued").value(true));
+
+        // ya no aparece, aunque sigue con stock bajo y activo
+        String after = mvc.perform(get("/api/admin/low-stock").header("Authorization", "Bearer " + jwt))
+                .andReturn().getResponse().getContentAsString();
+        assert !after.contains(id);
+    }
 }

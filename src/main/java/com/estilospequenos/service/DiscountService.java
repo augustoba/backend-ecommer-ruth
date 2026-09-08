@@ -4,11 +4,11 @@ import com.estilospequenos.common.BadRequestException;
 import com.estilospequenos.common.ResourceNotFoundException;
 import com.estilospequenos.dto.DiscountDtos.BreakdownLine;
 import com.estilospequenos.dto.DiscountDtos.CartDiscountResult;
-import com.estilospequenos.dto.DiscountDtos.ConfigRequest;
 import com.estilospequenos.dto.DiscountDtos.DiscountRequest;
+import com.estilospequenos.dto.DiscountDtos.FreeShipping;
+import com.estilospequenos.model.DeliveryMethod;
 import com.estilospequenos.model.Discount;
-import com.estilospequenos.model.DiscountConfig;
-import com.estilospequenos.repository.DiscountConfigRepository;
+import com.estilospequenos.model.PaymentMethod;
 import com.estilospequenos.repository.DiscountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,19 +18,24 @@ import java.math.RoundingMode;
 import java.util.*;
 
 /**
- * Descuentos por monto y por parametría. Es el port de
+ * Descuentos configurables. Es el port de
  * `frontend/src/app/core/services/discount.service.ts` (`computeCartDiscount`).
+ *
+ * Reglas de combinación:
+ *  - Si TODOS los descuentos que aplican son acumulables → se combinan
+ *    (compuestos: parámetro por ítem, luego monto, luego pago, cada uno sobre lo
+ *    que va quedando — le da al vendedor el menor descuento posible).
+ *  - Si hay al menos uno NO acumulable → se aplica sólo el que más ahorra.
+ *  - ENVIO_GRATIS es aparte: informativo, no descuenta plata.
  */
 @Service
 @Transactional
 public class DiscountService {
 
     private final DiscountRepository repo;
-    private final DiscountConfigRepository configRepo;
 
-    public DiscountService(DiscountRepository repo, DiscountConfigRepository configRepo) {
+    public DiscountService(DiscountRepository repo) {
         this.repo = repo;
-        this.configRepo = configRepo;
     }
 
     // --- CRUD ---
@@ -66,34 +71,28 @@ public class DiscountService {
         if (req.startsAt() != null && req.endsAt() != null && req.startsAt().isAfter(req.endsAt())) {
             throw new BadRequestException("La fecha 'desde' no puede ser posterior a 'hasta'.");
         }
-        d.setKind(req.kind());
-        d.setDiscountPercent(req.discountPercent());
+        Discount.Kind kind = req.kind();
+        d.setKind(kind);
+        d.setDiscountPercent(kind == Discount.Kind.ENVIO_GRATIS ? 0 : req.discountPercent());
         d.setEnabled(req.enabled() == null || req.enabled());
-        d.setLabel(req.label() == null || req.label().isBlank() ? null : req.label().trim());
+        d.setStackable(Boolean.TRUE.equals(req.stackable()));
+        d.setLabel(blankToNull(req.label()));
+        d.setDetail(blankToNull(req.detail()));
         d.setStartsAt(req.startsAt());
         d.setEndsAt(req.endsAt());
-        d.setMinAmount(req.kind() == Discount.Kind.MONTO ? req.minAmount() : null);
-        d.setGroupId(req.kind() == Discount.Kind.PARAMETRO ? req.groupId() : null);
-        d.setOptionId(req.kind() == Discount.Kind.PARAMETRO ? req.optionId() : null);
+        d.setMinAmount(kind == Discount.Kind.MONTO || kind == Discount.Kind.ENVIO_GRATIS ? req.minAmount() : null);
+        d.setGroupId(kind == Discount.Kind.PARAMETRO ? req.groupId() : null);
+        d.setOptionId(kind == Discount.Kind.PARAMETRO ? req.optionId() : null);
+        d.setPaymentMethodSet(kind == Discount.Kind.PAGO && req.paymentMethods() != null
+                ? EnumSet.copyOf(req.paymentMethods().isEmpty()
+                    ? EnumSet.noneOf(PaymentMethod.class) : req.paymentMethods())
+                : null);
     }
 
-    /** Descuentos de un tipo que hoy están vigentes (enabled + rango de fechas). */
     private List<Discount> activeOfKind(Discount.Kind kind) {
         return repo.findAll().stream()
                 .filter(d -> d.getKind() == kind && d.activeNow())
                 .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public DiscountConfig getConfig() {
-        return configRepo.findById(DiscountConfig.SINGLETON_ID)
-                .orElseGet(() -> configRepo.save(new DiscountConfig()));
-    }
-
-    public DiscountConfig setConfig(ConfigRequest req) {
-        DiscountConfig c = getConfig();
-        c.setCombineMode(req.combineMode());
-        return configRepo.save(c);
     }
 
     // --- Cálculo ---
@@ -101,23 +100,27 @@ public class DiscountService {
     /** Un ítem del carrito para el cálculo de descuentos. */
     public record CartLineInput(BigDecimal unitPrice, int quantity, Map<String, List<String>> params) {}
 
+    /** Un descuento que aplica al carrito, con el monto que ahorraría si fuera solo (sobre el subtotal). */
+    private record Instance(Discount discount, BigDecimal standaloneAmount, String breakdownLabel) {}
+
     @Transactional(readOnly = true)
-    public CartDiscountResult computeForLines(List<CartLineInput> items) {
+    public CartDiscountResult computeForLines(List<CartLineInput> items,
+                                              PaymentMethod paymentMethod, DeliveryMethod deliveryMethod) {
         BigDecimal subtotal = items.stream()
                 .map(i -> i.unitPrice().multiply(BigDecimal.valueOf(i.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        FreeShipping freeShipping = freeShippingFor(subtotal, deliveryMethod);
+
         if (subtotal.signum() <= 0) {
-            return new CartDiscountResult(0, BigDecimal.ZERO, List.of());
+            return new CartDiscountResult(0, BigDecimal.ZERO, List.of(), freeShipping);
         }
 
+        // --- Descuento por parámetro: por ítem, el % más alto que aplica ---
         List<Discount> paramDiscounts = activeOfKind(Discount.Kind.PARAMETRO).stream()
                 .filter(d -> d.getGroupId() != null && d.getOptionId() != null)
                 .toList();
-
-        // 1) Descuento por parámetro, por ítem (el % más alto que aplica).
         Map<String, BigDecimal> paramByDiscountId = new LinkedHashMap<>();
-        BigDecimal paramTotal = BigDecimal.ZERO;
         for (CartLineInput item : items) {
             BigDecimal lineTotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
             int bestPct = 0;
@@ -131,35 +134,64 @@ public class DiscountService {
                 }
             }
             if (bestId != null && bestPct > 0) {
-                BigDecimal amount = pctOf(lineTotal, bestPct);
-                paramTotal = paramTotal.add(amount);
-                paramByDiscountId.merge(bestId, amount, BigDecimal::add);
+                paramByDiscountId.merge(bestId, pctOf(lineTotal, bestPct), BigDecimal::add);
             }
         }
 
-        DiscountConfig.CombineMode mode = getConfig().getCombineMode();
+        // --- Instancias de descuento de plata (parámetro, monto, pago) ---
+        List<Instance> instances = new ArrayList<>();
+        paramByDiscountId.forEach((id, amount) -> {
+            if (amount.signum() > 0) {
+                Discount d = repo.findById(id).orElse(null);
+                if (d != null) instances.add(new Instance(d, amount, paramLabel(d)));
+            }
+        });
 
-        // 2) Descuento por monto.
-        BigDecimal amountBase = mode == DiscountConfig.CombineMode.COMBINAR
-                ? subtotal.subtract(paramTotal) : subtotal;
-        Discount amountTier = bestAmountTierFor(amountBase);
-        BigDecimal amountValue = amountTier != null
-                ? pctOf(amountBase, amountTier.getDiscountPercent()) : BigDecimal.ZERO;
+        Discount amountTier = bestAmountTierFor(subtotal);
+        if (amountTier != null) {
+            instances.add(new Instance(amountTier, pctOf(subtotal, amountTier.getDiscountPercent()),
+                    amountLabel(amountTier)));
+        }
 
-        // 3) Combinar.
+        if (paymentMethod != null) {
+            for (Discount d : activeOfKind(Discount.Kind.PAGO)) {
+                if (d.paymentMethodSet().contains(paymentMethod) && d.getDiscountPercent() > 0) {
+                    instances.add(new Instance(d, pctOf(subtotal, d.getDiscountPercent()), pagoLabel(d)));
+                }
+            }
+        }
+
         List<BreakdownLine> breakdown = new ArrayList<>();
         BigDecimal discountAmount;
 
-        if (mode == DiscountConfig.CombineMode.COMBINAR) {
-            addParamLines(breakdown, paramByDiscountId);
-            addAmountLine(breakdown, amountTier, amountValue);
-            discountAmount = paramTotal.add(amountValue);
-        } else if (paramTotal.compareTo(amountValue) >= 0) {
-            addParamLines(breakdown, paramByDiscountId);
-            discountAmount = paramTotal;
+        if (instances.isEmpty()) {
+            discountAmount = BigDecimal.ZERO;
+        } else if (instances.stream().allMatch(i -> i.discount().isStackable())) {
+            // Todos acumulables → combinar en cascada (menor descuento total).
+            discountAmount = BigDecimal.ZERO;
+            BigDecimal remaining = subtotal;
+            // orden: parámetro, monto, pago
+            instances.sort(Comparator.comparingInt(i -> switch (i.discount().getKind()) {
+                case PARAMETRO -> 0; case MONTO -> 1; default -> 2;
+            }));
+            for (Instance inst : instances) {
+                // % efectivo del descuento sobre el subtotal, aplicado a lo que queda
+                BigDecimal step = remaining
+                        .multiply(inst.standaloneAmount())
+                        .divide(subtotal, 0, RoundingMode.HALF_UP);
+                if (step.signum() > 0) {
+                    breakdown.add(new BreakdownLine(inst.breakdownLabel(), step, inst.discount().getDetail()));
+                    discountAmount = discountAmount.add(step);
+                    remaining = remaining.subtract(step);
+                }
+            }
         } else {
-            addAmountLine(breakdown, amountTier, amountValue);
-            discountAmount = amountValue;
+            // Hay al menos uno no acumulable → sólo el que más ahorra.
+            Instance best = instances.stream()
+                    .max(Comparator.comparing(Instance::standaloneAmount))
+                    .orElseThrow();
+            discountAmount = best.standaloneAmount();
+            breakdown.add(new BreakdownLine(best.breakdownLabel(), discountAmount, best.discount().getDetail()));
         }
 
         discountAmount = discountAmount.min(subtotal);
@@ -168,7 +200,17 @@ public class DiscountService {
                     .divide(subtotal, 0, RoundingMode.HALF_UP).intValue()
                 : 0;
 
-        return new CartDiscountResult(discountPercent, discountAmount, breakdown);
+        return new CartDiscountResult(discountPercent, discountAmount, breakdown, freeShipping);
+    }
+
+    private FreeShipping freeShippingFor(BigDecimal subtotal, DeliveryMethod deliveryMethod) {
+        if (deliveryMethod != DeliveryMethod.SHIPPING) return null;
+        return activeOfKind(Discount.Kind.ENVIO_GRATIS).stream()
+                .filter(d -> d.getMinAmount() != null && subtotal.compareTo(d.getMinAmount()) >= 0)
+                .max(Comparator.comparing(Discount::getMinAmount))
+                .map(d -> new FreeShipping(
+                        d.getLabel() != null ? d.getLabel() : "Envío gratis", d.getDetail()))
+                .orElse(null);
     }
 
     private Discount bestAmountTierFor(BigDecimal base) {
@@ -189,22 +231,14 @@ public class DiscountService {
                 .orElse(null);
     }
 
-    private void addParamLines(List<BreakdownLine> breakdown, Map<String, BigDecimal> byId) {
-        byId.forEach((id, amount) -> {
-            if (amount.signum() > 0) {
-                Discount d = repo.findById(id).orElse(null);
-                breakdown.add(new BreakdownLine(paramLabel(d), amount));
-            }
-        });
+    private static String amountLabel(Discount d) {
+        if (d.getLabel() != null) return d.getLabel();
+        return "Compra mayor a $" + d.getMinAmount().toBigInteger() + " (" + d.getDiscountPercent() + "%)";
     }
 
-    private void addAmountLine(List<BreakdownLine> breakdown, Discount tier, BigDecimal value) {
-        if (tier != null && value.signum() > 0) {
-            breakdown.add(new BreakdownLine(
-                    "Compra mayor a $" + tier.getMinAmount().toBigInteger()
-                            + " (" + tier.getDiscountPercent() + "%)",
-                    value));
-        }
+    private static String pagoLabel(Discount d) {
+        if (d.getLabel() != null) return d.getLabel();
+        return "Descuento por medio de pago (" + d.getDiscountPercent() + "%)";
     }
 
     private static String paramLabel(Discount d) {
@@ -216,5 +250,9 @@ public class DiscountService {
     private static BigDecimal pctOf(BigDecimal base, int percent) {
         return base.multiply(BigDecimal.valueOf(percent))
                 .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+    }
+
+    private static String blankToNull(String v) {
+        return (v == null || v.isBlank()) ? null : v.trim();
     }
 }

@@ -6,6 +6,7 @@ import com.estilospequenos.dto.DiscountDtos.CartDiscountResult;
 import com.estilospequenos.dto.OrderDtos.CartItem;
 import com.estilospequenos.dto.OrderDtos.CreateOrderRequest;
 import com.estilospequenos.dto.OrderDtos.LineAcceptance;
+import com.estilospequenos.model.DeliveryMethod;
 import com.estilospequenos.model.Order;
 import com.estilospequenos.model.OrderLine;
 import com.estilospequenos.model.OrderStatus;
@@ -103,6 +104,20 @@ public class OrderService {
         order.setCreatedAt(Instant.now());
         order.setStatus(OrderStatus.PENDIENTE);
 
+        DeliveryMethod delivery = req.deliveryMethod() != null ? req.deliveryMethod() : DeliveryMethod.PICKUP;
+        order.setDeliveryMethod(delivery);
+        order.setPaymentMethod(req.paymentMethod());
+        if (delivery == DeliveryMethod.SHIPPING) {
+            String addr = req.shippingAddress() != null ? req.shippingAddress().trim() : "";
+            if (addr.isEmpty()) {
+                throw new BadRequestException("Elegiste envío a domicilio: falta la dirección.");
+            }
+            order.setShippingAddress(addr);
+            order.setShippingReference(blankToNull(req.shippingReference()));
+            order.setShippingLat(req.shippingLat());
+            order.setShippingLng(req.shippingLng());
+        }
+
         List<CartLineInput> discountInput = new ArrayList<>();
         for (CartItem item : req.items()) {
             Product p = productRepo.findById(item.productId())
@@ -125,12 +140,27 @@ public class OrderService {
                 .map(l -> l.getUnitPrice().multiply(BigDecimal.valueOf(l.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        CartDiscountResult discount = discountService.computeForLines(discountInput);
+        CartDiscountResult discount =
+                discountService.computeForLines(discountInput, order.getPaymentMethod(), delivery);
 
         order.setSubtotal(subtotal);
         order.setDiscountPercent(discount.discountPercent());
         order.setDiscountAmount(discount.discountAmount());
         order.setTotal(subtotal.subtract(discount.discountAmount()));
+        String notes = discount.breakdown().stream()
+                .map(com.estilospequenos.dto.DiscountDtos.BreakdownLine::detail)
+                .filter(s -> s != null && !s.isBlank())
+                .distinct()
+                .reduce((a, b) -> a + "; " + b)
+                .orElse(null);
+        order.setDiscountNote(notes);
+        if (discount.freeShipping() != null) {
+            String note = discount.freeShipping().label();
+            if (discount.freeShipping().detail() != null) {
+                note += " — " + discount.freeShipping().detail();
+            }
+            order.setFreeShippingNote(note);
+        }
 
         return repo.save(order);
     }
@@ -199,6 +229,10 @@ public class OrderService {
         order.setStatus(OrderStatus.CANCELADO);
         order.setProcessedAt(Instant.now());
         return repo.save(order);
+    }
+
+    private static String blankToNull(String v) {
+        return (v == null || v.isBlank()) ? null : v.trim();
     }
 
     private static Map<String, List<String>> paramsOf(Product p) {

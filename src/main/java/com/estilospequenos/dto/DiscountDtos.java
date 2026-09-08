@@ -1,7 +1,7 @@
 package com.estilospequenos.dto;
 
 import com.estilospequenos.model.Discount;
-import com.estilospequenos.model.DiscountConfig;
+import com.estilospequenos.model.PaymentMethod;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -18,25 +18,29 @@ public final class DiscountDtos {
             @NotNull Discount.Kind kind,
             @Min(0) @Max(100) int discountPercent,
             Boolean enabled,
+            Boolean stackable,
             String label,
+            String detail,
             LocalDate startsAt,
             LocalDate endsAt,
             BigDecimal minAmount,
             String groupId,
-            String optionId
+            String optionId,
+            List<PaymentMethod> paymentMethods
     ) {}
 
     public record DiscountResponse(
-            String id, Discount.Kind kind, int discountPercent, boolean enabled,
-            String label, LocalDate startsAt, LocalDate endsAt,
+            String id, Discount.Kind kind, int discountPercent, boolean enabled, boolean stackable,
+            String label, String detail, LocalDate startsAt, LocalDate endsAt,
             /** ACTIVO | PROGRAMADO | VENCIDO | DESHABILITADO — con la fecha del servidor. */
             String status,
-            BigDecimal minAmount, String groupId, String optionId
+            BigDecimal minAmount, String groupId, String optionId, List<PaymentMethod> paymentMethods
     ) {
         public static DiscountResponse from(Discount d) {
             return new DiscountResponse(d.getId(), d.getKind(), d.getDiscountPercent(), d.isEnabled(),
-                    d.getLabel(), d.getStartsAt(), d.getEndsAt(), status(d),
-                    d.getMinAmount(), d.getGroupId(), d.getOptionId());
+                    d.isStackable(), d.getLabel(), d.getDetail(), d.getStartsAt(), d.getEndsAt(), status(d),
+                    d.getMinAmount(), d.getGroupId(), d.getOptionId(),
+                    d.paymentMethodSet().stream().toList());
         }
 
         private static String status(Discount d) {
@@ -48,26 +52,19 @@ public final class DiscountDtos {
         }
     }
 
-    public record ConfigRequest(@NotNull DiscountConfig.CombineMode combineMode) {}
-
-    public record ConfigResponse(DiscountConfig.CombineMode combineMode) {
-        public static ConfigResponse from(DiscountConfig c) {
-            return new ConfigResponse(c.getCombineMode());
-        }
-    }
-
     /** Reglas de descuento para el catálogo público (calcula el preview del carrito). */
-    public record PublicDiscounts(
-            List<DiscountResponse> discounts,
-            DiscountConfig.CombineMode combineMode
-    ) {}
+    public record PublicDiscounts(List<DiscountResponse> discounts) {}
 
     /** Detalle de un descuento aplicado a un carrito. */
-    public record BreakdownLine(String label, BigDecimal amount) {}
+    public record BreakdownLine(String label, BigDecimal amount, String detail) {}
+
+    /** "Envío gratis" (informativo, no descuenta plata). */
+    public record FreeShipping(String label, String detail) {}
 
     public record CartDiscountResult(
             int discountPercent,
             BigDecimal discountAmount,
-            List<BreakdownLine> breakdown
+            List<BreakdownLine> breakdown,
+            FreeShipping freeShipping
     ) {}
 }

@@ -43,6 +43,36 @@ public class Order {
     @Column(nullable = false, length = 20)
     private OrderStatus status = OrderStatus.PENDIENTE;
 
+    /** Entrega elegida por el cliente. Los pedidos viejos quedan en PICKUP. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private DeliveryMethod deliveryMethod = DeliveryMethod.PICKUP;
+
+    /** Dirección de envío normalizada (solo si deliveryMethod = SHIPPING). */
+    @Column(length = 500)
+    private String shippingAddress;
+
+    /** Aclaración/referencia de la dirección (piso, depto, entre calles…). */
+    @Column(length = 500)
+    private String shippingReference;
+
+    /** Coordenadas del pin confirmado en el mapa (para abrir en Google Maps). */
+    private Double shippingLat;
+    private Double shippingLng;
+
+    /** Medio de pago elegido por el cliente. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private PaymentMethod paymentMethod;
+
+    /** Si al crear el pedido aplicaba "envío gratis": el texto para mostrarle al cliente. null = no. */
+    @Column(length = 300)
+    private String freeShippingNote;
+
+    /** Letra chica de los descuentos aplicados (ej: "solo microcentro"), unida con "; ". */
+    @Column(length = 500)
+    private String discountNote;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 

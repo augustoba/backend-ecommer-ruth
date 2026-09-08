@@ -2,6 +2,7 @@ package com.estilospequenos.controller;
 
 import com.estilospequenos.dto.PageResponse;
 import com.estilospequenos.dto.ProductDtos.ActivePatch;
+import com.estilospequenos.dto.ProductDtos.DiscontinuedPatch;
 import com.estilospequenos.dto.ProductDtos.ProductRequest;
 import com.estilospequenos.dto.ProductDtos.ProductResponse;
 import com.estilospequenos.dto.ProductDtos.StockPatch;
@@ -71,6 +72,11 @@ public class ProductController {
     @PatchMapping("/api/admin/products/{id}/active")
     public ProductResponse setActive(@PathVariable String id, @Valid @RequestBody ActivePatch body) {
         return ProductResponse.from(service.setActive(id, body.active()));
+    }
+
+    @PatchMapping("/api/admin/products/{id}/discontinued")
+    public ProductResponse setDiscontinued(@PathVariable String id, @Valid @RequestBody DiscontinuedPatch body) {
+        return ProductResponse.from(service.setDiscontinued(id, body.discontinued()));
     }
 
     @PatchMapping("/api/admin/products/{id}/stock")

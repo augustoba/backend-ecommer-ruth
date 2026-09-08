@@ -29,12 +29,24 @@ SET FOREIGN_KEY_CHECKS = 0;
 --  Datos del local (una sola fila, editable desde el panel)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS site_settings (
-    id              VARCHAR(255)  NOT NULL,   -- siempre 'config'
-    store_name      VARCHAR(255)  NOT NULL,
-    whatsapp_number VARCHAR(255)  NOT NULL,
-    about_text      VARCHAR(2000),
-    instagram       VARCHAR(255),
-    facebook_url    VARCHAR(255),
+    id               VARCHAR(255)  NOT NULL,   -- siempre 'config'
+    store_name       VARCHAR(255)  NOT NULL,
+    whatsapp_number  VARCHAR(255)  NOT NULL,
+    about_text       VARCHAR(2000),
+    instagram        VARCHAR(255),
+    facebook_url     VARCHAR(255),
+    logo_url         MEDIUMTEXT,               -- logo del negocio (URL o data URI); null = logo.jpeg
+    whatsapp_intro   VARCHAR(2000),            -- saludo del mensaje de pedido; null = texto por defecto
+    whatsapp_closing VARCHAR(2000),            -- cierre del mensaje de pedido; null = texto por defecto
+    store_address    VARCHAR(500),             -- dirección del local (opción "retiro")
+    payment_transfer_enabled     BIT NOT NULL DEFAULT 0,
+    payment_transfer_alias       VARCHAR(200),
+    payment_qr_transfer_enabled  BIT NOT NULL DEFAULT 0,
+    payment_qr_transfer_image    MEDIUMTEXT,
+    payment_qr_card_enabled      BIT NOT NULL DEFAULT 0,
+    payment_qr_card_image        MEDIUMTEXT,
+    payment_card_link            VARCHAR(1000),
+    payment_cash_enabled         BIT NOT NULL DEFAULT 0,
     PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
@@ -118,6 +130,7 @@ CREATE TABLE IF NOT EXISTS product (
     price         DECIMAL(12,2)  NOT NULL,
     age_range     VARCHAR(255)   NOT NULL,
     active        BIT            NOT NULL,
+    discontinued  BIT            NOT NULL DEFAULT 0,   -- "no reponer": sale de las alertas de stock bajo
     created_at    DATETIME(6)    NOT NULL,
     size_scale_id VARCHAR(255),
     supplier_id   VARCHAR(255),
@@ -161,21 +174,18 @@ CREATE TABLE IF NOT EXISTS product_size_stock (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS discount (
     id               VARCHAR(255) NOT NULL,
-    kind             ENUM('MONTO','PARAMETRO') NOT NULL,
+    kind             ENUM('MONTO','PARAMETRO','PAGO','ENVIO_GRATIS') NOT NULL,
     discount_percent INTEGER      NOT NULL,
     enabled          BIT          NOT NULL,
+    stackable        BIT          NOT NULL DEFAULT 0,   -- acumulable con otros descuentos
     label            VARCHAR(255),
+    detail           VARCHAR(300),           -- letra chica configurable (ej: "solo microcentro")
     starts_at        DATE,                   -- vigencia opcional (inclusive)
     ends_at          DATE,                   -- vigencia opcional (inclusive)
-    min_amount       DECIMAL(38,2),          -- kind = MONTO
+    min_amount       DECIMAL(38,2),          -- kind = MONTO o ENVIO_GRATIS
     group_id         VARCHAR(255),           -- kind = PARAMETRO
     option_id        VARCHAR(255),           -- kind = PARAMETRO
-    PRIMARY KEY (id)
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS discount_config (
-    id           VARCHAR(255) NOT NULL,      -- siempre 'config' (fila única)
-    combine_mode ENUM('COMBINAR','MEJOR') NOT NULL,
+    payment_methods  VARCHAR(100),           -- kind = PAGO ("TRANSFER,CASH")
     PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
@@ -191,6 +201,14 @@ CREATE TABLE IF NOT EXISTS orders (
     discount_amount  DECIMAL(12,2) NOT NULL,
     total            DECIMAL(12,2) NOT NULL,
     status           ENUM('CANCELADO','PENDIENTE','PROCESADO') NOT NULL,
+    delivery_method  ENUM('PICKUP','SHIPPING') NOT NULL DEFAULT 'PICKUP',
+    shipping_address    VARCHAR(500),
+    shipping_reference  VARCHAR(500),
+    shipping_lat     DOUBLE,
+    shipping_lng     DOUBLE,
+    payment_method   ENUM('TRANSFER','QR_TRANSFER','QR_CARD','CASH'),
+    free_shipping_note VARCHAR(300),
+    discount_note      VARCHAR(500),
     created_at       DATETIME(6)   NOT NULL,
     processed_at     DATETIME(6),
     PRIMARY KEY (id),

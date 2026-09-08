@@ -1,12 +1,15 @@
 package com.estilospequenos.dto;
 
+import com.estilospequenos.model.DeliveryMethod;
 import com.estilospequenos.model.Order;
 import com.estilospequenos.model.OrderLine;
 import com.estilospequenos.model.OrderStatus;
+import com.estilospequenos.model.PaymentMethod;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -26,7 +29,14 @@ public final class OrderDtos {
 
     public record CreateOrderRequest(
             String customerName,
-            @NotEmpty List<CartItem> items
+            @NotEmpty List<CartItem> items,
+            /** null = PICKUP (compat con clientes viejos). */
+            DeliveryMethod deliveryMethod,
+            @Size(max = 500) String shippingAddress,
+            @Size(max = 500) String shippingReference,
+            Double shippingLat,
+            Double shippingLng,
+            PaymentMethod paymentMethod
     ) {}
 
     public record LineAcceptance(@NotBlank String lineId, @NotNull Boolean accepted) {}
@@ -49,6 +59,9 @@ public final class OrderDtos {
             String id, String code, String customerName,
             BigDecimal subtotal, int discountPercent, BigDecimal discountAmount, BigDecimal total,
             OrderStatus status, Instant createdAt, Instant processedAt,
+            DeliveryMethod deliveryMethod, String shippingAddress, String shippingReference,
+            Double shippingLat, Double shippingLng, PaymentMethod paymentMethod,
+            String freeShippingNote, String discountNote,
             List<OrderLineResponse> lines
     ) {
         public static OrderResponse from(Order o) {
@@ -56,6 +69,9 @@ public final class OrderDtos {
                     o.getId(), o.getCode(), o.getCustomerName(),
                     o.getSubtotal(), o.getDiscountPercent(), o.getDiscountAmount(), o.getTotal(),
                     o.getStatus(), o.getCreatedAt(), o.getProcessedAt(),
+                    o.getDeliveryMethod(), o.getShippingAddress(), o.getShippingReference(),
+                    o.getShippingLat(), o.getShippingLng(), o.getPaymentMethod(),
+                    o.getFreeShippingNote(), o.getDiscountNote(),
                     o.getLines().stream().map(OrderLineResponse::from).toList());
         }
     }

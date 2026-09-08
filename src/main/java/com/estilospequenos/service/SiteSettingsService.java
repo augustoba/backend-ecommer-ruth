@@ -21,6 +21,11 @@ public class SiteSettingsService {
         return repo.findById(SiteSettings.SINGLETON_ID).orElseGet(() -> repo.save(defaults()));
     }
 
+    /** Textos por defecto del mensaje de pedido de WhatsApp (si no se personalizan). */
+    public static final String DEFAULT_WHATSAPP_INTRO = "¡Hola! Quiero hacer un pedido en *{tienda}* 🧸";
+    public static final String DEFAULT_WHATSAPP_CLOSING =
+            "Quedo atento/a a que me pases el alias o el link de Mercado Pago para coordinar el pago. ¡Gracias!";
+
     public SiteSettings update(SettingsRequest req) {
         SiteSettings s = get();
         s.setStoreName(req.storeName().trim());
@@ -28,6 +33,18 @@ public class SiteSettingsService {
         s.setAboutText(blankToNull(req.aboutText()));
         s.setInstagram(cleanHandle(req.instagram()));
         s.setFacebookUrl(blankToNull(req.facebookUrl()));
+        s.setLogoUrl(blankToNull(req.logoUrl()));
+        s.setWhatsappIntro(blankToNull(req.whatsappIntro()));
+        s.setWhatsappClosing(blankToNull(req.whatsappClosing()));
+        s.setStoreAddress(blankToNull(req.storeAddress()));
+        s.setPaymentTransferEnabled(Boolean.TRUE.equals(req.paymentTransferEnabled()));
+        s.setPaymentTransferAlias(blankToNull(req.paymentTransferAlias()));
+        s.setPaymentQrTransferEnabled(Boolean.TRUE.equals(req.paymentQrTransferEnabled()));
+        s.setPaymentQrTransferImage(blankToNull(req.paymentQrTransferImage()));
+        s.setPaymentQrCardEnabled(Boolean.TRUE.equals(req.paymentQrCardEnabled()));
+        s.setPaymentQrCardImage(blankToNull(req.paymentQrCardImage()));
+        s.setPaymentCardLink(blankToNull(req.paymentCardLink()));
+        s.setPaymentCashEnabled(Boolean.TRUE.equals(req.paymentCashEnabled()));
         return repo.save(s);
     }
 
@@ -41,6 +58,8 @@ public class SiteSettingsService {
                         + "y la tranquilidad de las familias. ¡Gracias por elegirnos!");
         s.setInstagram("estilospequenos_");
         s.setFacebookUrl("https://www.facebook.com/share/1NZXdYgick/");
+        s.setWhatsappIntro(DEFAULT_WHATSAPP_INTRO);
+        s.setWhatsappClosing(DEFAULT_WHATSAPP_CLOSING);
         return s;
     }
 

@@ -69,6 +69,7 @@ public class DashboardService {
     public List<LowStockItem> lowStock() {
         List<LowStockItem> items = new ArrayList<>();
         for (Product p : productRepo.findByActiveTrueOrderByCreatedAtDesc()) {
+            if (p.isDiscontinued()) continue; // el dueño/a marcó "no reponer"
             int threshold = p.getLowStockThreshold() != null ? p.getLowStockThreshold() : DEFAULT_LOW_STOCK;
             for (SizeStock s : p.getSizeStocks()) {
                 if (s.getStock() <= threshold) {

@@ -1,14 +1,12 @@
 package com.estilospequenos.config;
 
 import com.estilospequenos.model.Discount;
-import com.estilospequenos.model.DiscountConfig;
 import com.estilospequenos.model.ParamGroup;
 import com.estilospequenos.model.ParamOption;
 import com.estilospequenos.model.Product;
 import com.estilospequenos.model.ProductParam;
 import com.estilospequenos.model.SizeScale;
 import com.estilospequenos.model.SizeStock;
-import com.estilospequenos.repository.DiscountConfigRepository;
 import com.estilospequenos.repository.DiscountRepository;
 import com.estilospequenos.repository.ParamRepository;
 import com.estilospequenos.repository.ProductRepository;
@@ -39,7 +37,6 @@ public class DataSeeder implements CommandLineRunner {
     private final ParamRepository paramRepo;
     private final SizeScaleRepository sizeScaleRepo;
     private final DiscountRepository discountRepo;
-    private final DiscountConfigRepository discountConfigRepo;
     private final ProductRepository productRepo;
 
     @Override
@@ -129,9 +126,6 @@ public class DataSeeder implements CommandLineRunner {
             discountRepo.save(montoTier("100000", 20));
             discountRepo.save(montoTier("200000", 25));
             log.info("Seed: 2 descuentos por monto cargados.");
-        }
-        if (discountConfigRepo.count() == 0) {
-            discountConfigRepo.save(new DiscountConfig());
         }
     }
 

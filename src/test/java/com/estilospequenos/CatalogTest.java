@@ -47,6 +47,47 @@ class CatalogTest {
     }
 
     @Test
+    void adminEditsLogoAndWhatsappTexts() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        String login = mvc.perform(post("/api/auth/login")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"admin\",\"password\":\"test-pass\"}"))
+                .andReturn().getResponse().getContentAsString();
+        String token = mapper.readTree(login).get("token").asText();
+
+        String body = "{\"storeName\":\"Estilos Pequeños\",\"whatsappNumber\":\"5491122334455\","
+                + "\"logoUrl\":\"data:image/png;base64,ABC123\","
+                + "\"whatsappIntro\":\"Hola desde {tienda}\",\"whatsappClosing\":\"Pagá al alias mi.alias\"}";
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/admin/settings").header("Authorization", "Bearer " + token)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.logoUrl").value("data:image/png;base64,ABC123"))
+                .andExpect(jsonPath("$.whatsappIntro").value("Hola desde {tienda}"))
+                .andExpect(jsonPath("$.whatsappClosing").value("Pagá al alias mi.alias"));
+
+        // vacío en el request → vuelve a null (usa el default en el front)
+        String cleared = "{\"storeName\":\"Estilos Pequeños\",\"whatsappNumber\":\"5491122334455\","
+                + "\"logoUrl\":\"\",\"whatsappIntro\":\"\",\"whatsappClosing\":\"  \"}";
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/admin/settings").header("Authorization", "Bearer " + token)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(cleared))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.logoUrl").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.whatsappIntro").value(org.hamcrest.Matchers.nullValue()));
+
+        // dejar la fila singleton como estaba (otros tests de la clase la leen)
+        String restore = "{\"storeName\":\"Estilos Pequeños\",\"whatsappNumber\":\"5491122334455\","
+                + "\"aboutText\":\"Somos Estilos Pequeños.\",\"instagram\":\"estilospequenos_\","
+                + "\"facebookUrl\":\"https://www.facebook.com/share/1NZXdYgick/\"}";
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/admin/settings").header("Authorization", "Bearer " + token)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(restore))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void adminCreatesProductWithGallery() throws Exception {
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
         String login = mvc.perform(post("/api/auth/login")
@@ -91,6 +132,34 @@ class CatalogTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value(org.hamcrest.Matchers.startsWith("PED-")))
                 .andExpect(jsonPath("$.status").value("PENDIENTE"))
-                .andExpect(jsonPath("$.total").exists());
+                .andExpect(jsonPath("$.total").exists())
+                .andExpect(jsonPath("$.deliveryMethod").value("PICKUP"));
+    }
+
+    @Test
+    void createOrderWithShippingAndPayment() throws Exception {
+        String products = mvc.perform(get("/api/products")).andReturn().getResponse().getContentAsString();
+        com.fasterxml.jackson.databind.JsonNode arr =
+                new com.fasterxml.jackson.databind.ObjectMapper().readTree(products);
+        String productId = arr.get(0).get("id").asText();
+        String size = arr.get(0).get("sizeStocks").get(0).get("size").asText();
+        String items = "\"items\":[{\"productId\":\"" + productId + "\",\"size\":\"" + size + "\",\"quantity\":1}]";
+
+        // envío sin dirección → 400
+        mvc.perform(post("/api/orders").contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"customerName\":\"Test\"," + items + ",\"deliveryMethod\":\"SHIPPING\"}"))
+                .andExpect(status().isBadRequest());
+
+        // envío con dirección + pago → OK y se guardan los datos
+        String ok = "{\"customerName\":\"Test\"," + items + ",\"deliveryMethod\":\"SHIPPING\","
+                + "\"shippingAddress\":\"San Martín 500, San Miguel de Tucumán\","
+                + "\"shippingReference\":\"depto 3B\",\"shippingLat\":-26.83,\"shippingLng\":-65.20,"
+                + "\"paymentMethod\":\"TRANSFER\"}";
+        mvc.perform(post("/api/orders").contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(ok))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.deliveryMethod").value("SHIPPING"))
+                .andExpect(jsonPath("$.shippingAddress").value("San Martín 500, San Miguel de Tucumán"))
+                .andExpect(jsonPath("$.shippingLat").value(-26.83))
+                .andExpect(jsonPath("$.paymentMethod").value("TRANSFER"));
     }
 }

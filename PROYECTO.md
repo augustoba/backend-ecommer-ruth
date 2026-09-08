@@ -94,7 +94,7 @@ com.estilospequenos
   model/        entidades JPA
                 AdminUser, Product + SizeStock + ProductParam (embeddables),
                 ParamGroup + ParamOption, SizeScale, Supplier,
-                Discount + DiscountConfig, Order + OrderLine + OrderStatus(enum),
+                Discount, Order + OrderLine + OrderStatus/DeliveryMethod/PaymentMethod (enums),
                 HeroSlide
   repository/   interfaces Spring Data (*Repository)
   service/      lógica de negocio (*Service)
@@ -129,8 +129,8 @@ DTO en el service y desactivarlo.
 | Entidad | Campos clave | Notas |
 |---|---|---|
 | **AdminUser** | `id, username (unique), passwordHash, recoveryHash?, enabled, createdAt` | Contraseña y frase de recuperación **hasheadas con BCrypt**. Un solo registro en la práctica. |
-| **SiteSettings** | fila única `id='config'`, `storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?` | Datos del local editables desde el panel. `whatsappNumber` valida `\d{8,15}`. `instagram` se guarda sin `@`. |
-| **Product** | `id, name, description, price, ageRange, active, createdAt, sizeScaleId?, supplierId?, costPrice?, lowStockThreshold?` | `supplierId`/`costPrice` = info interna, **no** se exponen en el catálogo público. `lowStockThreshold` (unidades por talle) = umbral propio para la alerta de reposición; null = default global (`DashboardService.DEFAULT_LOW_STOCK` = 3). |
+| **SiteSettings** | fila única `id='config'`, `storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?, logoUrl?, whatsappIntro?, whatsappClosing?, storeAddress?, payment{Transfer,QrTransfer,QrCard}Enabled, paymentTransferAlias?, paymentQr{Transfer,Card}Image?, paymentCardLink?, paymentCashEnabled` | Datos del local editables desde el panel. `whatsappNumber` valida `\d{8,15}`. `instagram` sin `@`. `logoUrl`/`paymentQr*Image` = data URI (MEDIUMTEXT). `whatsappIntro`/`whatsappClosing` = saludo/cierre (tokens `{tienda}`/`{codigo}`; el mensaje se arma en el front). `storeAddress` = dirección para el retiro. Cada medio de pago tiene su `*Enabled` (bool) aparte del dato → se ofrece si está habilitado **y** tiene el dato (efectivo sólo el bool). |
+| **Product** | `id, name, description, price, ageRange, active, discontinued, createdAt, sizeScaleId?, supplierId?, costPrice?, lowStockThreshold?` | `supplierId`/`costPrice` = info interna, **no** se exponen en el catálogo público. `lowStockThreshold` (unidades por talle) = umbral propio para la alerta de reposición; null = default global (`DashboardService.DEFAULT_LOW_STOCK` = 3). `discontinued` = "no reponer": sigue publicado/vendible pero `DashboardService.lowStock()` lo excluye. |
 | — `images` | `List<String>` ordenada (`@ElementCollection` → `product_image`) | fotos, URL o data URI. `idx 0` = portada. En el DTO va como `images[]` + `imageUrl` (la portada, getter `@Transient`, por compat con tarjetas/carrito). El request pide `images` (`@NotEmpty`). |
 | — `sizeStocks` | `List<SizeStock{size, stock}>` (`@ElementCollection` → `product_size_stock`) | stock por talle |
 | — `params` | `Set<ProductParam{groupId, optionId}>` (`@ElementCollection` → `product_param`) | en el DTO se expone como `Map<String,List<String>>` |
@@ -138,9 +138,8 @@ DTO en el service y desactivarlo.
 | **ParamOption** | `id, label, position` | |
 | **SizeScale** | `id, name, system` + `values: List<String>` ordenada | escalas de talle (ropa bebé/niños/adultos, calzado) |
 | **Supplier** | `id, name, phone?, address?, notes?` | proveedores del local |
-| **Discount** | `id, kind (MONTO\|PARAMETRO), discountPercent, enabled, label?, startsAt?, endsAt?, minAmount?, groupId?, optionId?` | `startsAt`/`endsAt` (LocalDate, inclusivas) = vigencia opcional. `activeNow()` = enabled + dentro del rango. El DTO expone `status` (ACTIVO\|PROGRAMADO\|VENCIDO\|DESHABILITADO). |
-| **DiscountConfig** | fila única `id='config'`, `combineMode (MEJOR\|COMBINAR)` | |
-| **Order** | `id, number (unique), customerName, subtotal, discountPercent, discountAmount, total, status (PENDIENTE\|PROCESADO\|CANCELADO), createdAt, processedAt?` | `code` = `"PED-" + %04d(number)` (getter `@Transient`). `number` se deriva de `MAX(number)+1`. |
+| **Discount** | `id, kind (MONTO\|PARAMETRO\|PAGO\|ENVIO_GRATIS), discountPercent, enabled, stackable, label?, detail?, startsAt?, endsAt?, minAmount?, groupId?, optionId?, paymentMethods?` | `stackable` = acumulable. `detail` = letra chica configurable. `paymentMethods` = CSV de `PaymentMethod` (kind PAGO). `minAmount` sirve para MONTO y ENVIO_GRATIS. `activeNow()` = enabled + rango. DTO expone `status`. **Ya no existe `DiscountConfig`/combineMode**. |
+| **Order** | `id, number (unique), customerName, subtotal, discountPercent, discountAmount, total, status (PENDIENTE\|PROCESADO\|CANCELADO), deliveryMethod (PICKUP\|SHIPPING), shippingAddress?, shippingReference?, shippingLat?, shippingLng?, paymentMethod? (TRANSFER\|QR_TRANSFER\|QR_CARD\|CASH), createdAt, processedAt?` | `code` = `"PED-" + %04d(number)` (getter `@Transient`). `number` = `MAX(number)+1`. `deliveryMethod` default PICKUP (pedidos viejos). El envío **no** se cotiza: no hay costo en el `Order`, se coordina aparte. `OrderService.create` exige `shippingAddress` si `deliveryMethod=SHIPPING`. |
 | — `lines` | `List<OrderLine{id, productId, productName, size, quantity, unitPrice, accepted}>` | `productName` se guarda por si el producto cambia después |
 | **HeroSlide** | `id, imageUrl (MEDIUMTEXT), alt, position` | fotos del carrusel de la home |
 
@@ -163,37 +162,40 @@ Base: `/api`. Errores → cuerpo `ApiError` (`{timestamp, status, error, message
 | `GET` | `/api/param-groups` | parametrías (filtros del catálogo) |
 | `GET` | `/api/size-scales` | escalas de talle |
 | `GET` | `/api/hero-slides` | carrusel |
-| `GET` | `/api/discounts` | `{discounts, combineMode}` — para el preview del descuento en el carrito |
-| `GET` | `/api/settings` | datos del local: `{storeName, whatsappNumber, aboutText, instagram, facebookUrl}` — los usan header, footer, home y el armado del mensaje de WhatsApp |
-| `POST` | `/api/orders` | crea el pedido desde el carrito: `{customerName, items:[{productId, size, quantity}]}` → calcula `code`, descuentos y totales |
+| `GET` | `/api/discounts` | `{discounts}` — para el preview del descuento en el carrito |
+| `GET` | `/api/settings` | datos del local (`SettingsResponse` completo: nombre, WhatsApp, redes, logo, textos del mensaje, dirección, medios de pago) — los usan header, footer, home, checkout y el armado del mensaje |
+| `POST` | `/api/orders` | crea el pedido desde el carrito: `{customerName, items:[{productId, size, quantity}], deliveryMethod?, shippingAddress?, shippingReference?, shippingLat?, shippingLng?, paymentMethod?}` → calcula `code`, descuentos y totales; exige dirección si `deliveryMethod=SHIPPING` |
 
 ### Admin (`/api/admin/**` — requieren `Authorization: Bearer <jwt>`)
 
 | Recurso | Endpoints |
 |---|---|
 | **account** | `GET /api/admin/account` → `{username, hasRecoveryPhrase}` · `PUT /account/password` `{currentPassword, newPassword}` · `PUT /account/recovery` `{currentPassword, recoveryPhrase}` |
-| **settings** | `GET /api/admin/settings` · `PUT /api/admin/settings` `{storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?}` (misma respuesta que el GET público) |
+| **settings** | `GET /api/admin/settings` · `PUT /api/admin/settings` `{…, storeAddress?, payment{Transfer,QrTransfer,QrCard}Enabled?, paymentTransferAlias?, paymentQr{Transfer,Card}Image?, paymentCardLink?, paymentCashEnabled?}` (misma respuesta que el GET público) |
 | **metrics** | `GET /api/admin/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=grp-tipo` → totales, serie mensual, top/bottom productos y desglose por grupo de parametría. `GET /api/admin/metrics/comparison?year=` → comparativas mes a mes y semana a semana. Ver §6bis. |
 | **dashboard** | `GET /api/admin/dashboard` → resumen del panel (pedidos pendientes, facturación del mes, conteo de productos, últimos 6 pedidos, `defaultLowStockThreshold`, lista de talles por reponer). `GET /api/admin/low-stock` → sólo la lista de talles por reponer (para el badge del menú). `DashboardService`. |
-| **products** | `GET?page&size` (**paginado**, `{content, page, size, totalElements, totalPages}`; todos, incl. inactivos) · `POST` · `GET/PUT/DELETE /{id}` · `PATCH /{id}/active` `{active}` · `PATCH /{id}/stock` `{size, stock}` |
+| **products** | `GET?page&size` (**paginado**, `{content, page, size, totalElements, totalPages}`; todos, incl. inactivos) · `POST` · `GET/PUT/DELETE /{id}` · `PATCH /{id}/active` `{active}` · `PATCH /{id}/discontinued` `{discontinued}` (marcar "no reponer") · `PATCH /{id}/stock` `{size, stock}` |
 | **param-groups** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `POST /{id}/options` · `PUT/DELETE /{id}/options/{optionId}` |
 | **size-scales** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `PUT /{id}/values` `{values}` (reemplaza la lista) |
 | **suppliers** | `GET` · `POST` · `GET/PUT/DELETE /{id}` |
-| **discounts** | `GET` · `POST` · `PUT/DELETE /{id}` · `GET/PUT /api/admin/discounts/config` `{combineMode}` |
+| **discounts** | `GET` · `POST` · `PUT/DELETE /{id}` (request: `kind, discountPercent, enabled?, stackable?, label?, detail?, startsAt?, endsAt?, minAmount?, groupId?, optionId?, paymentMethods?`) |
 | **orders** | `GET?page&size&search&status&from&to` (**paginado** + filtros: `search` = nombre del cliente o número/código de pedido, `status`, `from`/`to` sobre la fecha de creación) · `GET /pending-count` → `{pending}` · `GET /{id}` · `PUT /{id}/lines` `{lines:[{lineId, accepted}]}` · `POST /{id}/confirm` (**estricto**: 400 con detalle si falta stock en alguna línea aceptada — no toca nada; si alcanza, descuenta y estado→PROCESADO) · `POST /{id}/cancel` — las 3 mutaciones devuelven el pedido actualizado |
 | **hero-slides** | `GET` · `POST` · `PUT/DELETE /{id}` · `PUT /reorder` `{ids:[...]}` |
 
 ### Cálculo de descuentos (server-side)
 
-`DiscountService.computeForLines(...)` — port de `discount.service.ts`
-(`computeCartDiscount`) del frontend:
-- sólo entran los descuentos **vigentes** (`activeNow()` = habilitado + dentro de
-  `startsAt`/`endsAt` si tiene);
-- **por parámetro**: por ítem, el `%` más alto de un descuento vigente cuyo
-  `(groupId, optionId)` esté en `product.params`;
-- **por monto**: el mejor tier vigente alcanzado;
-- modo `MEJOR` (se usa el que más ahorra, no acumula) / `COMBINAR` (parámetro por
-  ítem + monto sobre el subtotal ya rebajado);
+`DiscountService.computeForLines(items, paymentMethod, deliveryMethod)` — port de
+`discount.service.ts` (`computeCartDiscount`) del frontend:
+- sólo entran los descuentos **vigentes** (`activeNow()`);
+- se arma una "instancia" por descuento que aplica: **parámetro** (por ítem, el `%`
+  más alto), **monto** (mejor tier alcanzado), **pago** (kind PAGO cuyo
+  `paymentMethods` contiene el elegido), con el monto que ahorraría **si fuera solo**;
+- **combinación**: si TODAS las instancias son `stackable` → cascada (parámetro,
+  monto, pago, cada una sobre lo que va quedando); si hay una NO stackable → sólo
+  la instancia que más ahorra;
+- **ENVIO_GRATIS**: aparte, informativo (`freeShipping` en el resultado) cuando
+  `deliveryMethod=SHIPPING` y el subtotal supera `minAmount`. `OrderService.create`
+  lo guarda en `Order.freeShippingNote`; los `detail` aplicados van a `Order.discountNote`;
 - `discountPercent` efectivo = `round(amount / subtotal * 100)`.
 
 Lo usan `POST /api/orders` (al crear) — `confirm` no recalcula, solo descuenta
@@ -270,7 +272,7 @@ el resto solo si `SEED_ENABLED=true` **y** la tabla está vacía:
   9 opciones, `grp-estacion` (multiple) 5 opciones — mismos ids que el front.
 - **SizeScales**: 5 escalas seed (`escala-bebe`, `escala-ninos`, `escala-adultos`,
   `escala-calzado-ninos` 17-34, `escala-calzado-adultos` 34-46).
-- **Discounts**: 2 por monto ($100.000→20%, $200.000→25%) + `DiscountConfig(MEJOR)`.
+- **Discounts**: 2 por monto ($100.000→20%, $200.000→25%), no acumulables.
 - **Products**: 10 de ejemplo, con `params`, `sizeScaleId`, `sizeStocks` y una
   imagen SVG data-URI mínima (emoji sobre círculo de color).
 - Suppliers / HeroSlides: vacío.
@@ -386,3 +388,35 @@ regenerarlo).
     acepta `search` (nombre del cliente o número/código), `status`, `from`/`to`
     (fecha de creación). `OrderRepository.search(...)` con `@Query` de params
     nulables + `OrderService.search()`.
+16. **Flag "no reponer" en productos** (2026-09-08): `Product.discontinued`
+    (`BIT NOT NULL DEFAULT 0`, columna nueva) + `PATCH /api/admin/products/{id}/discontinued`
+    (`ProductService.setDiscontinued`). `DashboardService.lowStock()` saltea los
+    discontinuados, así un producto que no se va a reponer deja de figurar en las
+    alertas de stock bajo sin dejar de venderse. **Sin migración**: recrear la
+    base de dev (o `schema.sql`/`setup.sql`, ya actualizados).
+17. **Logo y textos del mensaje de WhatsApp en `SiteSettings`** (2026-09-08):
+    columnas nuevas `logo_url` (`MEDIUMTEXT`, data URI), `whatsapp_intro` y
+    `whatsapp_closing` (`VARCHAR(2000)`). `SettingsRequest`/`Response` + service
+    las manejan (`blankToNull`; `defaults()` siembra los textos por defecto). El
+    mensaje de pedido se sigue armando en el frontend — el backend sólo guarda.
+    **Sin migración**: `ddl-auto=update` agrega las columnas; `schema.sql`/
+    `setup.sql` actualizados.
+18. **Entrega y medio de pago en el pedido** (2026-09-08): enums nuevos
+    `DeliveryMethod` (PICKUP/SHIPPING) y `PaymentMethod` (TRANSFER/QR_TRANSFER/
+    QR_CARD/CASH). `Order` sumó `deliveryMethod` (default PICKUP), `shipping_address`,
+    `shipping_reference`, `shipping_lat/lng`, `payment_method`. `OrderService.create`
+    valida que un envío traiga dirección (400 si no). `SiteSettings` sumó
+    `store_address` + 5 campos de medios de pago (`payment_transfer_alias`,
+    `payment_qr_transfer_image`, `payment_qr_card_image`, `payment_card_link`,
+    `payment_cash_enabled`). El envío **no se cotiza**: sin costo en el `Order`.
+    **Sin migración** (`ddl-auto=update`); `schema.sql`/`setup.sql` al día.
+19. **Motor de descuentos v2** (2026-09-08): `Discount.Kind` sumó **PAGO** y
+    **ENVIO_GRATIS**; cada descuento tiene `stackable` (acumulable) y `detail`
+    (letra chica) + `paymentMethods` (CSV, kind PAGO). **Se eliminó `DiscountConfig`**
+    y los endpoints `/api/admin/discounts/config`. `DiscountService.computeForLines`
+    reescrito: instancias por descuento, "todos acumulables → cascada / hay uno no
+    acumulable → el mejor solo". `Order` sumó `free_shipping_note` y `discount_note`
+    (van al mensaje de WhatsApp y al detalle del pedido). **`ddl-auto=update`**:
+    en el dev DB Hibernate mapea los enum a `VARCHAR`, así que los valores nuevos
+    entran sin ALTER; agrega las columnas nuevas; la tabla `discount_config` queda
+    huérfana (inocua). `schema.sql`/`setup.sql` actualizados.
