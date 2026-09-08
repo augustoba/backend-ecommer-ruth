@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS product (
     size_scale_id VARCHAR(255),
     supplier_id   VARCHAR(255),
     cost_price    DECIMAL(12,2),
+    low_stock_threshold INTEGER,               -- umbral de stock bajo propio (null = default global)
     PRIMARY KEY (id),
     KEY ix_product_active (active),
     KEY ix_product_supplier (supplier_id)

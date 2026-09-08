@@ -9,4 +9,5 @@ public interface ProductRepository extends JpaRepository<Product, String> {
     List<Product> findByActiveTrueOrderByCreatedAtDesc();
     List<Product> findAllByOrderByCreatedAtDesc();
     List<Product> findBySupplierId(String supplierId);
+    long countByActiveTrue();
 }

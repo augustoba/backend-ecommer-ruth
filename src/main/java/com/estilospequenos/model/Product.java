@@ -61,6 +61,12 @@ public class Product {
     @Column(precision = 12, scale = 2)
     private BigDecimal costPrice;
 
+    /**
+     * A partir de cuántas unidades por talle este producto se considera "stock
+     * bajo" (para las alertas de reposición). null = usar el default global (3).
+     */
+    private Integer lowStockThreshold;
+
     @ElementCollection
     @CollectionTable(name = "product_size_stock", joinColumns = @JoinColumn(name = "product_id"))
     @OrderColumn(name = "idx")

@@ -32,6 +32,8 @@ public final class ProductDtos {
             String sizeScaleId,
             String supplierId,
             BigDecimal costPrice,
+            /** Umbral de stock bajo propio del producto (unidades por talle). null = default global. */
+            Integer lowStockThreshold,
             Map<String, List<String>> params,
             List<SizeStockDto> sizeStocks
     ) {}
@@ -55,6 +57,7 @@ public final class ProductDtos {
             String sizeScaleId,
             String supplierId,
             BigDecimal costPrice,
+            Integer lowStockThreshold,
             Map<String, List<String>> params,
             List<SizeStockDto> sizeStocks
     ) {
@@ -69,7 +72,8 @@ public final class ProductDtos {
             return new ProductResponse(
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
                     p.getImageUrl(), List.copyOf(p.getImages()), p.isActive(), p.getCreatedAt(),
-                    p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(), params, stocks);
+                    p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(), p.getLowStockThreshold(),
+                    params, stocks);
         }
     }
 }

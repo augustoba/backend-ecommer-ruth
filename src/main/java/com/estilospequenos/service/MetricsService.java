@@ -58,6 +58,25 @@ public class MetricsService {
         this.paramRepo = paramRepo;
     }
 
+    /** Totales de ventas (líneas aceptadas de pedidos PROCESADO) en un rango. Usado por el dashboard. */
+    @Transactional(readOnly = true)
+    public Totals rangeTotals(LocalDate from, LocalDate to) {
+        Instant fromI = from.atStartOfDay(zone).toInstant();
+        Instant toI = to.plusDays(1).atStartOfDay(zone).toInstant();
+        List<Order> orders = orderRepo
+                .findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(OrderStatus.PROCESADO, fromI, toI);
+        BigDecimal revenue = BigDecimal.ZERO;
+        long units = 0;
+        for (Order o : orders) {
+            for (OrderLine l : o.getLines()) {
+                if (!l.isAccepted()) continue;
+                revenue = revenue.add(l.getUnitPrice().multiply(BigDecimal.valueOf(l.getQuantity())));
+                units += l.getQuantity();
+            }
+        }
+        return new Totals(revenue, units, orders.size());
+    }
+
     @Transactional(readOnly = true)
     public MetricsResponse compute(LocalDate from, LocalDate to, String groupBy) {
         Instant fromI = from.atStartOfDay(zone).toInstant();

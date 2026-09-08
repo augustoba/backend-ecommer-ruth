@@ -130,7 +130,7 @@ DTO en el service y desactivarlo.
 |---|---|---|
 | **AdminUser** | `id, username (unique), passwordHash, recoveryHash?, enabled, createdAt` | Contraseña y frase de recuperación **hasheadas con BCrypt**. Un solo registro en la práctica. |
 | **SiteSettings** | fila única `id='config'`, `storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?` | Datos del local editables desde el panel. `whatsappNumber` valida `\d{8,15}`. `instagram` se guarda sin `@`. |
-| **Product** | `id, name, description, price, ageRange, active, createdAt, sizeScaleId?, supplierId?, costPrice?` | `supplierId`/`costPrice` = info interna, **no** se exponen en el catálogo público. |
+| **Product** | `id, name, description, price, ageRange, active, createdAt, sizeScaleId?, supplierId?, costPrice?, lowStockThreshold?` | `supplierId`/`costPrice` = info interna, **no** se exponen en el catálogo público. `lowStockThreshold` (unidades por talle) = umbral propio para la alerta de reposición; null = default global (`DashboardService.DEFAULT_LOW_STOCK` = 3). |
 | — `images` | `List<String>` ordenada (`@ElementCollection` → `product_image`) | fotos, URL o data URI. `idx 0` = portada. En el DTO va como `images[]` + `imageUrl` (la portada, getter `@Transient`, por compat con tarjetas/carrito). El request pide `images` (`@NotEmpty`). |
 | — `sizeStocks` | `List<SizeStock{size, stock}>` (`@ElementCollection` → `product_size_stock`) | stock por talle |
 | — `params` | `Set<ProductParam{groupId, optionId}>` (`@ElementCollection` → `product_param`) | en el DTO se expone como `Map<String,List<String>>` |
@@ -174,6 +174,7 @@ Base: `/api`. Errores → cuerpo `ApiError` (`{timestamp, status, error, message
 | **account** | `GET /api/admin/account` → `{username, hasRecoveryPhrase}` · `PUT /account/password` `{currentPassword, newPassword}` · `PUT /account/recovery` `{currentPassword, recoveryPhrase}` |
 | **settings** | `GET /api/admin/settings` · `PUT /api/admin/settings` `{storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?}` (misma respuesta que el GET público) |
 | **metrics** | `GET /api/admin/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=grp-tipo` → totales, serie mensual, top/bottom productos y desglose por grupo de parametría. `GET /api/admin/metrics/comparison?year=` → comparativas mes a mes y semana a semana. Ver §6bis. |
+| **dashboard** | `GET /api/admin/dashboard` → resumen del panel (pedidos pendientes, facturación del mes, conteo de productos, últimos 6 pedidos, `defaultLowStockThreshold`, lista de talles por reponer). `GET /api/admin/low-stock` → sólo la lista de talles por reponer (para el badge del menú). `DashboardService`. |
 | **products** | `GET` (todos, incl. inactivos) · `POST` · `GET/PUT/DELETE /{id}` · `PATCH /{id}/active` `{active}` · `PATCH /{id}/stock` `{size, stock}` |
 | **param-groups** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `POST /{id}/options` · `PUT/DELETE /{id}/options/{optionId}` |
 | **size-scales** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `PUT /{id}/values` `{values}` (reemplaza la lista) |
@@ -361,3 +362,8 @@ regenerarlo).
     portada). El request pide `images` (`@NotEmpty`); la respuesta mantiene
     `imageUrl` (portada, `@Transient`) para no romper tarjetas/carrito.
     **Sin migración**: el backend no está desplegado — recrear la base de dev.
+11. **Dashboard + stock bajo** (2026-09-08): `Product.lowStockThreshold`
+    (nullable, columna nueva) + `GET /api/admin/dashboard` / `/low-stock`
+    (`DashboardService`). Resumen del panel + lista de talles por reponer (stock
+    ≤ umbral propio o el default 3). `MetricsService.rangeTotals()` para la
+    facturación del mes.
