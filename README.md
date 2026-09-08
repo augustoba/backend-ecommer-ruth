@@ -47,18 +47,17 @@ Al primer arranque, Hibernate crea el esquema (`ddl-auto=update`) y el
 `DataSeeder` carga parametrías, escalas de talle, descuentos y 10 productos de
 ejemplo. Para no sembrar: `SEED_ENABLED=false`.
 
-### Crear el esquema con scripts SQL (en vez de dejarlo a Hibernate)
+### Crear el esquema con scripts SQL (deploy)
 
-En `database/` hay scripts para armar la base a mano — útil para producción o
-para no depender de `ddl-auto`:
+En `database/` hay scripts para armar la base a mano — para producción o para no
+depender de `ddl-auto`:
 
 ```bash
-mysql -u root -p < database/schema.sql                    # crea la base + todas las tablas
-mysql -u root -p estilos_pequenos < database/seed.sql     # carga parametrías/escalas/descuentos
+mysql -u root -p < database/setup.sql   # todo junto: base + tablas + config
 ```
 
-Si usás los scripts, corré la app con `--spring.jpa.hibernate.ddl-auto=validate`
-(chequea que el esquema coincida) o `none`. Ver `database/README.md`.
+Después corré la app con `SPRING_JPA_HIBERNATE_DDL_AUTO=validate` (chequea que el
+esquema coincida) o `none`. Ver `database/README.md`.
 
 ## Probar
 

@@ -1,61 +1,64 @@
 # Scripts de base de datos
 
-Scripts SQL para crear y poblar la base **`estilos_pequenos`** (MySQL 8) sin
-depender de que Hibernate arme el esquema solo.
+Scripts SQL para crear y poblar la base **`estilos_pequenos`** (MySQL 8).
 
 | Archivo | Qué hace |
 |---|---|
-| `schema.sql` | Crea la base y **todas las tablas** (índices y FKs incluidos). |
-| `seed.sql` | Carga la **config base**: parametrías, escalas de talle y descuentos por defecto. No carga productos. |
+| **`setup.sql`** | **Todo junto:** crea la base, las 13 tablas y la config base. Es lo que se corre en un servidor nuevo al desplegar. |
+| `schema.sql` | Solo la base + las tablas (sin datos). |
+| `seed.sql` | Solo la config base: parametrías, escalas de talle, descuentos. Necesita la base ya creada. |
 | `reset.sql` | Borra la base entera y la vuelve a crear vacía. |
+
+`setup.sql` es la concatenación de `schema.sql` + `seed.sql`.
 
 ## Uso
 
 ```bash
-# desde la carpeta backend/
 MYSQL="/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe"   # o solo `mysql` si está en el PATH
 
-# 1) crear tablas
-"$MYSQL" -u root -p < database/schema.sql
+# instalación completa (una sola vez, en un server nuevo)
+"$MYSQL" -u root -p < database/setup.sql
 
-# 2) cargar la config base
-"$MYSQL" -u root -p estilos_pequenos < database/seed.sql
+# --- o por partes ---
+"$MYSQL" -u root -p < database/schema.sql                    # tablas
+"$MYSQL" -u root -p estilos_pequenos < database/seed.sql     # config
 
-# reset completo (opcional)
+# reset total
 "$MYSQL" -u root -p < database/reset.sql
 ```
 
-En **MySQL Workbench**: abrir el `.sql`, y ejecutar con el rayo (⚡).
+En **MySQL Workbench**: abrir el `.sql` y ejecutar con el rayo (⚡).
 
-## ¿Y el `DataSeeder` de la app?
+## Deploy
 
-La app tiene un `DataSeeder` que, **solo si las tablas están vacías**, carga las
-mismas parametrías/escalas/descuentos **+ 10 productos de ejemplo**. Sirve para
-desarrollo (arrancás y ya tenés datos). Si ya corriste `seed.sql`, el
-`DataSeeder` ve que hay datos y no hace nada — no se pisan.
+En el servidor:
 
-Para apagar el seeder de la app: `SEED_ENABLED=false`.
+1. `mysql < database/setup.sql` (crea todo).
+2. Correr la app con `SPRING_JPA_HIBERNATE_DDL_AUTO=validate` (Hibernate solo
+   verifica que el esquema coincida) — o `none`.
+3. Los **productos** se cargan desde el panel de admin (o dejás que el
+   `DataSeeder` de la app cargue los 10 de ejemplo la primera vez, si arrancás
+   con `SEED_ENABLED=true` y la base vacía de productos).
 
-## Relación con `ddl-auto`
+> En **desarrollo local** no hace falta correr ningún SQL: la app usa
+> `ddl-auto=update` + `createDatabaseIfNotExist=true` y crea todo sola.
 
-| Modo (`application.yml`) | Cuándo |
-|---|---|
-| `update` (actual) | Desarrollo. Hibernate crea/ajusta las tablas al arrancar. Con esto **no hace falta correr `schema.sql`**. |
-| `validate` | Producción / entornos controlados. Corrés `schema.sql` a mano y Hibernate solo verifica que coincida. |
-| `none` | Hibernate no toca el esquema. Todo lo manejás con estos scripts. |
+## Mantener los scripts al día
 
-## Regenerar `schema.sql` desde el código
+- **`schema.sql`** se mantiene a mano en sincronía con las entidades JPA.
+  Para regenerar la referencia cruda desde el código:
+  ```bash
+  ./mvnw spring-boot:run -Dspring-boot.run.arguments="\
+    --spring.jpa.hibernate.ddl-auto=none \
+    --spring.jpa.properties.jakarta.persistence.schema-generation.scripts.action=create \
+    --spring.jpa.properties.jakarta.persistence.schema-generation.scripts.create-target=database/schema.gen.sql \
+    --app.seed.enabled=false"
+  ```
+  Genera `database/schema.gen.sql` (gitignored). Usalo para actualizar
+  `schema.sql` a mano (formateado, con constraints con nombre legible).
 
-Cuando cambien las entidades JPA:
-
-```bash
-./mvnw spring-boot:run -Dspring-boot.run.arguments="\
-  --spring.jpa.hibernate.ddl-auto=none \
-  --spring.jpa.properties.jakarta.persistence.schema-generation.scripts.action=create \
-  --spring.jpa.properties.jakarta.persistence.schema-generation.scripts.create-target=database/schema.gen.sql \
-  --app.seed.enabled=false"
-```
-
-Genera `database/schema.gen.sql` (crudo, de Hibernate). Usalo como referencia
-para actualizar `schema.sql` a mano (que está formateado y con nombres de
-constraints legibles). `schema.gen.sql` está gitignored.
+- **`setup.sql`** se regenera concatenando:
+  ```bash
+  # (mantené el encabezado propio de setup.sql o volvé a ponerlo)
+  cat database/schema.sql database/seed.sql > database/setup.sql
+  ```
