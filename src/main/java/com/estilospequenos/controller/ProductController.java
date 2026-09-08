@@ -1,11 +1,14 @@
 package com.estilospequenos.controller;
 
+import com.estilospequenos.dto.PageResponse;
 import com.estilospequenos.dto.ProductDtos.ActivePatch;
 import com.estilospequenos.dto.ProductDtos.ProductRequest;
 import com.estilospequenos.dto.ProductDtos.ProductResponse;
 import com.estilospequenos.dto.ProductDtos.StockPatch;
 import com.estilospequenos.service.ProductService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -35,8 +38,13 @@ public class ProductController {
     // --- Admin ---
 
     @GetMapping("/api/admin/products")
-    public List<ProductResponse> list() {
-        return service.findAll().stream().map(ProductResponse::from).toList();
+    public PageResponse<ProductResponse> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        int capped = Math.min(Math.max(size, 1), 100);
+        Page<com.estilospequenos.model.Product> result =
+                service.findAll(PageRequest.of(Math.max(page, 0), capped));
+        return PageResponse.of(result, result.map(ProductResponse::from).getContent());
     }
 
     @GetMapping("/api/admin/products/{id}")

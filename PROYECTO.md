@@ -175,12 +175,12 @@ Base: `/api`. Errores → cuerpo `ApiError` (`{timestamp, status, error, message
 | **settings** | `GET /api/admin/settings` · `PUT /api/admin/settings` `{storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?}` (misma respuesta que el GET público) |
 | **metrics** | `GET /api/admin/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=grp-tipo` → totales, serie mensual, top/bottom productos y desglose por grupo de parametría. `GET /api/admin/metrics/comparison?year=` → comparativas mes a mes y semana a semana. Ver §6bis. |
 | **dashboard** | `GET /api/admin/dashboard` → resumen del panel (pedidos pendientes, facturación del mes, conteo de productos, últimos 6 pedidos, `defaultLowStockThreshold`, lista de talles por reponer). `GET /api/admin/low-stock` → sólo la lista de talles por reponer (para el badge del menú). `DashboardService`. |
-| **products** | `GET` (todos, incl. inactivos) · `POST` · `GET/PUT/DELETE /{id}` · `PATCH /{id}/active` `{active}` · `PATCH /{id}/stock` `{size, stock}` |
+| **products** | `GET?page&size` (**paginado**, `{content, page, size, totalElements, totalPages}`; todos, incl. inactivos) · `POST` · `GET/PUT/DELETE /{id}` · `PATCH /{id}/active` `{active}` · `PATCH /{id}/stock` `{size, stock}` |
 | **param-groups** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `POST /{id}/options` · `PUT/DELETE /{id}/options/{optionId}` |
 | **size-scales** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `PUT /{id}/values` `{values}` (reemplaza la lista) |
 | **suppliers** | `GET` · `POST` · `GET/PUT/DELETE /{id}` |
 | **discounts** | `GET` · `POST` · `PUT/DELETE /{id}` · `GET/PUT /api/admin/discounts/config` `{combineMode}` |
-| **orders** | `GET` · `GET /pending-count` → `{pending}` · `GET /{id}` · `PUT /{id}/lines` `{lines:[{lineId, accepted}]}` · `POST /{id}/confirm` (descuenta stock de las líneas `accepted`, estado→PROCESADO) · `POST /{id}/cancel` |
+| **orders** | `GET?page&size` (**paginado**, mismo envoltorio que products) · `GET /pending-count` → `{pending}` · `GET /{id}` · `PUT /{id}/lines` `{lines:[{lineId, accepted}]}` · `POST /{id}/confirm` (descuenta stock de las líneas `accepted`, estado→PROCESADO) · `POST /{id}/cancel` — las 3 mutaciones devuelven el pedido actualizado |
 | **hero-slides** | `GET` · `POST` · `PUT/DELETE /{id}` · `PUT /reorder` `{ids:[...]}` |
 
 ### Cálculo de descuentos (server-side)
@@ -367,3 +367,8 @@ regenerarlo).
     (`DashboardService`). Resumen del panel + lista de talles por reponer (stock
     ≤ umbral propio o el default 3). `MetricsService.rangeTotals()` para la
     facturación del mes.
+12. **Paginación de los listados del panel** (2026-09-08): `GET /api/admin/products`
+    y `/api/admin/orders` pasaron a devolver `PageResponse<T>`
+    (`{content, page, size, totalElements, totalPages}`), 20 por página por
+    defecto (`?page`/`?size`, tope 100). Los endpoints públicos siguen sin
+    paginar.

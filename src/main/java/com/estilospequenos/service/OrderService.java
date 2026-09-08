@@ -50,6 +50,11 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<Order> findAll(org.springframework.data.domain.Pageable pageable) {
+        return repo.findAllByOrderByCreatedAtDesc(pageable);
+    }
+
+    @Transactional(readOnly = true)
     public Order get(String id) {
         return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Pedido", id));
     }

@@ -3,12 +3,14 @@ package com.estilospequenos.controller;
 import com.estilospequenos.dto.OrderDtos.CreateOrderRequest;
 import com.estilospequenos.dto.OrderDtos.LinesRequest;
 import com.estilospequenos.dto.OrderDtos.OrderResponse;
+import com.estilospequenos.dto.PageResponse;
 import com.estilospequenos.service.OrderService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -29,8 +31,13 @@ public class OrderController {
     // --- Admin ---
 
     @GetMapping("/api/admin/orders")
-    public List<OrderResponse> list() {
-        return service.findAll().stream().map(OrderResponse::from).toList();
+    public PageResponse<OrderResponse> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        int capped = Math.min(Math.max(size, 1), 100);
+        Page<com.estilospequenos.model.Order> result =
+                service.findAll(PageRequest.of(Math.max(page, 0), capped));
+        return PageResponse.of(result, result.map(OrderResponse::from).getContent());
     }
 
     @GetMapping("/api/admin/orders/pending-count")

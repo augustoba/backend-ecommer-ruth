@@ -40,6 +40,11 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<Product> findAll(org.springframework.data.domain.Pageable pageable) {
+        return repo.findAllByOrderByCreatedAtDesc(pageable);
+    }
+
+    @Transactional(readOnly = true)
     public Product get(String id) {
         return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Producto", id));
     }
