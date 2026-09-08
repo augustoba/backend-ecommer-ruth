@@ -6,7 +6,7 @@
 spring:
   datasource:
     username: root
-    password: TU_PASSWORD_DE_MYSQL
+    password: root
 
 app:
   jwt:
