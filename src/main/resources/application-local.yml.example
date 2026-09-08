@@ -1,0 +1,13 @@
+# Copiá este archivo a `application-local.yml` (está gitignored) y poné tus
+# credenciales reales de MySQL. Spring lo toma automáticamente si corrés con
+# el perfil `local`:  ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+# o seteá las variables de entorno DB_USER / DB_PASSWORD y no hace falta este archivo.
+
+spring:
+  datasource:
+    username: root
+    password: TU_PASSWORD_DE_MYSQL
+
+app:
+  jwt:
+    secret: pon-aca-un-secreto-largo-de-al-menos-32-caracteres-para-dev

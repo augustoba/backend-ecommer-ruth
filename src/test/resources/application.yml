@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        globally_quoted_identifiers: true
+
+app:
+  jwt:
+    secret: test-secret-estilos-pequenos-1234567890-abcdefghij
+    expiration-minutes: 60
+  admin:
+    username: admin
+    password: test-pass
+  cors:
+    allowed-origins: http://localhost:4200
+  seed:
+    enabled: true

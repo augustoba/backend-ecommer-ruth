@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: estilos-pequenos-backend
+  datasource:
+    url: jdbc:mysql://localhost:3306/estilos_pequenos?createDatabaseIfNotExist=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    # OSIV activado (default de Spring Boot): permite mapear entidades a DTO en el
+    # controller sin LazyInitializationException. A futuro: proyecciones DTO en el
+    # service y desactivar esto.
+    open-in-view: true
+    properties:
+      hibernate:
+        format_sql: false
+        globally_quoted_identifiers: true
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 8MB
+
+server:
+  port: ${SERVER_PORT:8080}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  jwt:
+    # En produccion: definir JWT_SECRET (>= 32 chars). El default es solo para desarrollo local.
+    secret: ${JWT_SECRET:dev-secret-estilos-pequenos-cambiar-en-produccion-1234567890}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:720}
+  admin:
+    username: ${ADMIN_USER:admin}
+    password: ${ADMIN_PASSWORD:cambiar-esta-clave}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:4200,http://localhost:4300}
+  seed:
+    enabled: ${SEED_ENABLED:true}
+
+logging:
+  level:
+    org.hibernate.SQL: warn

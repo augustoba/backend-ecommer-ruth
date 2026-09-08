@@ -1,0 +1,26 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### Local config (credenciales) ###
+src/main/resources/application-local.yml
+src/main/resources/application-local.yaml
+*.local.yml
+
+### IDE ###
+.idea/
+*.iml
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+bin/
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Logs ###
+*.log
