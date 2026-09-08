@@ -222,7 +222,9 @@ public class DataSeeder implements CommandLineRunner {
         p.setDescription(description);
         p.setPrice(new BigDecimal(price));
         p.setAgeRange(ageRange);
-        p.setImageUrl(iconDataUri(emoji, color));
+        // 2 imágenes de ejemplo (portada + una alternativa) para ver la galería
+        p.getImages().add(iconDataUri(emoji, color));
+        p.getImages().add(iconDataUri(emoji, "#e7e5e4"));
         p.setActive(true);
         p.setSizeScaleId(sizeScaleId);
         p.getParams().addAll(params);

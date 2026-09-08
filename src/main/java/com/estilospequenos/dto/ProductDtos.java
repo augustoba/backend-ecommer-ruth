@@ -4,6 +4,7 @@ import com.estilospequenos.model.Product;
 import com.estilospequenos.model.ProductParam;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -25,7 +26,8 @@ public final class ProductDtos {
             @NotBlank @Size(min = 5) String description,
             @NotNull @DecimalMin("0.0") BigDecimal price,
             @NotBlank String ageRange,
-            @NotBlank String imageUrl,
+            /** Fotos del producto, en orden. La primera es la portada. Al menos una. */
+            @NotEmpty List<@NotBlank String> images,
             Boolean active,
             String sizeScaleId,
             String supplierId,
@@ -44,7 +46,10 @@ public final class ProductDtos {
             String description,
             BigDecimal price,
             String ageRange,
+            /** Portada (primera foto), por compatibilidad con las tarjetas / el carrito. */
             String imageUrl,
+            /** Todas las fotos, en orden. */
+            List<String> images,
             boolean active,
             Instant createdAt,
             String sizeScaleId,
@@ -63,8 +68,8 @@ public final class ProductDtos {
                     .toList();
             return new ProductResponse(
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
-                    p.getImageUrl(), p.isActive(), p.getCreatedAt(), p.getSizeScaleId(),
-                    p.getSupplierId(), p.getCostPrice(), params, stocks);
+                    p.getImageUrl(), List.copyOf(p.getImages()), p.isActive(), p.getCreatedAt(),
+                    p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(), params, stocks);
         }
     }
 }

@@ -117,7 +117,6 @@ CREATE TABLE IF NOT EXISTS product (
     description   VARCHAR(4000)  NOT NULL,
     price         DECIMAL(12,2)  NOT NULL,
     age_range     VARCHAR(255)   NOT NULL,
-    image_url     MEDIUMTEXT     NOT NULL,   -- URL o data URI (imagen embebida)
     active        BIT            NOT NULL,
     created_at    DATETIME(6)    NOT NULL,
     size_scale_id VARCHAR(255),
@@ -126,6 +125,15 @@ CREATE TABLE IF NOT EXISTS product (
     PRIMARY KEY (id),
     KEY ix_product_active (active),
     KEY ix_product_supplier (supplier_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS product_image (
+    product_id VARCHAR(255) NOT NULL,
+    idx        INTEGER      NOT NULL,
+    url        MEDIUMTEXT   NOT NULL,   -- URL o data URI (imagen embebida). idx 0 = portada
+    PRIMARY KEY (product_id, idx),
+    CONSTRAINT fk_product_image_product
+        FOREIGN KEY (product_id) REFERENCES product (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS product_param (

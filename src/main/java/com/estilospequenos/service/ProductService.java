@@ -99,7 +99,14 @@ public class ProductService {
         p.setDescription(req.description().trim());
         p.setPrice(req.price());
         p.setAgeRange(req.ageRange().trim());
-        p.setImageUrl(req.imageUrl().trim());
+
+        p.getImages().clear();
+        if (req.images() != null) {
+            for (String url : req.images()) {
+                if (url != null && !url.isBlank()) p.getImages().add(url.trim());
+            }
+        }
+
         p.setActive(req.active() == null || req.active());
         p.setSizeScaleId(blankToNull(req.sizeScaleId()));
         p.setSupplierId(blankToNull(req.supplierId()));

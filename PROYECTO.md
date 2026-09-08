@@ -130,7 +130,8 @@ DTO en el service y desactivarlo.
 |---|---|---|
 | **AdminUser** | `id, username (unique), passwordHash, recoveryHash?, enabled, createdAt` | Contraseña y frase de recuperación **hasheadas con BCrypt**. Un solo registro en la práctica. |
 | **SiteSettings** | fila única `id='config'`, `storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?` | Datos del local editables desde el panel. `whatsappNumber` valida `\d{8,15}`. `instagram` se guarda sin `@`. |
-| **Product** | `id, name, description, price, ageRange, imageUrl (MEDIUMTEXT), active, createdAt, sizeScaleId?, supplierId?, costPrice?` | `imageUrl` admite data URI. `supplierId`/`costPrice` = info interna, **no** se exponen en el catálogo público. |
+| **Product** | `id, name, description, price, ageRange, active, createdAt, sizeScaleId?, supplierId?, costPrice?` | `supplierId`/`costPrice` = info interna, **no** se exponen en el catálogo público. |
+| — `images` | `List<String>` ordenada (`@ElementCollection` → `product_image`) | fotos, URL o data URI. `idx 0` = portada. En el DTO va como `images[]` + `imageUrl` (la portada, getter `@Transient`, por compat con tarjetas/carrito). El request pide `images` (`@NotEmpty`). |
 | — `sizeStocks` | `List<SizeStock{size, stock}>` (`@ElementCollection` → `product_size_stock`) | stock por talle |
 | — `params` | `Set<ProductParam{groupId, optionId}>` (`@ElementCollection` → `product_param`) | en el DTO se expone como `Map<String,List<String>>` |
 | **ParamGroup** | `id, name, multiple, showInCatalog, system` + `@OneToMany options` | grupos de clasificación (Público / Tipo / Estación). `system` = no se puede borrar. |
@@ -280,7 +281,7 @@ app no genera duplicados.
 
 | Archivo | Qué hace |
 |---|---|
-| `setup.sql` | **todo junto**: crea la base + las 15 tablas + la config base (admin, `site_settings`, parametrías, escalas, descuentos). Es el de deploy. |
+| `setup.sql` | **todo junto**: crea la base + las 16 tablas + la config base (admin, `site_settings`, parametrías, escalas, descuentos). Es el de deploy. |
 | `schema.sql` | solo las tablas |
 | `seed.sql` | solo la config base (idempotente, `INSERT ... ON DUPLICATE KEY UPDATE`) |
 | `reset.sql` | drop + create de la base vacía |
@@ -355,3 +356,8 @@ regenerarlo).
 9. **Comparativas** (2026-09-08): `GET /api/admin/metrics/comparison` —
    facturación mes a mes del año y del mismo tramo de días (semana en curso) mes
    a mes.
+10. **Galería de fotos por producto** (2026-09-08): `Product.imageUrl` (campo
+    único) → `Product.images` (`List<String>`, tabla `product_image`, `idx 0` =
+    portada). El request pide `images` (`@NotEmpty`); la respuesta mantiene
+    `imageUrl` (portada, `@Transient`) para no romper tarjetas/carrito.
+    **Sin migración**: el backend no está desplegado — recrear la base de dev.

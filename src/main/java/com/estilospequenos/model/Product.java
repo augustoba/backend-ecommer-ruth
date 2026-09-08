@@ -34,9 +34,16 @@ public class Product {
     @Column(nullable = false)
     private String ageRange;
 
-    /** Puede ser una URL o un data URI (imagen embebida) — por eso el largo. */
-    @Column(nullable = false, length = 5_000_000)
-    private String imageUrl;
+    /**
+     * Fotos del producto, en orden. La primera es la portada (la que se ve en
+     * las tarjetas del catálogo, el carrito y el listado del panel). Cada valor
+     * puede ser una URL o un data URI (imagen embebida) — por eso el largo.
+     */
+    @ElementCollection
+    @CollectionTable(name = "product_image", joinColumns = @JoinColumn(name = "product_id"))
+    @OrderColumn(name = "idx")
+    @Column(name = "url", nullable = false, length = 5_000_000)
+    private List<String> images = new ArrayList<>();
 
     @Column(nullable = false)
     private boolean active = true;
@@ -62,4 +69,10 @@ public class Product {
     @ElementCollection
     @CollectionTable(name = "product_param", joinColumns = @JoinColumn(name = "product_id"))
     private Set<ProductParam> params = new LinkedHashSet<>();
+
+    /** Portada: la primera foto, o null si todavía no tiene ninguna. */
+    @Transient
+    public String getImageUrl() {
+        return images.isEmpty() ? null : images.get(0);
+    }
 }
