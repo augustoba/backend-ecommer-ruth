@@ -121,12 +121,37 @@ public class OrderService {
         return repo.save(order);
     }
 
-    /** Confirma: descuenta stock de las líneas aceptadas y marca PROCESADO. */
+    /**
+     * Confirma: descuenta stock de las líneas aceptadas y marca PROCESADO.
+     * <b>Estricto</b>: si alguna línea aceptada no tiene stock suficiente, no
+     * confirma nada y devuelve 400 con el detalle de lo que falta.
+     */
     public Order confirm(String orderId) {
         Order order = get(orderId);
         if (order.getStatus() != OrderStatus.PENDIENTE) {
             throw new BadRequestException("El pedido ya fue procesado o cancelado.");
         }
+
+        // Pre-chequeo: no tocar stock hasta saber que alcanza para todo.
+        List<String> shortages = new ArrayList<>();
+        for (OrderLine l : order.getLines()) {
+            if (!l.isAccepted()) continue;
+            int available = productRepo.findById(l.getProductId())
+                    .map(p -> p.getSizeStocks().stream()
+                            .filter(s -> s.getSize().equals(l.getSize()))
+                            .mapToInt(com.estilospequenos.model.SizeStock::getStock)
+                            .findFirst().orElse(0))
+                    .orElse(0);
+            if (available < l.getQuantity()) {
+                shortages.add(l.getProductName() + " (talle " + l.getSize() + "): pediste "
+                        + l.getQuantity() + ", quedan " + available);
+            }
+        }
+        if (!shortages.isEmpty()) {
+            throw new BadRequestException("No hay stock suficiente para confirmar. "
+                    + "Ajustá el stock o destildá estos ítems: " + String.join("; ", shortages) + ".");
+        }
+
         for (OrderLine l : order.getLines()) {
             if (l.isAccepted()) {
                 productService.decrementStock(l.getProductId(), l.getSize(), l.getQuantity());

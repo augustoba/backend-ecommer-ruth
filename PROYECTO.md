@@ -180,7 +180,7 @@ Base: `/api`. Errores → cuerpo `ApiError` (`{timestamp, status, error, message
 | **size-scales** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `PUT /{id}/values` `{values}` (reemplaza la lista) |
 | **suppliers** | `GET` · `POST` · `GET/PUT/DELETE /{id}` |
 | **discounts** | `GET` · `POST` · `PUT/DELETE /{id}` · `GET/PUT /api/admin/discounts/config` `{combineMode}` |
-| **orders** | `GET?page&size` (**paginado**, mismo envoltorio que products) · `GET /pending-count` → `{pending}` · `GET /{id}` · `PUT /{id}/lines` `{lines:[{lineId, accepted}]}` · `POST /{id}/confirm` (descuenta stock de las líneas `accepted`, estado→PROCESADO) · `POST /{id}/cancel` — las 3 mutaciones devuelven el pedido actualizado |
+| **orders** | `GET?page&size` (**paginado**, mismo envoltorio que products) · `GET /pending-count` → `{pending}` · `GET /{id}` · `PUT /{id}/lines` `{lines:[{lineId, accepted}]}` · `POST /{id}/confirm` (**estricto**: 400 con detalle si falta stock en alguna línea aceptada — no toca nada; si alcanza, descuenta y estado→PROCESADO) · `POST /{id}/cancel` — las 3 mutaciones devuelven el pedido actualizado |
 | **hero-slides** | `GET` · `POST` · `PUT/DELETE /{id}` · `PUT /reorder` `{ids:[...]}` |
 
 ### Cálculo de descuentos (server-side)
@@ -372,3 +372,8 @@ regenerarlo).
     (`{content, page, size, totalElements, totalPages}`), 20 por página por
     defecto (`?page`/`?size`, tope 100). Los endpoints públicos siguen sin
     paginar.
+13. **Confirmación de pedido estricta** (2026-09-08): `OrderService.confirm`
+    pre-chequea el stock de todas las líneas aceptadas antes de descontar; si
+    algo no alcanza → 400 con el detalle y el pedido queda intacto. (Carrera
+    entre dos confirmaciones simultáneas del mismo talle: no cubierta —
+    requeriría lock/UPDATE condicional; poco probable con un solo admin.)
