@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,6 +54,32 @@ public class OrderService {
     @Transactional(readOnly = true)
     public org.springframework.data.domain.Page<Order> findAll(org.springframework.data.domain.Pageable pageable) {
         return repo.findAllByOrderByCreatedAtDesc(pageable);
+    }
+
+    private final ZoneId zone = ZoneId.systemDefault();
+
+    /**
+     * Listado del panel con filtros opcionales: `search` (nombre del cliente o
+     * número/código de pedido), `status`, y `from`/`to` sobre la fecha de creación.
+     */
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<Order> search(
+            String search, OrderStatus status, LocalDate from, LocalDate to,
+            org.springframework.data.domain.Pageable pageable) {
+
+        Instant fromI = from != null ? from.atStartOfDay(zone).toInstant() : null;
+        Instant toI = to != null ? to.plusDays(1).atStartOfDay(zone).toInstant() : null;
+
+        String s = (search != null && !search.isBlank()) ? search.trim() : null;
+        String like = s != null ? "%" + s.toLowerCase() + "%" : null;
+        long num = -1;
+        if (s != null) {
+            String digits = s.replaceAll("\\D", "");
+            if (!digits.isEmpty()) {
+                try { num = Long.parseLong(digits); } catch (NumberFormatException ignored) { /* -1 */ }
+            }
+        }
+        return repo.search(status, fromI, toI, s, like, num, pageable);
     }
 
     @Transactional(readOnly = true)

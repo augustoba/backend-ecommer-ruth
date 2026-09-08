@@ -180,7 +180,7 @@ Base: `/api`. Errores → cuerpo `ApiError` (`{timestamp, status, error, message
 | **size-scales** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `PUT /{id}/values` `{values}` (reemplaza la lista) |
 | **suppliers** | `GET` · `POST` · `GET/PUT/DELETE /{id}` |
 | **discounts** | `GET` · `POST` · `PUT/DELETE /{id}` · `GET/PUT /api/admin/discounts/config` `{combineMode}` |
-| **orders** | `GET?page&size` (**paginado**, mismo envoltorio que products) · `GET /pending-count` → `{pending}` · `GET /{id}` · `PUT /{id}/lines` `{lines:[{lineId, accepted}]}` · `POST /{id}/confirm` (**estricto**: 400 con detalle si falta stock en alguna línea aceptada — no toca nada; si alcanza, descuenta y estado→PROCESADO) · `POST /{id}/cancel` — las 3 mutaciones devuelven el pedido actualizado |
+| **orders** | `GET?page&size&search&status&from&to` (**paginado** + filtros: `search` = nombre del cliente o número/código de pedido, `status`, `from`/`to` sobre la fecha de creación) · `GET /pending-count` → `{pending}` · `GET /{id}` · `PUT /{id}/lines` `{lines:[{lineId, accepted}]}` · `POST /{id}/confirm` (**estricto**: 400 con detalle si falta stock en alguna línea aceptada — no toca nada; si alcanza, descuenta y estado→PROCESADO) · `POST /{id}/cancel` — las 3 mutaciones devuelven el pedido actualizado |
 | **hero-slides** | `GET` · `POST` · `PUT/DELETE /{id}` · `PUT /reorder` `{ids:[...]}` |
 
 ### Cálculo de descuentos (server-side)
@@ -382,3 +382,7 @@ regenerarlo).
 14. **Vigencia por fechas en descuentos** (2026-09-08): `Discount.startsAt` /
     `endsAt` (columnas nuevas). El cálculo (`computeForLines`, tiers) sólo usa
     los vigentes. El DTO agrega `status`. Validación `startsAt <= endsAt`.
+15. **Filtros en el listado de pedidos** (2026-09-08): `GET /api/admin/orders`
+    acepta `search` (nombre del cliente o número/código), `status`, `from`/`to`
+    (fecha de creación). `OrderRepository.search(...)` con `@Query` de params
+    nulables + `OrderService.search()`.

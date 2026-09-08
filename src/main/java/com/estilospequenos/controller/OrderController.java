@@ -4,13 +4,16 @@ import com.estilospequenos.dto.OrderDtos.CreateOrderRequest;
 import com.estilospequenos.dto.OrderDtos.LinesRequest;
 import com.estilospequenos.dto.OrderDtos.OrderResponse;
 import com.estilospequenos.dto.PageResponse;
+import com.estilospequenos.model.OrderStatus;
 import com.estilospequenos.service.OrderService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 @RestController
@@ -30,13 +33,23 @@ public class OrderController {
 
     // --- Admin ---
 
+    /**
+     * @param search texto libre: nombre del cliente o número/código de pedido
+     * @param status PENDIENTE | PROCESADO | CANCELADO
+     * @param from   fecha de creación desde (inclusive)
+     * @param to     fecha de creación hasta (inclusive)
+     */
     @GetMapping("/api/admin/orders")
     public PageResponse<OrderResponse> list(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         int capped = Math.min(Math.max(size, 1), 100);
         Page<com.estilospequenos.model.Order> result =
-                service.findAll(PageRequest.of(Math.max(page, 0), capped));
+                service.search(search, status, from, to, PageRequest.of(Math.max(page, 0), capped));
         return PageResponse.of(result, result.map(OrderResponse::from).getContent());
     }
 
