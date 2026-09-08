@@ -26,6 +26,19 @@ USE estilos_pequenos;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ---------------------------------------------------------------------------
+--  Datos del local (una sola fila, editable desde el panel)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS site_settings (
+    id              VARCHAR(255)  NOT NULL,   -- siempre 'config'
+    store_name      VARCHAR(255)  NOT NULL,
+    whatsapp_number VARCHAR(255)  NOT NULL,
+    about_text      VARCHAR(2000),
+    instagram       VARCHAR(255),
+    facebook_url    VARCHAR(255),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
 --  Usuario del panel de administración (contraseña hasheada con BCrypt)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS admin_user (

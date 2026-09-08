@@ -35,6 +35,15 @@ class CatalogTest {
     }
 
     @Test
+    void siteSettingsArePublicAndSeeded() throws Exception {
+        mvc.perform(get("/api/settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.storeName").isNotEmpty())
+                .andExpect(jsonPath("$.whatsappNumber").isNotEmpty());
+        mvc.perform(get("/api/admin/settings")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void createOrderCalculatesTotals() throws Exception {
         // el primer producto sembrado; tomamos su id y un talle
         String products = mvc.perform(get("/api/products"))

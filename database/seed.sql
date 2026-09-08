@@ -16,6 +16,15 @@
 USE estilos_pequenos;
 
 -- ---------------------------------------------------------------------------
+--  Datos del local (editables desde /admin/ajustes)
+-- ---------------------------------------------------------------------------
+INSERT INTO site_settings (id, store_name, whatsapp_number, about_text, instagram, facebook_url) VALUES
+  ('config', 'Estilos Pequeños', '5491122334455',
+   'Somos Estilos Pequeños 🧸 Hace 5 años vestimos a los más chicos con ropa cómoda, de calidad y con onda. Elegimos cada prenda pensando en la comodidad de los peques y la tranquilidad de las familias. ¡Gracias por elegirnos!',
+   'estilospequenos_', 'https://www.facebook.com/share/1NZXdYgick/')
+ON DUPLICATE KEY UPDATE id = id;
+
+-- ---------------------------------------------------------------------------
 --  Admin inicial
 --    usuario: admin
 --    contraseña: ruth123

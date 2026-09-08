@@ -18,7 +18,6 @@
 --    cat database/schema.sql database/seed.sql > database/setup.sql
 --
 --  Después: correr la app con `spring.jpa.hibernate.ddl-auto=validate` (o `none`).
--- =============================================================================
 
 -- =============================================================================
 --  Estilos Pequeños — esquema de la base de datos (MySQL 8)
@@ -46,6 +45,19 @@ CREATE DATABASE IF NOT EXISTS estilos_pequenos
 USE estilos_pequenos;
 
 SET FOREIGN_KEY_CHECKS = 0;
+
+-- ---------------------------------------------------------------------------
+--  Datos del local (una sola fila, editable desde el panel)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS site_settings (
+    id              VARCHAR(255)  NOT NULL,   -- siempre 'config'
+    store_name      VARCHAR(255)  NOT NULL,
+    whatsapp_number VARCHAR(255)  NOT NULL,
+    about_text      VARCHAR(2000),
+    instagram       VARCHAR(255),
+    facebook_url    VARCHAR(255),
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
 --  Usuario del panel de administración (contraseña hasheada con BCrypt)
@@ -242,6 +254,15 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- =============================================================================
 
 USE estilos_pequenos;
+
+-- ---------------------------------------------------------------------------
+--  Datos del local (editables desde /admin/ajustes)
+-- ---------------------------------------------------------------------------
+INSERT INTO site_settings (id, store_name, whatsapp_number, about_text, instagram, facebook_url) VALUES
+  ('config', 'Estilos Pequeños', '5491122334455',
+   'Somos Estilos Pequeños 🧸 Hace 5 años vestimos a los más chicos con ropa cómoda, de calidad y con onda. Elegimos cada prenda pensando en la comodidad de los peques y la tranquilidad de las familias. ¡Gracias por elegirnos!',
+   'estilospequenos_', 'https://www.facebook.com/share/1NZXdYgick/')
+ON DUPLICATE KEY UPDATE id = id;
 
 -- ---------------------------------------------------------------------------
 --  Admin inicial

@@ -14,6 +14,7 @@ import com.estilospequenos.repository.ParamRepository;
 import com.estilospequenos.repository.ProductRepository;
 import com.estilospequenos.repository.SizeScaleRepository;
 import com.estilospequenos.service.AuthService;
+import com.estilospequenos.service.SiteSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -34,6 +35,7 @@ public class DataSeeder implements CommandLineRunner {
 
     private final AppProperties props;
     private final AuthService authService;
+    private final SiteSettingsService siteSettingsService;
     private final ParamRepository paramRepo;
     private final SizeScaleRepository sizeScaleRepo;
     private final DiscountRepository discountRepo;
@@ -42,8 +44,9 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        // El admin inicial se crea siempre (no es "dato de ejemplo").
+        // Config del sitio y admin inicial: siempre (no son "datos de ejemplo").
         authService.ensureInitialAdmin();
+        siteSettingsService.get();
 
         if (!props.getSeed().isEnabled()) return;
         seedParamGroups();
