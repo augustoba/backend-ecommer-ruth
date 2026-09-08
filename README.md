@@ -85,6 +85,20 @@ curl -i -X POST http://localhost:8080/api/admin/products
 ```
 Los tests usan **H2 en memoria** (no tocan MySQL).
 
+## Estructura (package-by-layer)
+
+```
+com.estilospequenos
+  BackendApplication
+  model/        entidades JPA (Product, Order, ParamGroup, SizeScale, Supplier, Discount…)
+  repository/   interfaces Spring Data (*Repository)
+  service/      lógica de negocio (*Service)
+  controller/   endpoints REST (*Controller, incl. AuthController)
+  dto/          records de request/response (*Dtos, LoginRequest, TokenResponse)
+  common/       ApiError, excepciones, utils (Slugs)
+  config/       seguridad/JWT, CORS, OpenAPI, DataSeeder, manejo de errores
+```
+
 ## Endpoints
 
 | Ámbito | Ruta base |

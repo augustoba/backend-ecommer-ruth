@@ -5,10 +5,10 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import javax.crypto.SecretKey;
 
 /** Genera y valida los JWT del panel de administración (HS256). */
 @Service
