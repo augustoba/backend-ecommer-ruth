@@ -1,11 +1,14 @@
 package com.estilospequenos.service;
 
+import com.estilospequenos.dto.MetricsDtos.ComparisonResponse;
 import com.estilospequenos.dto.MetricsDtos.GroupBreakdown;
 import com.estilospequenos.dto.MetricsDtos.GroupRow;
 import com.estilospequenos.dto.MetricsDtos.MetricsResponse;
 import com.estilospequenos.dto.MetricsDtos.MonthBucket;
+import com.estilospequenos.dto.MetricsDtos.PeriodStat;
 import com.estilospequenos.dto.MetricsDtos.ProductStat;
 import com.estilospequenos.dto.MetricsDtos.Totals;
+import com.estilospequenos.dto.MetricsDtos.WeekWindow;
 import com.estilospequenos.model.Order;
 import com.estilospequenos.model.OrderLine;
 import com.estilospequenos.model.OrderStatus;
@@ -117,6 +120,70 @@ public class MetricsService {
                 topProducts(byProduct),
                 bottomProducts(byProduct, productsById),
                 groupBreakdown(group, groupId, byOption));
+    }
+
+    /**
+     * Comparativas del año: venta total mes a mes, y ventas del mismo tramo de
+     * días de cada mes (la "semana en curso" del mes actual, tomando bloques de
+     * 7 días: 1–7, 8–14, 15–21, 22–28, 29–fin). El tramo se corta en el día de
+     * hoy, así se compara "lo que va de la semana" contra el mismo punto de los
+     * meses anteriores.
+     */
+    @Transactional(readOnly = true)
+    public ComparisonResponse compareYear(Integer yearParam) {
+        LocalDate today = LocalDate.now();
+        int year = yearParam != null ? yearParam : today.getYear();
+        int lastMonth = year == today.getYear() ? today.getMonthValue() : 12;
+
+        int weekOfMonth = (today.getDayOfMonth() - 1) / 7 + 1;
+        int dayFrom = (weekOfMonth - 1) * 7 + 1;
+        int dayTo = Math.min(today.getDayOfMonth(), dayFrom + 6);
+
+        Instant yearStart = LocalDate.of(year, 1, 1).atStartOfDay(zone).toInstant();
+        Instant yearEnd = LocalDate.of(year, 1, 1).plusYears(1).atStartOfDay(zone).toInstant();
+        List<Order> orders = orderRepo
+                .findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(OrderStatus.PROCESADO, yearStart, yearEnd);
+
+        Map<Integer, Acc> monthly = new LinkedHashMap<>();
+        Map<Integer, Acc> weekly = new LinkedHashMap<>();
+
+        for (Order o : orders) {
+            LocalDate d = LocalDate.ofInstant(o.getProcessedAt(), zone);
+            BigDecimal revenue = BigDecimal.ZERO;
+            long units = 0;
+            for (OrderLine l : o.getLines()) {
+                if (!l.isAccepted()) continue;
+                revenue = revenue.add(l.getUnitPrice().multiply(BigDecimal.valueOf(l.getQuantity())));
+                units += l.getQuantity();
+            }
+            if (units == 0) continue;
+
+            add(monthly.computeIfAbsent(d.getMonthValue(), k -> new Acc()), revenue, units);
+            if (d.getDayOfMonth() >= dayFrom && d.getDayOfMonth() <= dayTo) {
+                add(weekly.computeIfAbsent(d.getMonthValue(), k -> new Acc()), revenue, units);
+            }
+        }
+
+        return new ComparisonResponse(
+                year,
+                new WeekWindow(weekOfMonth, dayFrom, dayTo),
+                periodSeries(year, lastMonth, monthly),
+                periodSeries(year, lastMonth, weekly));
+    }
+
+    private static void add(Acc acc, BigDecimal revenue, long units) {
+        acc.revenue = acc.revenue.add(revenue);
+        acc.units += units;
+        acc.orders++;
+    }
+
+    private List<PeriodStat> periodSeries(int year, int lastMonth, Map<Integer, Acc> byMonth) {
+        List<PeriodStat> out = new ArrayList<>();
+        for (int m = 1; m <= lastMonth; m++) {
+            Acc a = byMonth.getOrDefault(m, new Acc());
+            out.add(new PeriodStat(String.format("%d-%02d", year, m), a.revenue, a.units, a.orders));
+        }
+        return out;
     }
 
     /** Opciones del grupo pedido que tiene el producto. Vacío ("") si no tiene ninguna o el producto no existe. */

@@ -172,7 +172,7 @@ Base: `/api`. Errores → cuerpo `ApiError` (`{timestamp, status, error, message
 |---|---|
 | **account** | `GET /api/admin/account` → `{username, hasRecoveryPhrase}` · `PUT /account/password` `{currentPassword, newPassword}` · `PUT /account/recovery` `{currentPassword, recoveryPhrase}` |
 | **settings** | `GET /api/admin/settings` · `PUT /api/admin/settings` `{storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?}` (misma respuesta que el GET público) |
-| **metrics** | `GET /api/admin/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=grp-tipo` → totales, serie mensual, top/bottom productos y desglose por grupo de parametría. Ver §6bis. |
+| **metrics** | `GET /api/admin/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=grp-tipo` → totales, serie mensual, top/bottom productos y desglose por grupo de parametría. `GET /api/admin/metrics/comparison?year=` → comparativas mes a mes y semana a semana. Ver §6bis. |
 | **products** | `GET` (todos, incl. inactivos) · `POST` · `GET/PUT/DELETE /{id}` · `PATCH /{id}/active` `{active}` · `PATCH /{id}/stock` `{size, stock}` |
 | **param-groups** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `POST /{id}/options` · `PUT/DELETE /{id}/options/{optionId}` |
 | **size-scales** | `GET` · `POST` · `PUT/DELETE /{id}` (DELETE bloqueado si `system`) · `PUT /{id}/values` `{values}` (reemplaza la lista) |
@@ -211,6 +211,14 @@ el descuento del pedido, que es a nivel total).
   **incluye productos activos con 0 ventas**, máx. 10), `byGroup {groupId,
   groupName, rows[]}` (unidades y facturación por opción del grupo).
 - Rango inválido (`from` > `to`) → 400.
+
+**`GET /api/admin/metrics/comparison?year=2026`** — comparativas del año
+(`MetricsService.compareYear`): `monthly[]` = facturación total mes a mes (hasta
+el mes actual), `weekly[]` = ídem pero sólo el mismo tramo de días que la
+"semana en curso" del mes actual (bloques de 7 días — 1–7, 8–14, 15–21, 22–28,
+29–fin — cortados en el día de hoy, para comparar "lo que va de la semana"
+contra el mismo punto de los meses anteriores). `week {weekOfMonth, dayFrom,
+dayTo}` describe esa ventana. `year` por defecto: el actual.
 
 ---
 
@@ -344,3 +352,6 @@ regenerarlo).
    (`MetricsService`) — totales, serie mensual continua, top/bottom productos y
    desglose por grupo de parametría, sobre los pedidos PROCESADO en un rango de
    fechas. Sin cambios de esquema (sólo lectura de `Order`/`OrderLine`).
+9. **Comparativas** (2026-09-08): `GET /api/admin/metrics/comparison` —
+   facturación mes a mes del año y del mismo tramo de días (semana en curso) mes
+   a mes.

@@ -73,5 +73,17 @@ class MetricsTest {
                 .andExpect(jsonPath("$.byMonth").isArray())
                 .andExpect(jsonPath("$.byGroup.groupId").value("grp-tipo"))
                 .andExpect(jsonPath("$.topProducts[0].units", greaterThanOrEqualTo(3)));
+
+        mvc.perform(get("/api/admin/metrics/comparison").header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.year").isNumber())
+                .andExpect(jsonPath("$.week.dayFrom").isNumber())
+                .andExpect(jsonPath("$.monthly").isArray())
+                .andExpect(jsonPath("$.weekly").isArray());
+    }
+
+    @Test
+    void comparisonRequiresToken() throws Exception {
+        mvc.perform(get("/api/admin/metrics/comparison")).andExpect(status().isUnauthorized());
     }
 }

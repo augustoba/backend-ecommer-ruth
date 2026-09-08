@@ -1,6 +1,7 @@
 package com.estilospequenos.controller;
 
 import com.estilospequenos.common.BadRequestException;
+import com.estilospequenos.dto.MetricsDtos.ComparisonResponse;
 import com.estilospequenos.dto.MetricsDtos.MetricsResponse;
 import com.estilospequenos.service.MetricsService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -40,5 +41,16 @@ public class MetricsController {
             throw new BadRequestException("La fecha 'desde' no puede ser posterior a 'hasta'.");
         }
         return service.compute(f, t, groupBy);
+    }
+
+    /**
+     * Comparativas del año: venta total mes a mes, y ventas del mismo tramo de
+     * días (la semana en curso) mes a mes.
+     *
+     * @param year año a comparar. Por defecto: el actual.
+     */
+    @GetMapping("/comparison")
+    public ComparisonResponse comparison(@RequestParam(required = false) Integer year) {
+        return service.compareYear(year);
     }
 }

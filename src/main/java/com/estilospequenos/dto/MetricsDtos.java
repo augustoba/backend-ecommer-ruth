@@ -28,4 +28,19 @@ public class MetricsDtos {
     public record GroupBreakdown(String groupId, String groupName, List<GroupRow> rows) {}
 
     public record GroupRow(String optionId, String label, long units, BigDecimal revenue) {}
+
+    // --- Comparativas del año (`/api/admin/metrics/comparison`) ---
+
+    public record ComparisonResponse(
+            int year,
+            /** Ventana de días del mes que se compara (semana en curso). */
+            WeekWindow week,
+            /** Venta total mes a mes del año (hasta el mes actual). */
+            List<PeriodStat> monthly,
+            /** Ventas del mismo tramo de días (`week`) mes a mes. */
+            List<PeriodStat> weekly) {}
+
+    public record WeekWindow(int weekOfMonth, int dayFrom, int dayTo) {}
+
+    public record PeriodStat(String month, BigDecimal revenue, long units, long orders) {}
 }
