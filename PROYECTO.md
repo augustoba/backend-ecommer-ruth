@@ -138,7 +138,7 @@ DTO en el service y desactivarlo.
 | **ParamOption** | `id, label, position` | |
 | **SizeScale** | `id, name, system` + `values: List<String>` ordenada | escalas de talle (ropa bebé/niños/adultos, calzado) |
 | **Supplier** | `id, name, phone?, address?, notes?` | proveedores del local |
-| **Discount** | `id, kind (MONTO\|PARAMETRO), discountPercent, enabled, label?, minAmount?, groupId?, optionId?` | |
+| **Discount** | `id, kind (MONTO\|PARAMETRO), discountPercent, enabled, label?, startsAt?, endsAt?, minAmount?, groupId?, optionId?` | `startsAt`/`endsAt` (LocalDate, inclusivas) = vigencia opcional. `activeNow()` = enabled + dentro del rango. El DTO expone `status` (ACTIVO\|PROGRAMADO\|VENCIDO\|DESHABILITADO). |
 | **DiscountConfig** | fila única `id='config'`, `combineMode (MEJOR\|COMBINAR)` | |
 | **Order** | `id, number (unique), customerName, subtotal, discountPercent, discountAmount, total, status (PENDIENTE\|PROCESADO\|CANCELADO), createdAt, processedAt?` | `code` = `"PED-" + %04d(number)` (getter `@Transient`). `number` se deriva de `MAX(number)+1`. |
 | — `lines` | `List<OrderLine{id, productId, productName, size, quantity, unitPrice, accepted}>` | `productName` se guarda por si el producto cambia después |
@@ -187,9 +187,11 @@ Base: `/api`. Errores → cuerpo `ApiError` (`{timestamp, status, error, message
 
 `DiscountService.computeForLines(...)` — port de `discount.service.ts`
 (`computeCartDiscount`) del frontend:
-- **por parámetro**: por ítem, el `%` más alto de un descuento habilitado cuyo
+- sólo entran los descuentos **vigentes** (`activeNow()` = habilitado + dentro de
+  `startsAt`/`endsAt` si tiene);
+- **por parámetro**: por ítem, el `%` más alto de un descuento vigente cuyo
   `(groupId, optionId)` esté en `product.params`;
-- **por monto**: el mejor tier habilitado alcanzado;
+- **por monto**: el mejor tier vigente alcanzado;
 - modo `MEJOR` (se usa el que más ahorra, no acumula) / `COMBINAR` (parámetro por
   ítem + monto sobre el subtotal ya rebajado);
 - `discountPercent` efectivo = `round(amount / subtotal * 100)`.
@@ -377,3 +379,6 @@ regenerarlo).
     algo no alcanza → 400 con el detalle y el pedido queda intacto. (Carrera
     entre dos confirmaciones simultáneas del mismo talle: no cubierta —
     requeriría lock/UPDATE condicional; poco probable con un solo admin.)
+14. **Vigencia por fechas en descuentos** (2026-09-08): `Discount.startsAt` /
+    `endsAt` (columnas nuevas). El cálculo (`computeForLines`, tiers) sólo usa
+    los vigentes. El DTO agrega `status`. Validación `startsAt <= endsAt`.

@@ -1,5 +1,6 @@
 package com.estilospequenos.service;
 
+import com.estilospequenos.common.BadRequestException;
 import com.estilospequenos.common.ResourceNotFoundException;
 import com.estilospequenos.dto.DiscountDtos.BreakdownLine;
 import com.estilospequenos.dto.DiscountDtos.CartDiscountResult;
@@ -62,13 +63,25 @@ public class DiscountService {
     }
 
     private void apply(Discount d, DiscountRequest req) {
+        if (req.startsAt() != null && req.endsAt() != null && req.startsAt().isAfter(req.endsAt())) {
+            throw new BadRequestException("La fecha 'desde' no puede ser posterior a 'hasta'.");
+        }
         d.setKind(req.kind());
         d.setDiscountPercent(req.discountPercent());
         d.setEnabled(req.enabled() == null || req.enabled());
         d.setLabel(req.label() == null || req.label().isBlank() ? null : req.label().trim());
+        d.setStartsAt(req.startsAt());
+        d.setEndsAt(req.endsAt());
         d.setMinAmount(req.kind() == Discount.Kind.MONTO ? req.minAmount() : null);
         d.setGroupId(req.kind() == Discount.Kind.PARAMETRO ? req.groupId() : null);
         d.setOptionId(req.kind() == Discount.Kind.PARAMETRO ? req.optionId() : null);
+    }
+
+    /** Descuentos de un tipo que hoy están vigentes (enabled + rango de fechas). */
+    private List<Discount> activeOfKind(Discount.Kind kind) {
+        return repo.findAll().stream()
+                .filter(d -> d.getKind() == kind && d.activeNow())
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -98,7 +111,7 @@ public class DiscountService {
             return new CartDiscountResult(0, BigDecimal.ZERO, List.of());
         }
 
-        List<Discount> paramDiscounts = repo.findByKindAndEnabledTrue(Discount.Kind.PARAMETRO).stream()
+        List<Discount> paramDiscounts = activeOfKind(Discount.Kind.PARAMETRO).stream()
                 .filter(d -> d.getGroupId() != null && d.getOptionId() != null)
                 .toList();
 
@@ -159,7 +172,7 @@ public class DiscountService {
     }
 
     private Discount bestAmountTierFor(BigDecimal base) {
-        return repo.findByKindAndEnabledTrue(Discount.Kind.MONTO).stream()
+        return activeOfKind(Discount.Kind.MONTO).stream()
                 .filter(d -> d.getMinAmount() != null && d.getMinAmount().signum() > 0)
                 .filter(d -> base.compareTo(d.getMinAmount()) >= 0)
                 .max(Comparator.comparing(Discount::getMinAmount))
@@ -169,7 +182,7 @@ public class DiscountService {
     /** El próximo tier por monto todavía no alcanzado (para el banner del carrito). */
     @Transactional(readOnly = true)
     public Discount nextAmountTierFor(BigDecimal subtotal) {
-        return repo.findByKindAndEnabledTrue(Discount.Kind.MONTO).stream()
+        return activeOfKind(Discount.Kind.MONTO).stream()
                 .filter(d -> d.getMinAmount() != null && d.getMinAmount().signum() > 0)
                 .filter(d -> subtotal.compareTo(d.getMinAmount()) < 0)
                 .min(Comparator.comparing(Discount::getMinAmount))

@@ -186,6 +186,8 @@ CREATE TABLE IF NOT EXISTS discount (
     discount_percent INTEGER      NOT NULL,
     enabled          BIT          NOT NULL,
     label            VARCHAR(255),
+    starts_at        DATE,                   -- vigencia opcional (inclusive)
+    ends_at          DATE,                   -- vigencia opcional (inclusive)
     min_amount       DECIMAL(38,2),          -- kind = MONTO
     group_id         VARCHAR(255),           -- kind = PARAMETRO
     option_id        VARCHAR(255),           -- kind = PARAMETRO
