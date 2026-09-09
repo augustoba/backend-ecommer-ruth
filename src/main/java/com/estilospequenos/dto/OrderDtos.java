@@ -56,6 +56,28 @@ public final class OrderDtos {
         }
     }
 
+    /** Vista pública de un pedido (consulta "mis pedidos" con código + nombre). Sin datos internos. */
+    public record PublicOrderResponse(
+            String code, String customerName, OrderStatus status,
+            Instant createdAt, Instant processedAt,
+            DeliveryMethod deliveryMethod, BigDecimal subtotal, int discountPercent,
+            BigDecimal discountAmount, BigDecimal total,
+            List<PublicOrderLine> items
+    ) {
+        public record PublicOrderLine(String productName, String size, int quantity, BigDecimal unitPrice) {}
+
+        public static PublicOrderResponse from(Order o) {
+            List<PublicOrderLine> items = o.getLines().stream()
+                    .map(l -> new PublicOrderLine(l.getProductName(), l.getSize(), l.getQuantity(), l.getUnitPrice()))
+                    .toList();
+            return new PublicOrderResponse(
+                    o.getCode(), o.getCustomerName(), o.getStatus(),
+                    o.getCreatedAt(), o.getProcessedAt(),
+                    o.getDeliveryMethod(), o.getSubtotal(), o.getDiscountPercent(),
+                    o.getDiscountAmount(), o.getTotal(), items);
+        }
+    }
+
     public record OrderResponse(
             String id, String code, String customerName,
             BigDecimal subtotal, int discountPercent, BigDecimal discountAmount, BigDecimal total,

@@ -3,6 +3,7 @@ package com.estilospequenos.controller;
 import com.estilospequenos.dto.OrderDtos.CreateOrderRequest;
 import com.estilospequenos.dto.OrderDtos.LinesRequest;
 import com.estilospequenos.dto.OrderDtos.OrderResponse;
+import com.estilospequenos.dto.OrderDtos.PublicOrderResponse;
 import com.estilospequenos.dto.PageResponse;
 import com.estilospequenos.model.OrderStatus;
 import com.estilospequenos.service.OrderService;
@@ -29,6 +30,12 @@ public class OrderController {
     @PostMapping("/api/orders")
     public ResponseEntity<OrderResponse> create(@Valid @RequestBody CreateOrderRequest req) {
         return ResponseEntity.status(201).body(OrderResponse.from(service.create(req)));
+    }
+
+    /** Público: consulta el estado de un pedido con el código + el nombre del cliente. */
+    @GetMapping("/api/orders/lookup")
+    public PublicOrderResponse lookup(@RequestParam String code, @RequestParam String name) {
+        return PublicOrderResponse.from(service.lookup(code, name));
     }
 
     // --- Admin ---

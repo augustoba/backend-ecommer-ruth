@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS site_settings (
     whatsapp_intro   VARCHAR(2000),            -- saludo del mensaje de pedido; null = texto por defecto
     whatsapp_closing VARCHAR(2000),            -- cierre del mensaje de pedido; null = texto por defecto
     store_address    VARCHAR(500),             -- dirección del local (opción "retiro")
+    help_text        VARCHAR(8000),            -- pagina "como comprar" (texto libre)
+    faq_text         TEXT,                     -- preguntas frecuentes (bloques separados por linea en blanco)
     payment_transfer_enabled     BIT NOT NULL DEFAULT 0,
     payment_transfer_alias       VARCHAR(200),
     payment_qr_transfer_enabled  BIT NOT NULL DEFAULT 0,

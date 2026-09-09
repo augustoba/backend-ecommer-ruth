@@ -59,6 +59,17 @@ public class SiteSettings {
     @Column(length = 500)
     private String storeAddress;
 
+    /** Texto de la página "Cómo comprar" (texto libre, se respeta el salto de línea). */
+    @Column(length = 8000)
+    private String helpText;
+
+    /**
+     * Preguntas frecuentes, texto libre. Cada bloque separado por una línea en
+     * blanco: la primera línea es la pregunta, el resto la respuesta.
+     */
+    @Column(length = 20000)
+    private String faqText;
+
     // --- Medios de pago (aparece en el checkout si está habilitado Y tiene su dato) ---
 
     @Column(nullable = false)

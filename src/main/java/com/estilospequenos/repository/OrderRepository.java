@@ -39,6 +39,8 @@ public interface OrderRepository extends JpaRepository<Order, String> {
                        @Param("searchNum") long searchNum,
                        Pageable pageable);
 
+    java.util.Optional<Order> findByNumber(long number);
+
     long countByStatus(OrderStatus status);
 
     /** Pedidos de un estado con `processedAt` dentro del rango [from, to). Para métricas. */

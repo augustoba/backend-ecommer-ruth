@@ -88,6 +88,28 @@ public class OrderService {
         return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Pedido", id));
     }
 
+    /**
+     * Consulta pública de un pedido por su código + nombre del cliente. Pide que
+     * el nombre coincida (ignora mayúsculas/espacios) para que no se puedan
+     * enumerar pedidos ajenos con sólo el código correlativo.
+     */
+    @Transactional(readOnly = true)
+    public Order lookup(String code, String name) {
+        String digits = code == null ? "" : code.replaceAll("\\D", "");
+        if (digits.isEmpty() || name == null || name.isBlank()) {
+            throw ResourceNotFoundException.of("Pedido", code);
+        }
+        long number;
+        try {
+            number = Long.parseLong(digits);
+        } catch (NumberFormatException e) {
+            throw ResourceNotFoundException.of("Pedido", code);
+        }
+        return repo.findByNumber(number)
+                .filter(o -> o.getCustomerName().trim().equalsIgnoreCase(name.trim()))
+                .orElseThrow(() -> ResourceNotFoundException.of("Pedido", code));
+    }
+
     @Transactional(readOnly = true)
     public long pendingCount() {
         return repo.countByStatus(OrderStatus.PENDIENTE);

@@ -37,6 +37,8 @@ public class SiteSettingsService {
         s.setWhatsappIntro(blankToNull(req.whatsappIntro()));
         s.setWhatsappClosing(blankToNull(req.whatsappClosing()));
         s.setStoreAddress(blankToNull(req.storeAddress()));
+        s.setHelpText(blankToNull(req.helpText()));
+        s.setFaqText(blankToNull(req.faqText()));
         s.setPaymentTransferEnabled(Boolean.TRUE.equals(req.paymentTransferEnabled()));
         s.setPaymentTransferAlias(blankToNull(req.paymentTransferAlias()));
         s.setPaymentQrTransferEnabled(Boolean.TRUE.equals(req.paymentQrTransferEnabled()));
