@@ -59,15 +59,19 @@ public class SiteSettings {
     @Column(length = 500)
     private String storeAddress;
 
-    /** Texto de la página "Cómo comprar" (texto libre, se respeta el salto de línea). */
-    @Column(length = 8000)
+    /**
+     * Texto de la página "Cómo comprar" (texto libre, se respeta el salto de
+     * línea). `length` grande → Hibernate lo mapea a MEDIUMTEXT (no entra en el
+     * límite de tamaño de fila de MySQL como haría un VARCHAR grande).
+     */
+    @Column(length = 100_000)
     private String helpText;
 
     /**
      * Preguntas frecuentes, texto libre. Cada bloque separado por una línea en
-     * blanco: la primera línea es la pregunta, el resto la respuesta.
+     * blanco: la primera línea es la pregunta, el resto la respuesta. MEDIUMTEXT.
      */
-    @Column(length = 20000)
+    @Column(length = 500_000)
     private String faqText;
 
     // --- Medios de pago (aparece en el checkout si está habilitado Y tiene su dato) ---
