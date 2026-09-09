@@ -57,6 +57,14 @@ public class Product {
     @Column(nullable = false)
     private boolean discontinued = false;
 
+    /**
+     * true = producto archivado (soft-delete). Sale del catálogo y de todos los
+     * listados del panel, pero se conserva la fila para no romper el historial
+     * de pedidos. Se puede restaurar desde "Productos archivados".
+     */
+    @Column(nullable = false)
+    private boolean deleted = false;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 

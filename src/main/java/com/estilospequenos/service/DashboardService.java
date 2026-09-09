@@ -44,8 +44,8 @@ public class DashboardService {
         LocalDate today = LocalDate.now();
         Totals month = metricsService.rangeTotals(today.withDayOfMonth(1), today);
 
-        long active = productRepo.countByActiveTrue();
-        long total = productRepo.count();
+        long active = productRepo.countByActiveTrueAndDeletedFalse();
+        long total = productRepo.countByDeletedFalse();
 
         List<RecentOrder> recent = orderRepo.findAllByOrderByCreatedAtDesc().stream()
                 .limit(RECENT_ORDERS)
@@ -68,7 +68,7 @@ public class DashboardService {
     @Transactional(readOnly = true)
     public List<LowStockItem> lowStock() {
         List<LowStockItem> items = new ArrayList<>();
-        for (Product p : productRepo.findByActiveTrueOrderByCreatedAtDesc()) {
+        for (Product p : productRepo.findByActiveTrueAndDeletedFalseOrderByCreatedAtDesc()) {
             if (p.isDiscontinued()) continue; // el dueño/a marcó "no reponer"
             int threshold = p.getLowStockThreshold() != null ? p.getLowStockThreshold() : DEFAULT_LOW_STOCK;
             for (SizeStock s : p.getSizeStocks()) {

@@ -31,17 +31,33 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public List<Product> findActive() {
-        return repo.findByActiveTrueOrderByCreatedAtDesc();
+        return repo.findByActiveTrueAndDeletedFalseOrderByCreatedAtDesc();
     }
 
     @Transactional(readOnly = true)
     public List<Product> findAll() {
-        return repo.findAllByOrderByCreatedAtDesc();
+        return repo.findByDeletedFalseOrderByCreatedAtDesc();
     }
 
     @Transactional(readOnly = true)
-    public org.springframework.data.domain.Page<Product> findAll(org.springframework.data.domain.Pageable pageable) {
-        return repo.findAllByOrderByCreatedAtDesc(pageable);
+    public List<Product> findArchived() {
+        return repo.findByDeletedTrueOrderByCreatedAtDesc();
+    }
+
+    /** Listado del panel con filtros (ver ProductRepository.search). */
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<Product> search(
+            String search, String supplierId, Boolean active,
+            String groupId, String optionId, boolean noStock,
+            org.springframework.data.domain.Pageable pageable) {
+        String s = (search != null && !search.isBlank()) ? search.trim() : null;
+        String like = s != null ? "%" + s.toLowerCase() + "%" : null;
+        String sup = (supplierId != null && !supplierId.isBlank()) ? supplierId.trim() : null;
+        String gid = (groupId != null && !groupId.isBlank()) ? groupId.trim() : null;
+        String oid = (optionId != null && !optionId.isBlank()) ? optionId.trim() : null;
+        // el filtro de parametría necesita el par completo
+        if (gid == null || oid == null) { gid = null; oid = null; }
+        return repo.search(s, like, sup, active, gid, oid, noStock, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -93,8 +109,19 @@ public class ProductService {
         return repo.save(copy);
     }
 
+    /** Soft-delete: archiva el producto (lo saca de todos lados) sin borrar la fila. */
     public void delete(String id) {
-        repo.delete(get(id));
+        Product p = get(id);
+        p.setDeleted(true);
+        p.setActive(false);
+        repo.save(p);
+    }
+
+    /** Restaura un producto archivado (queda oculto: hay que republicarlo a mano). */
+    public Product restore(String id) {
+        Product p = get(id);
+        p.setDeleted(false);
+        return repo.save(p);
     }
 
     public Product setActive(String id, boolean active) {

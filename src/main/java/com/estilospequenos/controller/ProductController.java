@@ -41,11 +41,28 @@ public class ProductController {
     @GetMapping("/api/admin/products")
     public PageResponse<ProductResponse> list(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String supplierId,
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) String groupId,
+            @RequestParam(required = false) String optionId,
+            @RequestParam(defaultValue = "false") boolean noStock) {
         int capped = Math.min(Math.max(size, 1), 100);
-        Page<com.estilospequenos.model.Product> result =
-                service.findAll(PageRequest.of(Math.max(page, 0), capped));
+        Page<com.estilospequenos.model.Product> result = service.search(
+                search, supplierId, active, groupId, optionId, noStock,
+                PageRequest.of(Math.max(page, 0), capped));
         return PageResponse.of(result, result.map(ProductResponse::from).getContent());
+    }
+
+    @GetMapping("/api/admin/products/archived")
+    public List<ProductResponse> archived() {
+        return service.findArchived().stream().map(ProductResponse::from).toList();
+    }
+
+    @PostMapping("/api/admin/products/{id}/restore")
+    public ProductResponse restore(@PathVariable String id) {
+        return ProductResponse.from(service.restore(id));
     }
 
     @GetMapping("/api/admin/products/{id}")

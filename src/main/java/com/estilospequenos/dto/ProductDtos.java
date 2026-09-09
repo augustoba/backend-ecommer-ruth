@@ -58,6 +58,7 @@ public final class ProductDtos {
             List<String> images,
             boolean active,
             boolean discontinued,
+            boolean deleted,
             Instant createdAt,
             String sizeScaleId,
             String supplierId,
@@ -77,7 +78,7 @@ public final class ProductDtos {
             return new ProductResponse(
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
                     p.getImageUrl(), List.copyOf(p.getImages()), p.isActive(), p.isDiscontinued(),
-                    p.getCreatedAt(), p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(),
+                    p.isDeleted(), p.getCreatedAt(), p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(),
                     p.getLowStockThreshold(), params, stocks);
         }
     }

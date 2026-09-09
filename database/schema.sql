@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS product (
     age_range     VARCHAR(255)   NOT NULL,
     active        BIT            NOT NULL,
     discontinued  BIT            NOT NULL DEFAULT 0,   -- "no reponer": sale de las alertas de stock bajo
+    deleted       BIT            NOT NULL DEFAULT 0,   -- soft-delete: archivado, sale de catalogo y listados
     created_at    DATETIME(6)    NOT NULL,
     size_scale_id VARCHAR(255),
     supplier_id   VARCHAR(255),
