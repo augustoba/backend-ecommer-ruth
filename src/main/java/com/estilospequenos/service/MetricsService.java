@@ -98,10 +98,13 @@ public class MetricsService {
         Map<String, Acc> byMonth = new LinkedHashMap<>();
         Map<String, ProdAcc> byProduct = new LinkedHashMap<>();
         Map<String, Acc> byOption = new LinkedHashMap<>(); // optionId ("" = sin opción) -> acc
+        Acc webAcc = new Acc();
+        Acc localAcc = new Acc();
 
         for (Order o : orders) {
             String month = YearMonth.from(o.getProcessedAt().atZone(zone)).format(MONTH);
             Acc monthAcc = byMonth.computeIfAbsent(month, k -> new Acc());
+            Acc channelAcc = o.getChannel() == com.estilospequenos.model.SaleChannel.LOCAL ? localAcc : webAcc;
             boolean countedOrder = false;
 
             for (OrderLine l : o.getLines()) {
@@ -114,6 +117,8 @@ public class MetricsService {
 
                 monthAcc.revenue = monthAcc.revenue.add(lineRevenue);
                 monthAcc.units += qty;
+                channelAcc.revenue = channelAcc.revenue.add(lineRevenue);
+                channelAcc.units += qty;
                 countedOrder = true;
 
                 ProdAcc pa = byProduct.computeIfAbsent(l.getProductId(),
@@ -127,7 +132,10 @@ public class MetricsService {
                     oa.units += qty;
                 }
             }
-            if (countedOrder) monthAcc.orders++;
+            if (countedOrder) {
+                monthAcc.orders++;
+                channelAcc.orders++;
+            }
         }
 
         return new MetricsResponse(
@@ -135,6 +143,9 @@ public class MetricsService {
                 to.toString(),
                 "processedAt",
                 new Totals(totalRevenue, totalUnits, orders.size()),
+                new com.estilospequenos.dto.MetricsDtos.ChannelBreakdown(
+                        new Totals(webAcc.revenue, webAcc.units, webAcc.orders),
+                        new Totals(localAcc.revenue, localAcc.units, localAcc.orders)),
                 monthSeries(from, to, byMonth),
                 topProducts(byProduct),
                 bottomProducts(byProduct, productsById),

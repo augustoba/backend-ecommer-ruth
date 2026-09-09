@@ -11,6 +11,8 @@ public class MetricsDtos {
             String to,
             String basis,
             Totals totals,
+            /** Desglose por canal: cuánto se vendió por la web y cuánto en el local. */
+            ChannelBreakdown byChannel,
             List<MonthBucket> byMonth,
             List<ProductStat> topProducts,
             List<ProductStat> bottomProducts,
@@ -18,6 +20,9 @@ public class MetricsDtos {
 
     /** Totales del período. `revenue` = precio de lista × cantidad de las líneas aceptadas. */
     public record Totals(BigDecimal revenue, long units, long orders) {}
+
+    /** Ventas online (checkout) vs en el local (POS). */
+    public record ChannelBreakdown(Totals web, Totals local) {}
 
     /** Un mes del período (siempre continuo: se rellenan los meses sin ventas con 0). */
     public record MonthBucket(String month, BigDecimal revenue, long units, long orders) {}
