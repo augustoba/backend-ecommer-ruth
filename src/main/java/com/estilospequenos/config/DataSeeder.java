@@ -48,7 +48,8 @@ public class DataSeeder implements CommandLineRunner {
         roleService.ensureSystemRole();
         roleService.ensureRole("Vendedor",
                 Permission.ORDERS_VIEW, Permission.ORDERS_MANAGE,
-                Permission.POS_USE, Permission.METRICS_VIEW);
+                Permission.POS_USE, Permission.EXCHANGES_USE,
+                Permission.CASH_REGISTER_VIEW, Permission.METRICS_VIEW);
         authService.ensureInitialAdmin();
         siteSettingsService.get();
 

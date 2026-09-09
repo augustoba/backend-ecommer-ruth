@@ -12,7 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/exchanges")
-@PreAuthorize("hasAuthority('POS_USE')")
+@PreAuthorize("hasAuthority('EXCHANGES_USE')")
 public class ExchangeController {
 
     private final ExchangeService service;

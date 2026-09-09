@@ -15,6 +15,10 @@ public enum Permission {
     ORDERS_MANAGE("Gestionar pedidos"),
     /** Registrar ventas en el local (punto de venta). */
     POS_USE("Registrar ventas en el local"),
+    /** Registrar cambios de prenda en el local. */
+    EXCHANGES_USE("Registrar cambios de prenda"),
+    /** Ver el cierre de caja del día. */
+    CASH_REGISTER_VIEW("Ver la caja (cierre del día)"),
     /** Editar parametrías (clasificación de prendas). */
     PARAMS_MANAGE("Parametrías"),
     /** Editar escalas de talle. */

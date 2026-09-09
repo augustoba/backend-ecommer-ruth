@@ -13,7 +13,7 @@ import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/admin/cash-register")
-@PreAuthorize("hasAuthority('POS_USE')")
+@PreAuthorize("hasAuthority('CASH_REGISTER_VIEW')")
 public class CashRegisterController {
 
     private final CashRegisterService service;
