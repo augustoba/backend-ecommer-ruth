@@ -5,6 +5,7 @@ import com.estilospequenos.dto.AccountDtos.RecoverRequest;
 import com.estilospequenos.dto.LoginRequest;
 import com.estilospequenos.dto.TokenResponse;
 import com.estilospequenos.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,8 +25,8 @@ public class AuthController {
 
     /** Login del panel de administración. Devuelve el JWT a mandar como Bearer. */
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest req) {
-        JwtService.TokenData data = authService.login(req.username(), req.password());
+    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
+        JwtService.TokenData data = authService.login(req.username(), req.password(), clientIp(http));
         return ResponseEntity.ok(TokenResponse.bearer(data.token(), data.expiresAt()));
     }
 
@@ -34,9 +35,18 @@ public class AuthController {
      * nueva y devuelve un JWT (queda logueado).
      */
     @PostMapping("/recover")
-    public ResponseEntity<TokenResponse> recover(@Valid @RequestBody RecoverRequest req) {
+    public ResponseEntity<TokenResponse> recover(@Valid @RequestBody RecoverRequest req, HttpServletRequest http) {
         JwtService.TokenData data =
-                authService.recover(req.username(), req.recoveryPhrase(), req.newPassword());
+                authService.recover(req.username(), req.recoveryPhrase(), req.newPassword(), clientIp(http));
         return ResponseEntity.ok(TokenResponse.bearer(data.token(), data.expiresAt()));
+    }
+
+    /** IP del cliente, respetando el primer hop de {@code X-Forwarded-For} si viene por proxy. */
+    private static String clientIp(HttpServletRequest http) {
+        String fwd = http.getHeader("X-Forwarded-For");
+        if (fwd != null && !fwd.isBlank()) {
+            return fwd.split(",")[0].trim();
+        }
+        return http.getRemoteAddr();
     }
 }

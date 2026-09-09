@@ -23,21 +23,32 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AppProperties props;
+    private final LoginAttemptService loginAttempts;
 
     public AuthService(AdminUserRepository users, PasswordEncoder passwordEncoder,
-                       JwtService jwtService, AppProperties props) {
+                       JwtService jwtService, AppProperties props,
+                       LoginAttemptService loginAttempts) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.props = props;
+        this.loginAttempts = loginAttempts;
     }
 
-    /** Valida usuario/contraseña contra la tabla admin_user y devuelve un JWT. */
-    public JwtService.TokenData login(String username, String rawPassword) {
-        AdminUser user = enabledByUsername(username);
-        if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+    /**
+     * Valida usuario/contraseña contra la tabla admin_user y devuelve un JWT.
+     * {@code clientIp} se usa para el rate-limiting (ver LoginAttemptService).
+     */
+    public JwtService.TokenData login(String username, String rawPassword, String clientIp) {
+        loginAttempts.assertNotBlocked(clientIp, username);
+        AdminUser user = users.findByUsername(username == null ? "" : username.trim())
+                .filter(AdminUser::isEnabled)
+                .orElse(null);
+        if (user == null || !passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+            loginAttempts.recordFailure(clientIp, username);
             throw new BadCredentialsException("Usuario o contraseña incorrectos");
         }
+        loginAttempts.recordSuccess(clientIp, username);
         return jwtService.generate(user.getUsername());
     }
 
@@ -45,12 +56,17 @@ public class AuthService {
      * Recupera la cuenta: si la frase de recuperación es correcta, setea una
      * contraseña nueva y devuelve un JWT (queda logueado). Público.
      */
-    public JwtService.TokenData recover(String username, String recoveryPhrase, String newPassword) {
-        AdminUser user = enabledByUsername(username);
-        if (user.getRecoveryHash() == null
+    public JwtService.TokenData recover(String username, String recoveryPhrase, String newPassword, String clientIp) {
+        loginAttempts.assertNotBlocked(clientIp, username);
+        AdminUser user = users.findByUsername(username == null ? "" : username.trim())
+                .filter(AdminUser::isEnabled)
+                .orElse(null);
+        if (user == null || user.getRecoveryHash() == null
                 || !passwordEncoder.matches(recoveryPhrase, user.getRecoveryHash())) {
+            loginAttempts.recordFailure(clientIp, username);
             throw new BadCredentialsException("La frase de recuperación no coincide.");
         }
+        loginAttempts.recordSuccess(clientIp, username);
         setPassword(user, newPassword);
         return jwtService.generate(user.getUsername());
     }

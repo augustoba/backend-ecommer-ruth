@@ -16,6 +16,7 @@ public class AppProperties {
     private Admin admin = new Admin();
     private Cors cors = new Cors();
     private Seed seed = new Seed();
+    private LoginThrottle loginThrottle = new LoginThrottle();
 
     @Getter
     @Setter
@@ -48,5 +49,19 @@ public class AppProperties {
     @Setter
     public static class Seed {
         private boolean enabled = true;
+    }
+
+    /**
+     * Rate-limiting del login / recuperación de cuenta (ver LoginAttemptService).
+     * Tras {@code maxAttempts} fallos dentro de {@code windowMinutes}, esa IP
+     * (y ese usuario) quedan bloqueados {@code lockMinutes}.
+     */
+    @Getter
+    @Setter
+    public static class LoginThrottle {
+        private boolean enabled = true;
+        private int maxAttempts = 5;
+        private long windowMinutes = 15;
+        private long lockMinutes = 15;
     }
 }

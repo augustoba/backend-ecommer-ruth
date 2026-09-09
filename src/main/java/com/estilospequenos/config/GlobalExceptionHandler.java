@@ -3,6 +3,8 @@ package com.estilospequenos.config;
 import com.estilospequenos.common.ApiError;
 import com.estilospequenos.common.BadRequestException;
 import com.estilospequenos.common.ResourceNotFoundException;
+import com.estilospequenos.common.TooManyRequestsException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -35,6 +37,14 @@ public class GlobalExceptionHandler {
             fields.putIfAbsent(fe.getField(), fe.getDefaultMessage());
         }
         return build(HttpStatus.BAD_REQUEST, "Datos inválidos", fields);
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiError> tooManyRequests(TooManyRequestsException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+                .body(ApiError.of(HttpStatus.TOO_MANY_REQUESTS.value(),
+                        HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase(), ex.getMessage(), null));
     }
 
     @ExceptionHandler(AuthenticationException.class)
