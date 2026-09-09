@@ -5,6 +5,7 @@ import com.estilospequenos.model.Order;
 import com.estilospequenos.model.OrderLine;
 import com.estilospequenos.model.OrderStatus;
 import com.estilospequenos.model.PaymentMethod;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -24,7 +25,7 @@ public final class OrderDtos {
     public record CartItem(
             @NotBlank String productId,
             @NotBlank String size,
-            @Min(1) int quantity
+            @Min(1) @Max(999) int quantity
     ) {}
 
     public record CreateOrderRequest(
