@@ -63,6 +63,11 @@ public class ProductController {
         return ProductResponse.from(service.update(id, req));
     }
 
+    @PostMapping("/api/admin/products/{id}/duplicate")
+    public ResponseEntity<ProductResponse> duplicate(@PathVariable String id) {
+        return ResponseEntity.status(201).body(ProductResponse.from(service.duplicate(id)));
+    }
+
     @DeleteMapping("/api/admin/products/{id}")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         service.delete(id);

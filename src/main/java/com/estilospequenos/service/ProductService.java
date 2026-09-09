@@ -63,6 +63,36 @@ public class ProductService {
         return repo.save(p);
     }
 
+    /**
+     * Duplica un producto: copia todo salvo el stock (arranca en 0), lo deja
+     * <b>oculto</b> (active=false) y le agrega " (copia)" al nombre. Sirve para
+     * cargar variantes parecidas sin volver a tipear todo.
+     */
+    public Product duplicate(String id) {
+        Product src = get(id);
+        Product copy = new Product();
+        copy.setId(UUID.randomUUID().toString());
+        copy.setCreatedAt(Instant.now());
+        copy.setName(src.getName() + " (copia)");
+        copy.setDescription(src.getDescription());
+        copy.setPrice(src.getPrice());
+        copy.setAgeRange(src.getAgeRange());
+        copy.getImages().addAll(src.getImages());
+        copy.setActive(false);
+        copy.setDiscontinued(false);
+        copy.setSizeScaleId(src.getSizeScaleId());
+        copy.setSupplierId(src.getSupplierId());
+        copy.setCostPrice(src.getCostPrice());
+        copy.setLowStockThreshold(src.getLowStockThreshold());
+        for (SizeStock s : src.getSizeStocks()) {
+            copy.getSizeStocks().add(new SizeStock(s.getSize(), 0));
+        }
+        for (ProductParam pp : src.getParams()) {
+            copy.getParams().add(new ProductParam(pp.getGroupId(), pp.getOptionId()));
+        }
+        return repo.save(copy);
+    }
+
     public void delete(String id) {
         repo.delete(get(id));
     }
