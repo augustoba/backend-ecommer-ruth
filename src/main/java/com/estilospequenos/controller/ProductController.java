@@ -32,6 +32,12 @@ public class ProductController {
         return service.findActive().stream().map(ProductResponse::from).toList();
     }
 
+    @GetMapping("/api/products/best-sellers")
+    public List<ProductResponse> bestSellers(@RequestParam(defaultValue = "8") int limit) {
+        return service.bestSellers(Math.min(Math.max(limit, 1), 20)).stream()
+                .map(ProductResponse::from).toList();
+    }
+
     @GetMapping("/api/products/{id}")
     public ProductResponse publicGet(@PathVariable String id) {
         return ProductResponse.from(service.get(id));

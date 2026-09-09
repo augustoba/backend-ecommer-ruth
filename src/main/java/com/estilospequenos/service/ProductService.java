@@ -5,14 +5,18 @@ import com.estilospequenos.dto.ProductDtos.ProductRequest;
 import com.estilospequenos.dto.ProductDtos.SizeStockDto;
 import com.estilospequenos.model.Product;
 import com.estilospequenos.model.ProductParam;
+import com.estilospequenos.model.OrderStatus;
 import com.estilospequenos.model.SizeStock;
+import com.estilospequenos.repository.OrderRepository;
 import com.estilospequenos.repository.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -24,9 +28,32 @@ import java.util.UUID;
 public class ProductService {
 
     private final ProductRepository repo;
+    private final OrderRepository orderRepo;
 
-    public ProductService(ProductRepository repo) {
+    public ProductService(ProductRepository repo, OrderRepository orderRepo) {
         this.repo = repo;
+        this.orderRepo = orderRepo;
+    }
+
+    /**
+     * Los más vendidos de los últimos 90 días (líneas aceptadas de pedidos
+     * PROCESADO), sólo productos publicados y no archivados. Para la home.
+     */
+    @Transactional(readOnly = true)
+    public List<Product> bestSellers(int limit) {
+        Instant from = Instant.now().minus(90, ChronoUnit.DAYS);
+        Map<String, Long> units = new LinkedHashMap<>();
+        orderRepo.findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
+                        OrderStatus.PROCESADO, from, Instant.now())
+                .forEach(o -> o.getLines().forEach(l -> {
+                    if (l.isAccepted()) units.merge(l.getProductId(), (long) l.getQuantity(), Long::sum);
+                }));
+        return units.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .map(e -> repo.findById(e.getKey()).orElse(null))
+                .filter(p -> p != null && p.isActive() && !p.isDeleted())
+                .limit(Math.max(1, limit))
+                .toList();
     }
 
     @Transactional(readOnly = true)
