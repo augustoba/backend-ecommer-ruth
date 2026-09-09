@@ -43,6 +43,11 @@ public class Order {
     @Column(nullable = false, length = 20)
     private OrderStatus status = OrderStatus.PENDIENTE;
 
+    /** De dónde vino: WEB (checkout) o LOCAL (venta cargada a mano en el panel). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private SaleChannel channel = SaleChannel.WEB;
+
     /** Entrega elegida por el cliente. Los pedidos viejos quedan en PICKUP. */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

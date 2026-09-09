@@ -39,6 +39,13 @@ public class OrderController {
         return PublicOrderResponse.from(service.lookup(code, name));
     }
 
+    /** Venta en el local (POS): crea y confirma el pedido en el acto. */
+    @PostMapping("/api/admin/orders/pos")
+    @PreAuthorize("hasAuthority('POS_USE')")
+    public ResponseEntity<OrderResponse> createPos(@Valid @RequestBody CreateOrderRequest req) {
+        return ResponseEntity.status(201).body(OrderResponse.from(service.createPos(req)));
+    }
+
     // --- Admin ---
 
     /**

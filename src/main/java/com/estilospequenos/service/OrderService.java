@@ -212,6 +212,19 @@ public class OrderService {
         return repo.save(order);
     }
 
+    /**
+     * Venta cargada en el local (POS): crea el pedido, lo marca como canal LOCAL
+     * y lo confirma en el acto (descuenta stock, queda PROCESADO). Si falta stock,
+     * el confirm tira 400 y no se guarda nada (misma transacción).
+     */
+    public Order createPos(CreateOrderRequest req) {
+        Order order = create(req);
+        order.setChannel(com.estilospequenos.model.SaleChannel.LOCAL);
+        order.setDeliveryMethod(DeliveryMethod.PICKUP);
+        repo.save(order);
+        return confirm(order.getId());
+    }
+
     /** Tilda/destilda ítems (solo mientras el pedido está pendiente). */
     public Order setLineAcceptance(String orderId, List<LineAcceptance> changes) {
         Order order = get(orderId);

@@ -83,7 +83,8 @@ public final class OrderDtos {
     public record OrderResponse(
             String id, String code, String customerName,
             BigDecimal subtotal, int discountPercent, BigDecimal discountAmount, BigDecimal total,
-            OrderStatus status, Instant createdAt, Instant processedAt,
+            OrderStatus status, com.estilospequenos.model.SaleChannel channel,
+            Instant createdAt, Instant processedAt,
             DeliveryMethod deliveryMethod, String shippingAddress, String shippingReference,
             Double shippingLat, Double shippingLng, PaymentMethod paymentMethod,
             String freeShippingNote, String discountNote,
@@ -94,7 +95,7 @@ public final class OrderDtos {
             return new OrderResponse(
                     o.getId(), o.getCode(), o.getCustomerName(),
                     o.getSubtotal(), o.getDiscountPercent(), o.getDiscountAmount(), o.getTotal(),
-                    o.getStatus(), o.getCreatedAt(), o.getProcessedAt(),
+                    o.getStatus(), o.getChannel(), o.getCreatedAt(), o.getProcessedAt(),
                     o.getDeliveryMethod(), o.getShippingAddress(), o.getShippingReference(),
                     o.getShippingLat(), o.getShippingLng(), o.getPaymentMethod(),
                     o.getFreeShippingNote(), o.getDiscountNote(),

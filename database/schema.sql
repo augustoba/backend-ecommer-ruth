@@ -242,6 +242,7 @@ CREATE TABLE IF NOT EXISTS orders (
     discount_amount  DECIMAL(12,2) NOT NULL,
     total            DECIMAL(12,2) NOT NULL,
     status           ENUM('CANCELADO','PENDIENTE','PROCESADO') NOT NULL,
+    channel          ENUM('WEB','LOCAL') NOT NULL DEFAULT 'WEB',
     delivery_method  ENUM('PICKUP','SHIPPING') NOT NULL DEFAULT 'PICKUP',
     shipping_address    VARCHAR(500),
     shipping_reference  VARCHAR(500),
