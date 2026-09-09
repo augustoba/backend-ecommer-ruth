@@ -448,3 +448,24 @@ regenerarlo).
     - `schema.sql` actualizado (role, role_permission, admin_user.role_id, coupon,
       product.deleted, orders.channel/coupon_*, site_settings.help/faq).
       `ddl-auto=update` agrega todo solo en el dev DB.
+21. **Tanda 3 (2026-09-09):**
+    - **Cambios de prenda:** `Exchange` + `ExchangeLine` (DEVUELTA/LLEVADA).
+      `ExchangeService.create` valida stock de lo que se lleva (estricto),
+      suma al stock lo devuelto, descuenta lo que se lleva, `difference` a
+      precio de lista. `POST/GET /api/admin/exchanges` (permiso `EXCHANGES_USE`).
+      Código `CAM-0001`. `ProductService.incrementStock` / `stockOf` nuevos.
+    - **Caja:** `CashRegisterService` + `GET /api/admin/cash-register?date=`
+      (permiso `CASH_REGISTER_VIEW`) — total por medio de pago, abierto en
+      local / cambios (diferencia) / online (pedidos confirmados ese día).
+    - **Permisos nuevos:** `EXCHANGES_USE`, `CASH_REGISTER_VIEW`. El seed
+      "Vendedor" los suma. `Permission` pasó de 16 a 18.
+    - **Métricas:** `MetricsResponse` sumó `bySize` y `bySupplier`; las
+      diferencias positivas de los cambios del período suman a `totalRevenue`
+      y al canal LOCAL (no a unidades ni a `orders`). `MetricsService` sumó
+      `SupplierRepository` + `ExchangeRepository`.
+    - **Best-sellers:** `GET /api/products/best-sellers?limit=` (público) —
+      top por unidades de los últimos 90 días, sólo publicados/no archivados.
+      `ProductService` sumó `OrderRepository`.
+    - **Export CSV:** `CsvExportController` `/api/admin/export/{products,
+      orders,exchanges}.csv` + helper `common/Csv`.
+    - `schema.sql`: `exchange`, `exchange_line`.
