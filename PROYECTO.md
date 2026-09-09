@@ -420,3 +420,31 @@ regenerarlo).
     en el dev DB Hibernate mapea los enum a `VARCHAR`, así que los valores nuevos
     entran sin ALTER; agrega las columnas nuevas; la tabla `discount_config` queda
     huérfana (inocua). `schema.sql`/`setup.sql` actualizados.
+20. **Tanda 2026-09-09** (todo commiteado sin pushear; 28 tests en verde):
+    - **Rate limiting** del login/recuperación: `LoginAttemptService` (memoria,
+      por IP + usuario), `TooManyRequestsException` → 429 + `Retry-After`.
+      Config `app.login-throttle.*` (5 intentos / 15 min → bloqueo 15 min).
+    - **Productos:** `POST /api/admin/products/{id}/duplicate`;
+      `ProductRepository.search` (nombre, proveedor, parametría, estado,
+      `noStock`); **soft-delete** `Product.deleted` (`DELETE` archiva, `get()`
+      sigue encontrándolo; `/archived` + `/{id}/restore`).
+    - **Pedidos:** `@Max(999)` en `CartItem.quantity`. `OrderService.create` NO
+      valida stock (el flujo "el dueño revisa" lo necesita; sólo `confirm` es
+      estricto). `GET /api/orders/lookup?code&name` (público, para "mis pedidos").
+      `Order.channel` (WEB/LOCAL). `POST /api/admin/orders/pos` (permiso POS_USE):
+      crea + confirma en la misma transacción (venta en el local).
+    - **Cupones:** entidad `Coupon` + `CouponService` (% o monto, mínimo, tope de
+      usos, vencimiento, `stackable`). `GET /api/coupons/{code}` (público, valida
+      sin consumir), CRUD admin (`COUPONS_MANAGE`), genera N códigos de una.
+      `Order` sumó `coupon_code`/`coupon_discount`; se aplica al crear el pedido.
+    - **RBAC:** `Permission` (enum, 14), `Role` (nombre + permisos; system
+      "Administrador" = todos), `AdminUser.role`. `JwtAuthFilter` carga los
+      permisos por request. `@EnableMethodSecurity` + `@PreAuthorize` en todos
+      los controllers de `/api/admin/**`. `GET /api/auth/me`. `RoleController` /
+      `AdminUserController` (`USERS_MANAGE`). `DataSeeder` siembra
+      "Administrador" + "Vendedor"; el admin inicial y los usuarios sin rol
+      quedan como Administrador (backfill).
+    - **SiteSettings** sumó `help_text` / `faq_text` (página "cómo comprar" + FAQ).
+    - `schema.sql` actualizado (role, role_permission, admin_user.role_id, coupon,
+      product.deleted, orders.channel/coupon_*, site_settings.help/faq).
+      `ddl-auto=update` agrega todo solo en el dev DB.
