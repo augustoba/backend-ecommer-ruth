@@ -260,6 +260,37 @@ CREATE TABLE IF NOT EXISTS orders (
     KEY ix_orders_status (status)
 ) ENGINE=InnoDB;
 
+-- ---------------------------------------------------------------------------
+--  Cambios de prenda en el local
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS exchange (
+    id             VARCHAR(255)  NOT NULL,
+    number         BIGINT        NOT NULL,   -- correlativo → code "CAM-0001"
+    customer_name  VARCHAR(255)  NOT NULL,
+    returned_total DECIMAL(12,2) NOT NULL,
+    taken_total    DECIMAL(12,2) NOT NULL,
+    difference     DECIMAL(12,2) NOT NULL,   -- taken - returned (+ cobra el local / - a favor del cliente)
+    payment_method ENUM('TRANSFER','QR_TRANSFER','QR_CARD','CASH'),
+    note           VARCHAR(500),
+    created_at     DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_exchange_number UNIQUE (number)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS exchange_line (
+    id           VARCHAR(255)  NOT NULL,
+    exchange_id  VARCHAR(255)  NOT NULL,
+    idx          INTEGER,
+    kind         ENUM('DEVUELTA','LLEVADA') NOT NULL,
+    product_id   VARCHAR(255)  NOT NULL,
+    product_name VARCHAR(255)  NOT NULL,
+    size_value   VARCHAR(255)  NOT NULL,
+    quantity     INTEGER       NOT NULL,
+    unit_price   DECIMAL(12,2) NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_exchange_line_exchange FOREIGN KEY (exchange_id) REFERENCES exchange (id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS order_line (
     id           VARCHAR(255)  NOT NULL,
     order_id     VARCHAR(255)  NOT NULL,

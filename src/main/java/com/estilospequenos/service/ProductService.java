@@ -162,6 +162,32 @@ public class ProductService {
         });
     }
 
+    /** Suma unidades al stock de un talle (ej: prenda devuelta en un cambio). */
+    public void incrementStock(String id, String size, int quantity) {
+        repo.findById(id).ifPresent(p -> {
+            boolean found = false;
+            for (SizeStock s : p.getSizeStocks()) {
+                if (s.getSize().equals(size)) {
+                    s.setStock(Math.max(0, s.getStock() + quantity));
+                    found = true;
+                }
+            }
+            if (!found && quantity > 0) p.getSizeStocks().add(new SizeStock(size, quantity));
+            repo.save(p);
+        });
+    }
+
+    /** Stock actual de un talle puntual (0 si el producto no viene en ese talle). */
+    @Transactional(readOnly = true)
+    public int stockOf(String id, String size) {
+        return repo.findById(id)
+                .map(p -> p.getSizeStocks().stream()
+                        .filter(s -> s.getSize().equals(size))
+                        .mapToInt(SizeStock::getStock)
+                        .findFirst().orElse(0))
+                .orElse(0);
+    }
+
     private void apply(Product p, ProductRequest req) {
         p.setName(req.name().trim());
         p.setDescription(req.description().trim());
