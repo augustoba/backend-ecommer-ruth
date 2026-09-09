@@ -16,7 +16,11 @@ public class MetricsDtos {
             List<MonthBucket> byMonth,
             List<ProductStat> topProducts,
             List<ProductStat> bottomProducts,
-            GroupBreakdown byGroup) {}
+            GroupBreakdown byGroup,
+            /** Unidades y facturación por talle. */
+            List<GroupRow> bySize,
+            /** Unidades y facturación por proveedor. */
+            List<GroupRow> bySupplier) {}
 
     /** Totales del período. `revenue` = precio de lista × cantidad de las líneas aceptadas. */
     public record Totals(BigDecimal revenue, long units, long orders) {}

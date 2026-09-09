@@ -16,9 +16,13 @@ import com.estilospequenos.model.ParamGroup;
 import com.estilospequenos.model.ParamOption;
 import com.estilospequenos.model.Product;
 import com.estilospequenos.model.ProductParam;
+import com.estilospequenos.model.Exchange;
+import com.estilospequenos.model.Supplier;
+import com.estilospequenos.repository.ExchangeRepository;
 import com.estilospequenos.repository.OrderRepository;
 import com.estilospequenos.repository.ParamRepository;
 import com.estilospequenos.repository.ProductRepository;
+import com.estilospequenos.repository.SupplierRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,12 +54,17 @@ public class MetricsService {
     private final OrderRepository orderRepo;
     private final ProductRepository productRepo;
     private final ParamRepository paramRepo;
+    private final SupplierRepository supplierRepo;
+    private final ExchangeRepository exchangeRepo;
     private final ZoneId zone = ZoneId.systemDefault();
 
-    public MetricsService(OrderRepository orderRepo, ProductRepository productRepo, ParamRepository paramRepo) {
+    public MetricsService(OrderRepository orderRepo, ProductRepository productRepo, ParamRepository paramRepo,
+                          SupplierRepository supplierRepo, ExchangeRepository exchangeRepo) {
         this.orderRepo = orderRepo;
         this.productRepo = productRepo;
         this.paramRepo = paramRepo;
+        this.supplierRepo = supplierRepo;
+        this.exchangeRepo = exchangeRepo;
     }
 
     /** Totales de ventas (líneas aceptadas de pedidos PROCESADO) en un rango. Usado por el dashboard. */
@@ -98,6 +107,8 @@ public class MetricsService {
         Map<String, Acc> byMonth = new LinkedHashMap<>();
         Map<String, ProdAcc> byProduct = new LinkedHashMap<>();
         Map<String, Acc> byOption = new LinkedHashMap<>(); // optionId ("" = sin opción) -> acc
+        Map<String, Acc> bySize = new LinkedHashMap<>();
+        Map<String, Acc> bySupplier = new LinkedHashMap<>(); // supplierId ("" = sin proveedor) -> acc
         Acc webAcc = new Acc();
         Acc localAcc = new Acc();
 
@@ -126,6 +137,16 @@ public class MetricsService {
                 pa.revenue = pa.revenue.add(lineRevenue);
                 pa.units += qty;
 
+                Acc sa = bySize.computeIfAbsent(l.getSize() == null ? "" : l.getSize(), k -> new Acc());
+                sa.revenue = sa.revenue.add(lineRevenue);
+                sa.units += qty;
+
+                Product prod = productsById.get(l.getProductId());
+                String supId = prod != null && prod.getSupplierId() != null ? prod.getSupplierId() : "";
+                Acc supAcc = bySupplier.computeIfAbsent(supId, k -> new Acc());
+                supAcc.revenue = supAcc.revenue.add(lineRevenue);
+                supAcc.units += qty;
+
                 for (String optionId : optionIdsFor(productsById.get(l.getProductId()), groupId)) {
                     Acc oa = byOption.computeIfAbsent(optionId, k -> new Acc());
                     oa.revenue = oa.revenue.add(lineRevenue);
@@ -136,6 +157,17 @@ public class MetricsService {
                 monthAcc.orders++;
                 channelAcc.orders++;
             }
+        }
+
+        // --- Cambios: la diferencia cobrada cuenta como facturación (local). No suma unidades ni pedidos. ---
+        for (Exchange e : exchangeRepo.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(fromI, toI)) {
+            if (e.getDifference().signum() <= 0) continue;
+            BigDecimal diff = e.getDifference();
+            totalRevenue = totalRevenue.add(diff);
+            localAcc.revenue = localAcc.revenue.add(diff);
+            String month = YearMonth.from(e.getCreatedAt().atZone(zone)).format(MONTH);
+            Acc ma = byMonth.computeIfAbsent(month, k -> new Acc());
+            ma.revenue = ma.revenue.add(diff);
         }
 
         return new MetricsResponse(
@@ -149,7 +181,33 @@ public class MetricsService {
                 monthSeries(from, to, byMonth),
                 topProducts(byProduct),
                 bottomProducts(byProduct, productsById),
-                groupBreakdown(group, groupId, byOption));
+                groupBreakdown(group, groupId, byOption),
+                sizeRows(bySize),
+                supplierRows(bySupplier));
+    }
+
+    private List<com.estilospequenos.dto.MetricsDtos.GroupRow> sizeRows(Map<String, Acc> bySize) {
+        return bySize.entrySet().stream()
+                .filter(en -> en.getValue().units > 0)
+                .sorted(java.util.Comparator.comparingLong((Map.Entry<String, Acc> en) -> en.getValue().units).reversed())
+                .map(en -> new com.estilospequenos.dto.MetricsDtos.GroupRow(
+                        en.getKey().isEmpty() ? null : en.getKey(),
+                        en.getKey().isEmpty() ? "Sin talle" : "Talle " + en.getKey(),
+                        en.getValue().units, en.getValue().revenue))
+                .toList();
+    }
+
+    private List<com.estilospequenos.dto.MetricsDtos.GroupRow> supplierRows(Map<String, Acc> bySupplier) {
+        Map<String, String> names = new LinkedHashMap<>();
+        for (Supplier s : supplierRepo.findAll()) names.put(s.getId(), s.getName());
+        return bySupplier.entrySet().stream()
+                .filter(en -> en.getValue().units > 0)
+                .sorted(java.util.Comparator.comparingLong((Map.Entry<String, Acc> en) -> en.getValue().units).reversed())
+                .map(en -> new com.estilospequenos.dto.MetricsDtos.GroupRow(
+                        en.getKey().isEmpty() ? null : en.getKey(),
+                        en.getKey().isEmpty() ? "Sin proveedor" : names.getOrDefault(en.getKey(), en.getKey()),
+                        en.getValue().units, en.getValue().revenue))
+                .toList();
     }
 
     /**
