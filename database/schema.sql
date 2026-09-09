@@ -193,6 +193,26 @@ CREATE TABLE IF NOT EXISTS discount (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
+--  Cupones (codigos que el cliente escribe en el carrito)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS coupon (
+    id          VARCHAR(255)  NOT NULL,
+    code        VARCHAR(40)   NOT NULL,
+    kind        ENUM('PERCENT','AMOUNT') NOT NULL,
+    value       DECIMAL(12,2) NOT NULL,
+    min_amount  DECIMAL(12,2),
+    max_uses    INTEGER,                    -- null = ilimitado
+    used_count  INTEGER       NOT NULL DEFAULT 0,
+    expires_at  DATE,
+    enabled     BIT           NOT NULL DEFAULT 1,
+    stackable   BIT           NOT NULL DEFAULT 1,   -- combina con los descuentos automaticos
+    label       VARCHAR(200),
+    created_at  DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_coupon_code UNIQUE (code)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
 --  Pedidos
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS orders (
@@ -212,6 +232,8 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_method   ENUM('TRANSFER','QR_TRANSFER','QR_CARD','CASH'),
     free_shipping_note VARCHAR(300),
     discount_note      VARCHAR(500),
+    coupon_code       VARCHAR(40),              -- cupon aplicado (null = ninguno)
+    coupon_discount   DECIMAL(12,2),            -- descuento en pesos del cupon (aparte del automatico)
     created_at       DATETIME(6)   NOT NULL,
     processed_at     DATETIME(6),
     PRIMARY KEY (id),

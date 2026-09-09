@@ -37,7 +37,9 @@ public final class OrderDtos {
             @Size(max = 500) String shippingReference,
             Double shippingLat,
             Double shippingLng,
-            PaymentMethod paymentMethod
+            PaymentMethod paymentMethod,
+            /** Código de cupón escrito en el carrito (opcional). */
+            @Size(max = 40) String couponCode
     ) {}
 
     public record LineAcceptance(@NotBlank String lineId, @NotNull Boolean accepted) {}
@@ -85,6 +87,7 @@ public final class OrderDtos {
             DeliveryMethod deliveryMethod, String shippingAddress, String shippingReference,
             Double shippingLat, Double shippingLng, PaymentMethod paymentMethod,
             String freeShippingNote, String discountNote,
+            String couponCode, BigDecimal couponDiscount,
             List<OrderLineResponse> lines
     ) {
         public static OrderResponse from(Order o) {
@@ -95,6 +98,7 @@ public final class OrderDtos {
                     o.getDeliveryMethod(), o.getShippingAddress(), o.getShippingReference(),
                     o.getShippingLat(), o.getShippingLng(), o.getPaymentMethod(),
                     o.getFreeShippingNote(), o.getDiscountNote(),
+                    o.getCouponCode(), o.getCouponDiscount(),
                     o.getLines().stream().map(OrderLineResponse::from).toList());
         }
     }

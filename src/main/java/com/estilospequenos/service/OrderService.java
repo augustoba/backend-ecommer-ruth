@@ -38,13 +38,16 @@ public class OrderService {
     private final ProductRepository productRepo;
     private final ProductService productService;
     private final DiscountService discountService;
+    private final CouponService couponService;
 
     public OrderService(OrderRepository repo, ProductRepository productRepo,
-                        ProductService productService, DiscountService discountService) {
+                        ProductService productService, DiscountService discountService,
+                        CouponService couponService) {
         this.repo = repo;
         this.productRepo = productRepo;
         this.productService = productService;
         this.discountService = discountService;
+        this.couponService = couponService;
     }
 
     @Transactional(readOnly = true)
@@ -180,10 +183,32 @@ public class OrderService {
         CartDiscountResult discount =
                 discountService.computeForLines(discountInput, order.getPaymentMethod(), delivery);
 
+        BigDecimal autoDiscount = discount.discountAmount();
+        BigDecimal couponDiscount = BigDecimal.ZERO;
+
+        if (req.couponCode() != null && !req.couponCode().isBlank()) {
+            // check() valida (existe / vigente / mínimo) sin consumir.
+            var chk = couponService.check(req.couponCode(), subtotal);
+            boolean couponWins = chk.stackable() || autoDiscount.signum() == 0
+                    || chk.discountAmount().compareTo(autoDiscount) >= 0;
+            if (couponWins) {
+                // Recién acá se consume el uso.
+                couponDiscount = couponService.redeem(req.couponCode(), subtotal).amount();
+                order.setCouponCode(chk.code());
+                if (!chk.stackable()) autoDiscount = BigDecimal.ZERO;
+            }
+        }
+
+        // El total no puede bajar de 0: si los dos descuentos se pasan, se recorta el del cupón.
+        if (autoDiscount.add(couponDiscount).compareTo(subtotal) > 0) {
+            couponDiscount = subtotal.subtract(autoDiscount).max(BigDecimal.ZERO);
+        }
+
         order.setSubtotal(subtotal);
         order.setDiscountPercent(discount.discountPercent());
-        order.setDiscountAmount(discount.discountAmount());
-        order.setTotal(subtotal.subtract(discount.discountAmount()));
+        order.setDiscountAmount(autoDiscount);
+        order.setCouponDiscount(couponDiscount.signum() > 0 ? couponDiscount : null);
+        order.setTotal(subtotal.subtract(autoDiscount).subtract(couponDiscount));
         String notes = discount.breakdown().stream()
                 .map(com.estilospequenos.dto.DiscountDtos.BreakdownLine::detail)
                 .filter(s -> s != null && !s.isBlank())

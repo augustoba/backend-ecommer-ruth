@@ -73,6 +73,14 @@ public class Order {
     @Column(length = 500)
     private String discountNote;
 
+    /** Código de cupón aplicado (null = ninguno). */
+    @Column(length = 40)
+    private String couponCode;
+
+    /** Descuento en pesos del cupón (aparte del descuento automático). */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal couponDiscount;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 

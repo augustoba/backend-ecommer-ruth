@@ -45,6 +45,7 @@ public class SecurityConfig {
                                 "/api/size-scales/**",
                                 "/api/hero-slides/**",
                                 "/api/discounts",
+                                "/api/coupons/**",
                                 "/api/settings",
                                 "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
                                 "/error"
