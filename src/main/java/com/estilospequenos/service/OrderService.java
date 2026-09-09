@@ -144,19 +144,9 @@ public class OrderService {
         }
 
         List<CartLineInput> discountInput = new ArrayList<>();
-        List<String> shortages = new ArrayList<>();
         for (CartItem item : req.items()) {
             Product p = productRepo.findById(item.productId())
                     .orElseThrow(() -> ResourceNotFoundException.of("Producto", item.productId()));
-
-            int available = p.getSizeStocks().stream()
-                    .filter(s -> s.getSize().equals(item.size()))
-                    .mapToInt(com.estilospequenos.model.SizeStock::getStock)
-                    .findFirst().orElse(0);
-            if (item.quantity() > available) {
-                shortages.add(p.getName() + " (talle " + item.size() + "): pediste "
-                        + item.quantity() + ", " + (available > 0 ? "quedan " + available : "sin stock"));
-            }
 
             OrderLine line = new OrderLine();
             line.setId(UUID.randomUUID().toString());
@@ -169,11 +159,6 @@ public class OrderService {
             order.addLine(line);
 
             discountInput.add(new CartLineInput(p.getPrice(), item.quantity(), paramsOf(p)));
-        }
-
-        if (!shortages.isEmpty()) {
-            throw new BadRequestException("Se quedó sin stock parte del carrito. "
-                    + "Actualizá la página y revisá: " + String.join("; ", shortages) + ".");
         }
 
         BigDecimal subtotal = order.getLines().stream()

@@ -11,7 +11,9 @@ import com.estilospequenos.repository.DiscountRepository;
 import com.estilospequenos.repository.ParamRepository;
 import com.estilospequenos.repository.ProductRepository;
 import com.estilospequenos.repository.SizeScaleRepository;
+import com.estilospequenos.model.Permission;
 import com.estilospequenos.service.AuthService;
+import com.estilospequenos.service.RoleService;
 import com.estilospequenos.service.SiteSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class DataSeeder implements CommandLineRunner {
 
     private final AppProperties props;
     private final AuthService authService;
+    private final RoleService roleService;
     private final SiteSettingsService siteSettingsService;
     private final ParamRepository paramRepo;
     private final SizeScaleRepository sizeScaleRepo;
@@ -41,7 +44,11 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        // Config del sitio y admin inicial: siempre (no son "datos de ejemplo").
+        // Roles, config del sitio y admin inicial: siempre (no son "datos de ejemplo").
+        roleService.ensureSystemRole();
+        roleService.ensureRole("Vendedor",
+                Permission.ORDERS_VIEW, Permission.ORDERS_MANAGE,
+                Permission.POS_USE, Permission.METRICS_VIEW);
         authService.ensureInitialAdmin();
         siteSettingsService.get();
 

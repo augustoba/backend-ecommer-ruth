@@ -55,15 +55,33 @@ CREATE TABLE IF NOT EXISTS site_settings (
 -- ---------------------------------------------------------------------------
 --  Usuario del panel de administración (contraseña hasheada con BCrypt)
 -- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS role (
+    id         VARCHAR(255) NOT NULL,
+    name       VARCHAR(60)  NOT NULL,
+    system     BIT          NOT NULL DEFAULT 0,   -- rol "Administrador": todos los permisos, no editable
+    created_at DATETIME(6)  NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_role_name UNIQUE (name)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS role_permission (
+    role_id    VARCHAR(255) NOT NULL,
+    permission VARCHAR(40)  NOT NULL,
+    PRIMARY KEY (role_id, permission),
+    CONSTRAINT fk_role_permission_role FOREIGN KEY (role_id) REFERENCES role (id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS admin_user (
     id            VARCHAR(255) NOT NULL,
     username      VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     recovery_hash VARCHAR(255),                -- frase de recuperación (BCrypt)
     enabled       BIT          NOT NULL,
+    role_id       VARCHAR(255),                -- rol (define los permisos)
     created_at    DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
-    CONSTRAINT uk_admin_user_username UNIQUE (username)
+    CONSTRAINT uk_admin_user_username UNIQUE (username),
+    CONSTRAINT fk_admin_user_role FOREIGN KEY (role_id) REFERENCES role (id)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------

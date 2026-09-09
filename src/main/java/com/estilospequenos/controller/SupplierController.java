@@ -5,12 +5,14 @@ import com.estilospequenos.dto.SupplierDtos.SupplierResponse;
 import com.estilospequenos.service.SupplierService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/suppliers")
+@PreAuthorize("hasAuthority('SUPPLIERS_MANAGE')")
 public class SupplierController {
 
     private final SupplierService service;

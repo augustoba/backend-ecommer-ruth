@@ -2,12 +2,15 @@ package com.estilospequenos.controller;
 
 import com.estilospequenos.config.JwtService;
 import com.estilospequenos.dto.AccountDtos.RecoverRequest;
+import com.estilospequenos.dto.AdminUserDtos.MeResponse;
 import com.estilospequenos.dto.LoginRequest;
 import com.estilospequenos.dto.TokenResponse;
 import com.estilospequenos.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,6 +42,12 @@ public class AuthController {
         JwtService.TokenData data =
                 authService.recover(req.username(), req.recoveryPhrase(), req.newPassword(), clientIp(http));
         return ResponseEntity.ok(TokenResponse.bearer(data.token(), data.expiresAt()));
+    }
+
+    /** Quién soy y qué permisos tengo (para que el panel muestre/oculte cosas). */
+    @GetMapping("/me")
+    public MeResponse me(Authentication auth) {
+        return MeResponse.from(authService.get(auth.getName()));
     }
 
     /** IP del cliente, respetando el primer hop de {@code X-Forwarded-For} si viene por proxy. */

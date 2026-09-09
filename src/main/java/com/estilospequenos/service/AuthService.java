@@ -5,7 +5,9 @@ import com.estilospequenos.common.ResourceNotFoundException;
 import com.estilospequenos.config.AppProperties;
 import com.estilospequenos.config.JwtService;
 import com.estilospequenos.model.AdminUser;
+import com.estilospequenos.model.Role;
 import com.estilospequenos.repository.AdminUserRepository;
+import com.estilospequenos.repository.RoleRepository;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,15 +26,17 @@ public class AuthService {
     private final JwtService jwtService;
     private final AppProperties props;
     private final LoginAttemptService loginAttempts;
+    private final RoleRepository roles;
 
     public AuthService(AdminUserRepository users, PasswordEncoder passwordEncoder,
                        JwtService jwtService, AppProperties props,
-                       LoginAttemptService loginAttempts) {
+                       LoginAttemptService loginAttempts, RoleRepository roles) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.props = props;
         this.loginAttempts = loginAttempts;
+        this.roles = roles;
     }
 
     /**
@@ -105,6 +109,7 @@ public class AuthService {
      * recuperación, se la completa. Se llama desde el DataSeeder.
      */
     public void ensureInitialAdmin() {
+        Role systemRole = roles.findFirstBySystemTrue().orElse(null);
         String username = props.getAdmin().getUsername();
         AdminUser admin = users.findByUsername(username).orElse(null);
         if (admin == null) {
@@ -114,10 +119,29 @@ public class AuthService {
             admin.setPasswordHash(passwordEncoder.encode(props.getAdmin().getPassword()));
             admin.setRecoveryHash(passwordEncoder.encode(props.getAdmin().getRecoveryPhrase()));
             admin.setEnabled(true);
+            admin.setRole(systemRole);
             users.save(admin);
-        } else if (admin.getRecoveryHash() == null) {
-            admin.setRecoveryHash(passwordEncoder.encode(props.getAdmin().getRecoveryPhrase()));
-            users.save(admin);
+        } else {
+            boolean dirty = false;
+            if (admin.getRecoveryHash() == null) {
+                admin.setRecoveryHash(passwordEncoder.encode(props.getAdmin().getRecoveryPhrase()));
+                dirty = true;
+            }
+            // Backfill: usuarios viejos sin rol → Administrador.
+            if (admin.getRole() == null && systemRole != null) {
+                admin.setRole(systemRole);
+                dirty = true;
+            }
+            if (dirty) users.save(admin);
+        }
+        // Cualquier otro usuario sin rol (datos viejos) también queda como Administrador.
+        if (systemRole != null) {
+            for (AdminUser u : users.findAll()) {
+                if (u.getRole() == null) {
+                    u.setRole(systemRole);
+                    users.save(u);
+                }
+            }
         }
     }
 

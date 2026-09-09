@@ -39,6 +39,20 @@ public class AdminUser {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    /** Rol del usuario (define sus permisos). */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id")
+    private Role role;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
+
+    public java.util.Set<Permission> permissions() {
+        return role != null ? role.effectivePermissions()
+                : java.util.EnumSet.noneOf(Permission.class);
+    }
+
+    public boolean isSystemAdmin() {
+        return role != null && role.isSystem();
+    }
 }

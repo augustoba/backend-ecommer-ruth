@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -47,6 +48,7 @@ public class OrderController {
      * @param to     fecha de creación hasta (inclusive)
      */
     @GetMapping("/api/admin/orders")
+    @PreAuthorize("hasAuthority('ORDERS_VIEW')")
     public PageResponse<OrderResponse> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -61,26 +63,31 @@ public class OrderController {
     }
 
     @GetMapping("/api/admin/orders/pending-count")
+    @PreAuthorize("hasAuthority('ORDERS_VIEW')")
     public Map<String, Long> pendingCount() {
         return Map.of("pending", service.pendingCount());
     }
 
     @GetMapping("/api/admin/orders/{id}")
+    @PreAuthorize("hasAuthority('ORDERS_VIEW')")
     public OrderResponse get(@PathVariable String id) {
         return OrderResponse.from(service.get(id));
     }
 
     @PutMapping("/api/admin/orders/{id}/lines")
+    @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
     public OrderResponse setLines(@PathVariable String id, @Valid @RequestBody LinesRequest req) {
         return OrderResponse.from(service.setLineAcceptance(id, req.lines()));
     }
 
     @PostMapping("/api/admin/orders/{id}/confirm")
+    @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
     public OrderResponse confirm(@PathVariable String id) {
         return OrderResponse.from(service.confirm(id));
     }
 
     @PostMapping("/api/admin/orders/{id}/cancel")
+    @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
     public OrderResponse cancel(@PathVariable String id) {
         return OrderResponse.from(service.cancel(id));
     }

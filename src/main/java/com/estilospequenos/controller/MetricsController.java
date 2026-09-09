@@ -5,6 +5,7 @@ import com.estilospequenos.dto.MetricsDtos.ComparisonResponse;
 import com.estilospequenos.dto.MetricsDtos.MetricsResponse;
 import com.estilospequenos.service.MetricsService;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -12,9 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 
-/** Métricas de ventas del panel. Sólo admin (`/api/admin/**`). */
+/** Métricas de ventas del panel. Requiere el permiso METRICS_VIEW. */
 @RestController
 @RequestMapping("/api/admin/metrics")
+@PreAuthorize("hasAuthority('METRICS_VIEW')")
 public class MetricsController {
 
     private final MetricsService service;

@@ -6,6 +6,7 @@ import com.estilospequenos.dto.HeroSlideDtos.SlideResponse;
 import com.estilospequenos.service.HeroSlideService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,22 +31,26 @@ public class HeroSlideController {
     }
 
     @PostMapping("/api/admin/hero-slides")
+    @PreAuthorize("hasAuthority('CAROUSEL_MANAGE')")
     public ResponseEntity<SlideResponse> create(@Valid @RequestBody SlideRequest req) {
         return ResponseEntity.status(201).body(SlideResponse.from(service.create(req)));
     }
 
     @PutMapping("/api/admin/hero-slides/{id}")
+    @PreAuthorize("hasAuthority('CAROUSEL_MANAGE')")
     public SlideResponse update(@PathVariable String id, @Valid @RequestBody SlideRequest req) {
         return SlideResponse.from(service.update(id, req));
     }
 
     @DeleteMapping("/api/admin/hero-slides/{id}")
+    @PreAuthorize("hasAuthority('CAROUSEL_MANAGE')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/api/admin/hero-slides/reorder")
+    @PreAuthorize("hasAuthority('CAROUSEL_MANAGE')")
     public List<SlideResponse> reorder(@Valid @RequestBody ReorderRequest req) {
         return service.reorder(req.ids()).stream().map(SlideResponse::from).toList();
     }

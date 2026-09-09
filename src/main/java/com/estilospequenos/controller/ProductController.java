@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,6 +40,7 @@ public class ProductController {
     // --- Admin ---
 
     @GetMapping("/api/admin/products")
+    @PreAuthorize("hasAuthority('PRODUCTS_VIEW')")
     public PageResponse<ProductResponse> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -56,52 +58,62 @@ public class ProductController {
     }
 
     @GetMapping("/api/admin/products/archived")
+    @PreAuthorize("hasAuthority('PRODUCTS_VIEW')")
     public List<ProductResponse> archived() {
         return service.findArchived().stream().map(ProductResponse::from).toList();
     }
 
     @PostMapping("/api/admin/products/{id}/restore")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
     public ProductResponse restore(@PathVariable String id) {
         return ProductResponse.from(service.restore(id));
     }
 
     @GetMapping("/api/admin/products/{id}")
+    @PreAuthorize("hasAuthority('PRODUCTS_VIEW')")
     public ProductResponse get(@PathVariable String id) {
         return ProductResponse.from(service.get(id));
     }
 
     @PostMapping("/api/admin/products")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest req) {
         return ResponseEntity.status(201).body(ProductResponse.from(service.create(req)));
     }
 
     @PutMapping("/api/admin/products/{id}")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
     public ProductResponse update(@PathVariable String id, @Valid @RequestBody ProductRequest req) {
         return ProductResponse.from(service.update(id, req));
     }
 
     @PostMapping("/api/admin/products/{id}/duplicate")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
     public ResponseEntity<ProductResponse> duplicate(@PathVariable String id) {
         return ResponseEntity.status(201).body(ProductResponse.from(service.duplicate(id)));
     }
 
     @DeleteMapping("/api/admin/products/{id}")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/api/admin/products/{id}/active")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
     public ProductResponse setActive(@PathVariable String id, @Valid @RequestBody ActivePatch body) {
         return ProductResponse.from(service.setActive(id, body.active()));
     }
 
     @PatchMapping("/api/admin/products/{id}/discontinued")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
     public ProductResponse setDiscontinued(@PathVariable String id, @Valid @RequestBody DiscontinuedPatch body) {
         return ProductResponse.from(service.setDiscontinued(id, body.discontinued()));
     }
 
     @PatchMapping("/api/admin/products/{id}/stock")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
     public ProductResponse setStock(@PathVariable String id, @Valid @RequestBody StockPatch body) {
         return ProductResponse.from(service.setStock(id, body.size(), body.stock()));
     }
