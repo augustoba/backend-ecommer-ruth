@@ -1,9 +1,6 @@
 package com.estilospequenos.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,9 +24,6 @@ import java.util.Set;
  */
 @Entity
 @Table(name = "discount")
-@Getter
-@Setter
-@NoArgsConstructor
 public class Discount {
 
     public enum Kind { MONTO, PARAMETRO, PAGO, ENVIO_GRATIS }
@@ -104,5 +98,109 @@ public class Discount {
     /** Helper para el seeder / tests. */
     public static Set<PaymentMethod> methods(PaymentMethod... m) {
         return m.length == 0 ? EnumSet.noneOf(PaymentMethod.class) : EnumSet.copyOf(Arrays.asList(m));
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public Kind getKind() {
+        return kind;
+    }
+
+    public void setKind(Kind kind) {
+        this.kind = kind;
+    }
+
+    public int getDiscountPercent() {
+        return discountPercent;
+    }
+
+    public void setDiscountPercent(int discountPercent) {
+        this.discountPercent = discountPercent;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public boolean isStackable() {
+        return stackable;
+    }
+
+    public void setStackable(boolean stackable) {
+        this.stackable = stackable;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
+    public String getDetail() {
+        return detail;
+    }
+
+    public void setDetail(String detail) {
+        this.detail = detail;
+    }
+
+    public LocalDate getStartsAt() {
+        return startsAt;
+    }
+
+    public void setStartsAt(LocalDate startsAt) {
+        this.startsAt = startsAt;
+    }
+
+    public LocalDate getEndsAt() {
+        return endsAt;
+    }
+
+    public void setEndsAt(LocalDate endsAt) {
+        this.endsAt = endsAt;
+    }
+
+    public BigDecimal getMinAmount() {
+        return minAmount;
+    }
+
+    public void setMinAmount(BigDecimal minAmount) {
+        this.minAmount = minAmount;
+    }
+
+    public String getGroupId() {
+        return groupId;
+    }
+
+    public void setGroupId(String groupId) {
+        this.groupId = groupId;
+    }
+
+    public String getOptionId() {
+        return optionId;
+    }
+
+    public void setOptionId(String optionId) {
+        this.optionId = optionId;
+    }
+
+    public String getPaymentMethods() {
+        return paymentMethods;
+    }
+
+    public void setPaymentMethods(String paymentMethods) {
+        this.paymentMethods = paymentMethods;
     }
 }

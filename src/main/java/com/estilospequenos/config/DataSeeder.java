@@ -15,8 +15,8 @@ import com.estilospequenos.model.Permission;
 import com.estilospequenos.service.AuthService;
 import com.estilospequenos.service.RoleService;
 import com.estilospequenos.service.SiteSettingsService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -29,9 +29,9 @@ import java.util.stream.IntStream;
 
 /** Carga datos de ejemplo la primera vez (si las tablas están vacías). */
 @Component
-@RequiredArgsConstructor
-@Slf4j
 public class DataSeeder implements CommandLineRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
     private final AppProperties props;
     private final AuthService authService;
@@ -41,6 +41,24 @@ public class DataSeeder implements CommandLineRunner {
     private final SizeScaleRepository sizeScaleRepo;
     private final DiscountRepository discountRepo;
     private final ProductRepository productRepo;
+
+    public DataSeeder(AppProperties props,
+                      AuthService authService,
+                      RoleService roleService,
+                      SiteSettingsService siteSettingsService,
+                      ParamRepository paramRepo,
+                      SizeScaleRepository sizeScaleRepo,
+                      DiscountRepository discountRepo,
+                      ProductRepository productRepo) {
+        this.props = props;
+        this.authService = authService;
+        this.roleService = roleService;
+        this.siteSettingsService = siteSettingsService;
+        this.paramRepo = paramRepo;
+        this.sizeScaleRepo = sizeScaleRepo;
+        this.discountRepo = discountRepo;
+        this.productRepo = productRepo;
+    }
 
     @Override
     public void run(String... args) {

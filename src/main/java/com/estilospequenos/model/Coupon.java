@@ -1,9 +1,6 @@
 package com.estilospequenos.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -20,9 +17,6 @@ import java.time.LocalDate;
  */
 @Entity
 @Table(name = "coupon")
-@Getter
-@Setter
-@NoArgsConstructor
 public class Coupon {
 
     public enum Kind { PERCENT, AMOUNT }
@@ -80,5 +74,101 @@ public class Coupon {
     /** Usable ahora: habilitado, no vencido y con usos disponibles. */
     public boolean isUsable() {
         return enabled && !isExpired() && !isExhausted();
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
+
+    public Kind getKind() {
+        return kind;
+    }
+
+    public void setKind(Kind kind) {
+        this.kind = kind;
+    }
+
+    public BigDecimal getValue() {
+        return value;
+    }
+
+    public void setValue(BigDecimal value) {
+        this.value = value;
+    }
+
+    public BigDecimal getMinAmount() {
+        return minAmount;
+    }
+
+    public void setMinAmount(BigDecimal minAmount) {
+        this.minAmount = minAmount;
+    }
+
+    public Integer getMaxUses() {
+        return maxUses;
+    }
+
+    public void setMaxUses(Integer maxUses) {
+        this.maxUses = maxUses;
+    }
+
+    public int getUsedCount() {
+        return usedCount;
+    }
+
+    public void setUsedCount(int usedCount) {
+        this.usedCount = usedCount;
+    }
+
+    public LocalDate getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(LocalDate expiresAt) {
+        this.expiresAt = expiresAt;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public boolean isStackable() {
+        return stackable;
+    }
+
+    public void setStackable(boolean stackable) {
+        this.stackable = stackable;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
     }
 }

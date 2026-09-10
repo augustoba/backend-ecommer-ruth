@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS product (
     description   VARCHAR(4000)  NOT NULL,
     price         DECIMAL(12,2)  NOT NULL,
     age_range     VARCHAR(255)   NOT NULL,
+    video_url     VARCHAR(500),                        -- link a un video de la prenda (YouTube), opcional
     active        BIT            NOT NULL,
     discontinued  BIT            NOT NULL DEFAULT 0,   -- "no reponer": sale de las alertas de stock bajo
     deleted       BIT            NOT NULL DEFAULT 0,   -- soft-delete: archivado, sale de catalogo y listados

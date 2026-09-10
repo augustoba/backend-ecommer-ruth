@@ -1,9 +1,6 @@
 package com.estilospequenos.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -19,9 +16,6 @@ import java.util.List;
  */
 @Entity
 @Table(name = "exchange")
-@Getter
-@Setter
-@NoArgsConstructor
 public class Exchange {
 
     @Id
@@ -69,5 +63,85 @@ public class Exchange {
     public void addLine(ExchangeLine line) {
         line.setExchange(this);
         lines.add(line);
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public long getNumber() {
+        return number;
+    }
+
+    public void setNumber(long number) {
+        this.number = number;
+    }
+
+    public String getCustomerName() {
+        return customerName;
+    }
+
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
+    }
+
+    public BigDecimal getReturnedTotal() {
+        return returnedTotal;
+    }
+
+    public void setReturnedTotal(BigDecimal returnedTotal) {
+        this.returnedTotal = returnedTotal;
+    }
+
+    public BigDecimal getTakenTotal() {
+        return takenTotal;
+    }
+
+    public void setTakenTotal(BigDecimal takenTotal) {
+        this.takenTotal = takenTotal;
+    }
+
+    public BigDecimal getDifference() {
+        return difference;
+    }
+
+    public void setDifference(BigDecimal difference) {
+        this.difference = difference;
+    }
+
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public String getNote() {
+        return note;
+    }
+
+    public void setNote(String note) {
+        this.note = note;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public List<ExchangeLine> getLines() {
+        return lines;
+    }
+
+    public void setLines(List<ExchangeLine> lines) {
+        this.lines = lines;
     }
 }

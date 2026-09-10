@@ -1,9 +1,6 @@
 package com.estilospequenos.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 /**
  * Datos del local editables desde el panel (nombre, WhatsApp, "sobre nosotros",
@@ -12,9 +9,6 @@ import lombok.Setter;
  */
 @Entity
 @Table(name = "site_settings")
-@Getter
-@Setter
-@NoArgsConstructor
 public class SiteSettings {
 
     public static final String SINGLETON_ID = "config";
@@ -100,4 +94,164 @@ public class SiteSettings {
     /** Habilita "efectivo al recibir/retirar". */
     @Column(nullable = false)
     private boolean paymentCashEnabled = false;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getStoreName() {
+        return storeName;
+    }
+
+    public void setStoreName(String storeName) {
+        this.storeName = storeName;
+    }
+
+    public String getWhatsappNumber() {
+        return whatsappNumber;
+    }
+
+    public void setWhatsappNumber(String whatsappNumber) {
+        this.whatsappNumber = whatsappNumber;
+    }
+
+    public String getAboutText() {
+        return aboutText;
+    }
+
+    public void setAboutText(String aboutText) {
+        this.aboutText = aboutText;
+    }
+
+    public String getInstagram() {
+        return instagram;
+    }
+
+    public void setInstagram(String instagram) {
+        this.instagram = instagram;
+    }
+
+    public String getFacebookUrl() {
+        return facebookUrl;
+    }
+
+    public void setFacebookUrl(String facebookUrl) {
+        this.facebookUrl = facebookUrl;
+    }
+
+    public String getLogoUrl() {
+        return logoUrl;
+    }
+
+    public void setLogoUrl(String logoUrl) {
+        this.logoUrl = logoUrl;
+    }
+
+    public String getWhatsappIntro() {
+        return whatsappIntro;
+    }
+
+    public void setWhatsappIntro(String whatsappIntro) {
+        this.whatsappIntro = whatsappIntro;
+    }
+
+    public String getWhatsappClosing() {
+        return whatsappClosing;
+    }
+
+    public void setWhatsappClosing(String whatsappClosing) {
+        this.whatsappClosing = whatsappClosing;
+    }
+
+    public String getStoreAddress() {
+        return storeAddress;
+    }
+
+    public void setStoreAddress(String storeAddress) {
+        this.storeAddress = storeAddress;
+    }
+
+    public String getHelpText() {
+        return helpText;
+    }
+
+    public void setHelpText(String helpText) {
+        this.helpText = helpText;
+    }
+
+    public String getFaqText() {
+        return faqText;
+    }
+
+    public void setFaqText(String faqText) {
+        this.faqText = faqText;
+    }
+
+    public boolean isPaymentTransferEnabled() {
+        return paymentTransferEnabled;
+    }
+
+    public void setPaymentTransferEnabled(boolean paymentTransferEnabled) {
+        this.paymentTransferEnabled = paymentTransferEnabled;
+    }
+
+    public String getPaymentTransferAlias() {
+        return paymentTransferAlias;
+    }
+
+    public void setPaymentTransferAlias(String paymentTransferAlias) {
+        this.paymentTransferAlias = paymentTransferAlias;
+    }
+
+    public boolean isPaymentQrTransferEnabled() {
+        return paymentQrTransferEnabled;
+    }
+
+    public void setPaymentQrTransferEnabled(boolean paymentQrTransferEnabled) {
+        this.paymentQrTransferEnabled = paymentQrTransferEnabled;
+    }
+
+    public String getPaymentQrTransferImage() {
+        return paymentQrTransferImage;
+    }
+
+    public void setPaymentQrTransferImage(String paymentQrTransferImage) {
+        this.paymentQrTransferImage = paymentQrTransferImage;
+    }
+
+    public boolean isPaymentQrCardEnabled() {
+        return paymentQrCardEnabled;
+    }
+
+    public void setPaymentQrCardEnabled(boolean paymentQrCardEnabled) {
+        this.paymentQrCardEnabled = paymentQrCardEnabled;
+    }
+
+    public String getPaymentQrCardImage() {
+        return paymentQrCardImage;
+    }
+
+    public void setPaymentQrCardImage(String paymentQrCardImage) {
+        this.paymentQrCardImage = paymentQrCardImage;
+    }
+
+    public String getPaymentCardLink() {
+        return paymentCardLink;
+    }
+
+    public void setPaymentCardLink(String paymentCardLink) {
+        this.paymentCardLink = paymentCardLink;
+    }
+
+    public boolean isPaymentCashEnabled() {
+        return paymentCashEnabled;
+    }
+
+    public void setPaymentCashEnabled(boolean paymentCashEnabled) {
+        this.paymentCashEnabled = paymentCashEnabled;
+    }
 }

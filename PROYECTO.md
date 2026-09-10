@@ -40,7 +40,7 @@ El 2026-09-08 se hizo este backend (v1) y se conectó el frontend Angular
 | Auth | **JWT stateless** (HS256, `io.jsonwebtoken` 0.12.6) | un solo admin, sin sesión de servidor |
 | Contraseñas | **BCrypt** (tabla `admin_user`) | nunca texto plano |
 | Docs de API | **springdoc-openapi** → Swagger UI en `/swagger-ui.html` | |
-| Boilerplate | Lombok | |
+| Boilerplate | getters/setters/constructores a mano (sin Lombok) | evita el problema de Lombok + annotation processing en cada IDE |
 | Organización | **package-by-layer** (`model/`, `repository/`, `service/`, `controller/`, `dto/`) | pedido del cliente (estilo MVC clásico) |
 
 Paquete base: `com.estilospequenos`. Puerto: `8080`.
