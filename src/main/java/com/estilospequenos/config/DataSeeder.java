@@ -52,13 +52,14 @@ public class DataSeeder implements CommandLineRunner {
                 Permission.PRODUCTS_VIEW, Permission.PRODUCTS_MANAGE,
                 Permission.ORDERS_VIEW, Permission.ORDERS_MANAGE,
                 Permission.POS_USE, Permission.EXCHANGES_USE, Permission.CASH_REGISTER_VIEW,
+                Permission.SHIFTS_MANAGE,
                 Permission.PARAMS_MANAGE, Permission.SIZE_SCALES_MANAGE, Permission.SUPPLIERS_MANAGE,
                 Permission.DISCOUNTS_MANAGE, Permission.COUPONS_MANAGE, Permission.MARKETING_MANAGE,
                 Permission.METRICS_VIEW, Permission.PAYMENTS_MANAGE, Permission.USERS_MANAGE);
         roleService.ensureRole("Vendedor",
                 Permission.ORDERS_VIEW, Permission.ORDERS_MANAGE,
                 Permission.POS_USE, Permission.EXCHANGES_USE,
-                Permission.CASH_REGISTER_VIEW, Permission.METRICS_VIEW);
+                Permission.CASH_REGISTER_VIEW, Permission.SHIFTS_MANAGE, Permission.METRICS_VIEW);
         authService.ensureInitialAdmin();
         authService.ensureInitialSuperadmin();
         siteSettingsService.get();

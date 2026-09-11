@@ -13,6 +13,10 @@ public interface ExchangeRepository extends JpaRepository<Exchange, String> {
 
     List<Exchange> findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(Instant from, Instant to);
 
+    /** Igual, pero sólo lo que procesó un usuario puntual. Para la caja de un turno. */
+    List<Exchange> findByCreatedAtGreaterThanEqualAndCreatedAtLessThanAndProcessedByDni(
+            Instant from, Instant to, String processedByDni);
+
     @Query("select coalesce(max(e.number), 0) from Exchange e")
     long maxNumber();
 }

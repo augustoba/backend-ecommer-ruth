@@ -80,7 +80,7 @@ public class CsvExportController {
                 org.springframework.data.domain.PageRequest.of(0, 100_000));
 
         Csv csv = Csv.withHeader("Codigo", "Fecha", "Cliente", "Canal", "Estado", "Entrega",
-                "Pago", "Subtotal", "Descuento", "Cupon", "Total", "Items");
+                "Pago", "Subtotal", "Descuento", "Cupon", "Total", "Vendio", "Cobro", "Items");
         for (Order o : page.getContent()) {
             String items = o.getLines().stream()
                     .map(l -> l.getProductName() + " T" + l.getSize() + " x" + l.getQuantity())
@@ -90,7 +90,10 @@ public class CsvExportController {
                     o.getPaymentMethod() != null ? o.getPaymentMethod() : "",
                     o.getSubtotal(), o.getDiscountAmount(),
                     o.getCouponDiscount() != null ? o.getCouponDiscount() : "",
-                    o.getTotal(), items);
+                    o.getTotal(),
+                    o.getCreatedByName() != null ? o.getCreatedByName() : "",
+                    o.getConfirmedByName() != null ? o.getConfirmedByName() : "",
+                    items);
         }
         return download(csv, "pedidos.csv");
     }
@@ -99,7 +102,7 @@ public class CsvExportController {
     @PreAuthorize("hasAuthority('EXCHANGES_USE')")
     public ResponseEntity<String> exchangesCsv() {
         Csv csv = Csv.withHeader("Codigo", "Fecha", "Cliente", "Devuelve", "Se lleva",
-                "Total devuelto", "Total llevado", "Diferencia", "Pago", "Nota");
+                "Total devuelto", "Total llevado", "Diferencia", "Pago", "Nota", "Proceso");
         for (Exchange e : exchanges.findAll()) {
             String dev = e.getLines().stream()
                     .filter(l -> l.getKind() == ExchangeLine.Kind.DEVUELTA)
@@ -112,7 +115,8 @@ public class CsvExportController {
             csv.row(e.getCode(), e.getCreatedAt(), e.getCustomerName(), dev, llev,
                     e.getReturnedTotal(), e.getTakenTotal(), e.getDifference(),
                     e.getPaymentMethod() != null ? e.getPaymentMethod() : "",
-                    e.getNote() != null ? e.getNote() : "");
+                    e.getNote() != null ? e.getNote() : "",
+                    e.getProcessedByName() != null ? e.getProcessedByName() : "");
         }
         return download(csv, "cambios.csv");
     }

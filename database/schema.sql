@@ -269,6 +269,10 @@ CREATE TABLE IF NOT EXISTS orders (
     coupon_discount   DECIMAL(12,2),            -- descuento en pesos del cupon (aparte del automatico)
     created_at       DATETIME(6)   NOT NULL,
     processed_at     DATETIME(6),
+    created_by_dni    VARCHAR(20),   -- quien armo el pedido (null = checkout web)
+    created_by_name   VARCHAR(200),
+    confirmed_by_dni  VARCHAR(20),   -- quien lo confirmo/cobro
+    confirmed_by_name VARCHAR(200),
     PRIMARY KEY (id),
     CONSTRAINT uk_orders_number UNIQUE (number),
     KEY ix_orders_status (status)
@@ -287,8 +291,22 @@ CREATE TABLE IF NOT EXISTS exchange (
     payment_method ENUM('TRANSFER','QR_TRANSFER','QR_CARD','CASH'),
     note           VARCHAR(500),
     created_at     DATETIME(6)   NOT NULL,
+    processed_by_dni  VARCHAR(20),
+    processed_by_name VARCHAR(200),
     PRIMARY KEY (id),
     CONSTRAINT uk_exchange_number UNIQUE (number)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+--  Turnos (abrir/cerrar) de vendedores/cajeros
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS shift (
+    id         VARCHAR(255) NOT NULL,
+    user_dni   VARCHAR(20)  NOT NULL,
+    user_name  VARCHAR(200) NOT NULL,
+    opened_at  DATETIME(6)  NOT NULL,
+    closed_at  DATETIME(6),           -- null = turno abierto
+    PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS exchange_line (

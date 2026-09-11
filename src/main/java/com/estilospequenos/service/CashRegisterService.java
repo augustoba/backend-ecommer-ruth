@@ -7,6 +7,7 @@ import com.estilospequenos.model.Order;
 import com.estilospequenos.model.OrderStatus;
 import com.estilospequenos.model.PaymentMethod;
 import com.estilospequenos.model.SaleChannel;
+import com.estilospequenos.model.Shift;
 import com.estilospequenos.repository.ExchangeRepository;
 import com.estilospequenos.repository.OrderRepository;
 import org.springframework.stereotype.Service;
@@ -53,19 +54,41 @@ public class CashRegisterService {
         Instant from = day.atStartOfDay(zone).toInstant();
         Instant to = day.plusDays(1).atStartOfDay(zone).toInstant();
 
+        List<Order> orders = orderRepo
+                .findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(OrderStatus.PROCESADO, from, to);
+        List<Exchange> exchanges = exchangeRepo.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(from, to);
+        return build(day.toString(), orders, exchanges);
+    }
+
+    /**
+     * Caja de un turno: sólo lo que ESA persona cobró/procesó en su ventana de
+     * tiempo (no todo lo que pasó en el local durante ese rango) — es lo que
+     * hace falta para que cada uno pueda cerrar su propio turno.
+     */
+    @Transactional(readOnly = true)
+    public CashRegisterResponse forShift(Shift shift) {
+        Instant from = shift.getOpenedAt();
+        Instant to = shift.getClosedAt() != null ? shift.getClosedAt() : Instant.now();
+
+        List<Order> orders = orderRepo.findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThanAndConfirmedByDni(
+                OrderStatus.PROCESADO, from, to, shift.getUserDni());
+        List<Exchange> exchanges = exchangeRepo.findByCreatedAtGreaterThanEqualAndCreatedAtLessThanAndProcessedByDni(
+                from, to, shift.getUserDni());
+        return build("Turno de " + shift.getUserName(), orders, exchanges);
+    }
+
+    private CashRegisterResponse build(String label, List<Order> orders, List<Exchange> exchanges) {
         // método -> [local, exchanges, online]
         Map<String, BigDecimal[]> acc = new LinkedHashMap<>();
         for (String m : ORDER) acc.put(m, new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
 
-        List<Order> orders = orderRepo
-                .findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(OrderStatus.PROCESADO, from, to);
         for (Order o : orders) {
             int idx = o.getChannel() == SaleChannel.LOCAL ? 0 : 2;
             acc.get(methodKey(o.getPaymentMethod()))[idx] =
                     acc.get(methodKey(o.getPaymentMethod()))[idx].add(o.getTotal());
         }
 
-        for (Exchange e : exchangeRepo.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(from, to)) {
+        for (Exchange e : exchanges) {
             if (e.getDifference().signum() > 0) {
                 acc.get(methodKey(e.getPaymentMethod()))[1] =
                         acc.get(methodKey(e.getPaymentMethod()))[1].add(e.getDifference());
@@ -83,7 +106,7 @@ public class CashRegisterService {
         }
 
         MethodRow total = new MethodRow("", "Total", tl, te, to2, tl.add(te).add(to2));
-        return new CashRegisterResponse(day.toString(), rows, total);
+        return new CashRegisterResponse(label, rows, total);
     }
 
     private static String methodKey(PaymentMethod m) {

@@ -6,6 +6,7 @@ import com.estilospequenos.service.ExchangeService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,7 +33,7 @@ public class ExchangeController {
     }
 
     @PostMapping
-    public ResponseEntity<ExchangeResponse> create(@Valid @RequestBody CreateExchangeRequest req) {
-        return ResponseEntity.status(201).body(ExchangeResponse.from(service.create(req)));
+    public ResponseEntity<ExchangeResponse> create(@Valid @RequestBody CreateExchangeRequest req, Authentication auth) {
+        return ResponseEntity.status(201).body(ExchangeResponse.from(service.create(req, auth.getName())));
     }
 }

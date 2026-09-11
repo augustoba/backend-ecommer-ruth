@@ -55,6 +55,10 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     List<Order> findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
             OrderStatus status, Instant from, Instant to);
 
+    /** Igual, pero sólo lo que confirmó/cobró un usuario puntual. Para la caja de un turno. */
+    List<Order> findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThanAndConfirmedByDni(
+            OrderStatus status, Instant from, Instant to, String confirmedByDni);
+
     @Query("select coalesce(max(o.number), 0) from Order o")
     long maxNumber();
 

@@ -47,14 +47,14 @@ public final class ExchangeDtos {
     public record ExchangeResponse(
             String id, String code, String customerName,
             BigDecimal returnedTotal, BigDecimal takenTotal, BigDecimal difference,
-            PaymentMethod paymentMethod, String note, Instant createdAt,
+            PaymentMethod paymentMethod, String note, Instant createdAt, String processedByName,
             List<ExchangeLineResponse> lines
     ) {
         public static ExchangeResponse from(Exchange e) {
             return new ExchangeResponse(
                     e.getId(), e.getCode(), e.getCustomerName(),
                     e.getReturnedTotal(), e.getTakenTotal(), e.getDifference(),
-                    e.getPaymentMethod(), e.getNote(), e.getCreatedAt(),
+                    e.getPaymentMethod(), e.getNote(), e.getCreatedAt(), e.getProcessedByName(),
                     e.getLines().stream().map(ExchangeLineResponse::from).toList());
         }
     }

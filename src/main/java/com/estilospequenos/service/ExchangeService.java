@@ -7,6 +7,7 @@ import com.estilospequenos.dto.ExchangeDtos.ExchangeItem;
 import com.estilospequenos.model.Exchange;
 import com.estilospequenos.model.ExchangeLine;
 import com.estilospequenos.model.Product;
+import com.estilospequenos.repository.AdminUserRepository;
 import com.estilospequenos.repository.ExchangeRepository;
 import com.estilospequenos.repository.ProductRepository;
 import org.springframework.stereotype.Service;
@@ -30,12 +31,14 @@ public class ExchangeService {
     private final ExchangeRepository repo;
     private final ProductRepository productRepo;
     private final ProductService productService;
+    private final AdminUserRepository adminUsers;
 
     public ExchangeService(ExchangeRepository repo, ProductRepository productRepo,
-                           ProductService productService) {
+                           ProductService productService, AdminUserRepository adminUsers) {
         this.repo = repo;
         this.productRepo = productRepo;
         this.productService = productService;
+        this.adminUsers = adminUsers;
     }
 
     @Transactional(readOnly = true)
@@ -48,13 +51,16 @@ public class ExchangeService {
         return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Cambio", id));
     }
 
-    public Exchange create(CreateExchangeRequest req) {
+    public Exchange create(CreateExchangeRequest req, String processedByDni) {
         Exchange ex = new Exchange();
         ex.setId(UUID.randomUUID().toString());
         ex.setNumber(repo.maxNumber() + 1);
         ex.setCustomerName(req.customerName() == null || req.customerName().isBlank()
                 ? "Cambio en el local" : req.customerName().trim());
         ex.setNote(req.note() == null || req.note().isBlank() ? null : req.note().trim());
+        ex.setProcessedByDni(processedByDni);
+        ex.setProcessedByName(processedByDni == null || processedByDni.isBlank() ? null
+                : adminUsers.findByDni(processedByDni).map(u -> u.getNombre() + " " + u.getApellido()).orElse(null));
 
         // Pre-chequeo de stock de lo que se lleva (agrupando por producto+talle).
         List<String> shortages = new ArrayList<>();

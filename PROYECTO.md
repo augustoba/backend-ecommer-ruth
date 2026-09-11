@@ -138,7 +138,7 @@ DTO en el service y desactivarlo.
 |---|---|---|
 | **AdminUser** | `id, dni (unique), nombre, apellido, email (unique), passwordHash, enabled, role, createdAt` | **DNI = identificador de login** (reemplazó a `username`). Sin frase de recuperación (se sacó, ver §7). `role` → `Role`. Hoy 2 filas reales: Ruth (Administrador) y Augusto (Superadmin). |
 | **Role** | `id, name (unique), system, permissions: Set<Permission>, createdAt` | `system=true` → **todos** los permisos siempre (incluidos los que se agreguen a futuro), no editable/borrable. Sólo el rol **"Superadmin"** es `system`. "Administrador" y "Vendedor" son roles normales (editables) con una lista fija de permisos. |
-| **Permission** | enum, 18 valores | Ver `model/Permission.java`. Los dos más nuevos: `PAYMENTS_MANAGE` (medios de pago, lo tiene "Administrador") y `PLATFORM_SETTINGS_MANAGE` (identidad/logo/WhatsApp/redes/textos/carrusel/servicio de mail — **sólo** lo tiene "Superadmin"). Reemplazaron a `SETTINGS_MANAGE`, que se sacó. |
+| **Permission** | enum, 19 valores | Ver `model/Permission.java`. El más nuevo: `SHIFTS_MANAGE` (turnos, ver §12 #25) — lo tiene "Administrador" y "Vendedor" (se sumó a mano en la DB real porque `DataSeeder.ensureRole` no retocaba roles ya existentes). `PAYMENTS_MANAGE` (medios de pago, lo tiene "Administrador") y `PLATFORM_SETTINGS_MANAGE` (identidad/logo/WhatsApp/redes/textos/carrusel/servicio de mail — **sólo** lo tiene "Superadmin") reemplazaron a `SETTINGS_MANAGE`, que se sacó. |
 | **PlatformMailSettings** | fila única `id='config'`, `host, port, username, password, fromAddress` | Credenciales SMTP (hoy Brevo). Editable sólo por superadmin (`PLATFORM_SETTINGS_MANAGE`) desde `/admin/config/servicios`, `GET/PUT /api/admin/platform/mail`. El `GET` nunca devuelve la clave en texto plano (`passwordSet: boolean`). Semilla inicial desde `app.mail.*` / env vars `BREVO_SMTP_*`. |
 | **MarketingConfig** | fila única `id='config'`, `enabled, discountPercent, inactivityDays, spendThreshold, dailyEmailCap, couponValidityDays, cooldownDays, emailSubject?, emailBody?, emailImageUrl?` | Config de la campaña automática de cupón por email (ver §12 #23/#24). `email*` admiten los tokens `{tienda}`/`{codigo}`/`{porcentaje}`/`{vencimiento}`; null/vacío = texto por defecto. `emailImageUrl` = data URI (imagen arriba del mail). |
 | **MarketingSend** | `id, email, reason (INACTIVE\|VIP), couponCode?, sentAt, status (SENT\|FAILED), errorMessage?, lifetimeSpendSnapshot?, lastOrderAtSnapshot?` | Log de cada envío (o intento) de campaña — historial en `/admin/campanias` + export CSV. Sólo cuenta para el **cooldown** (no repetirle a un mismo cliente) si `status=SENT`; un `FAILED` no bloquea el reintento al otro día. Los que quedan afuera por el **tope diario** ni siquiera generan fila acá, así que al otro día vuelven a entrar en la cuenta (no se pierden). |
@@ -152,8 +152,10 @@ DTO en el service y desactivarlo.
 | **SizeScale** | `id, name, system` + `values: List<String>` ordenada | escalas de talle (ropa bebé/niños/adultos, calzado) |
 | **Supplier** | `id, name, phone?, address?, notes?` | proveedores del local |
 | **Discount** | `id, kind (MONTO\|PARAMETRO\|PAGO\|ENVIO_GRATIS), discountPercent, enabled, stackable, label?, detail?, startsAt?, endsAt?, minAmount?, groupId?, optionId?, paymentMethods?` | `stackable` = acumulable. `detail` = letra chica configurable. `paymentMethods` = CSV de `PaymentMethod` (kind PAGO). `minAmount` sirve para MONTO y ENVIO_GRATIS. `activeNow()` = enabled + rango. DTO expone `status`. **Ya no existe `DiscountConfig`/combineMode**. |
-| **Order** | `id, number (unique), customerName, customerEmail? (2026-09-11, opcional, no bloquea la venta — para la campaña de marketing y la base de clientes, ver §12 #23), subtotal, discountPercent, discountAmount, total, status (PENDIENTE\|PROCESADO\|CANCELADO), deliveryMethod (PICKUP\|SHIPPING), shippingAddress?, shippingReference?, shippingLat?, shippingLng?, paymentMethod? (TRANSFER\|QR_TRANSFER\|QR_CARD\|CASH), createdAt, processedAt?` | `code` = `"PED-" + %04d(number)` (getter `@Transient`). `number` = `MAX(number)+1`. `deliveryMethod` default PICKUP (pedidos viejos). El envío **no** se cotiza: no hay costo en el `Order`, se coordina aparte. `OrderService.create` exige `shippingAddress` si `deliveryMethod=SHIPPING`. |
+| **Order** | `id, number (unique), customerName, customerEmail? (2026-09-11, opcional, no bloquea la venta — para la campaña de marketing y la base de clientes, ver §12 #23), subtotal, discountPercent, discountAmount, total, status (PENDIENTE\|PROCESADO\|CANCELADO), deliveryMethod (PICKUP\|SHIPPING), shippingAddress?, shippingReference?, shippingLat?, shippingLng?, paymentMethod? (TRANSFER\|QR_TRANSFER\|QR_CARD\|CASH), createdAt, processedAt?, createdByDni?/createdByName?, confirmedByDni?/confirmedByName?` | `code` = `"PED-" + %04d(number)` (getter `@Transient`). `number` = `MAX(number)+1`. `deliveryMethod` default PICKUP (pedidos viejos). El envío **no** se cotiza: no hay costo en el `Order`, se coordina aparte. `OrderService.create` exige `shippingAddress` si `deliveryMethod=SHIPPING`. `createdBy*`/`confirmedBy*` (2026-09-11, ver §12 #25) = quién armó / quién cobró — snapshots del nombre por DNI, null en pedidos viejos o del checkout web. |
 | — `lines` | `List<OrderLine{id, productId, productName, size, quantity, unitPrice, accepted}>` | `productName` se guarda por si el producto cambia después |
+| **Exchange** | `id, createdAt, processedByDni?/processedByName?` + `lines: List<ExchangeLine{DEVUELTA\|LLEVADA}>` | Cambios de prenda (ver §12 #21). `processedBy*` (2026-09-11, §12 #25) = snapshot de quién lo procesó, null en cambios viejos. |
+| **Shift** | `id, userDni, userName (snapshot), openedAt, closedAt?` | Turno de un vendedor/cajero (2026-09-11, ver §12 #25). `closedAt=null` = turno abierto. Un usuario no puede tener dos abiertos a la vez. |
 | **HeroSlide** | `id, imageUrl (MEDIUMTEXT), alt, position` | fotos del carrusel de la home |
 
 Enums en MAYÚSCULA (así los devuelve la API y así los espera el frontend).
@@ -624,3 +626,50 @@ hace falta el mismo paso.
     - Probado en vivo contra Brevo real (pedido de prueba + cupón + mail de
       recuperación, después borrados/revertidos).
     - `schema.sql`/`seed.sql` actualizados (sin `recovery_hash`).
+25. **QR por producto + quién vendió/cobró + turnos con cierre de caja
+    (2026-09-11, misma sesión que #22-24, tanda siguiente).**
+    - **Quién armó/cobró la venta**: `Order` sumó `createdByDni`/`createdByName`
+      (se completan en `OrderService.createPos`, null en el checkout web
+      público) y `confirmedByDni`/`confirmedByName` (se completan recién en
+      `confirm`, sea el mismo pedido del POS o uno del checkout web).
+      `Exchange` sumó el mismo par `processedByDni`/`processedByName`. Son
+      **snapshots** del nombre (mismo criterio que `OrderLine.productName`):
+      si el usuario cambia de nombre o se borra después, el pedido/cambio
+      viejo no se rompe. `OrderController`/`ExchangeController` resuelven el
+      DNI de `Authentication.getName()` (JWT). CSV de pedidos/cambios sumó
+      columnas "Vendió"/"Cobró"/"Proceso".
+    - **POS en dos pasos**: `OrderService.createPos` **dejó de confirmar
+      automáticamente** — crea el pedido `LOCAL`/`PENDIENTE` con
+      `createdBy*` seteado; `confirm` (el de siempre, ahora con `confirmedBy*`)
+      pasa a ser el paso de "cobrar", ya sea desde el POS en el momento (caso
+      normal, un solo empleado) o después desde `/admin/pedidos` (si lo cobra
+      otra persona). Sin endpoint nuevo — es el mismo `POST .../confirm` de
+      siempre.
+    - **Turnos** (`Shift`, nueva entidad + `ShiftService` + `ShiftController`
+      bajo `/api/admin/shifts`, permiso nuevo `SHIFTS_MANAGE`): `GET /current`,
+      `POST /open` (400 si ya hay uno abierto), `POST /{id}/close` (400 si ya
+      está cerrado; lo puede cerrar el dueño del turno o alguien con
+      `CASH_REGISTER_VIEW`, para turnos olvidados), `GET` paginado (`userDni`
+      opcional). `CashRegisterService.forShift(shift)` — refactor: `forDay` y
+      `forShift` comparten un `build(label, orders, exchanges)` privado;
+      `forShift` filtra pedidos por `confirmedByDni == shift.userDni` y
+      cambios por `processedByDni == shift.userDni` en la ventana
+      `[openedAt, closedAt ?? now)`, así el cierre de caja de un turno es sólo
+      lo que **esa persona** cobró/procesó, no todo lo del local.
+      `GET /api/admin/cash-register/shift/{id}` nuevo (reusa `CashRegisterResponse`,
+      el campo `date` se repurpone como label genérico "Turno de {nombre}").
+    - **QR por producto**: sin cambios de backend — el QR sólo codifica la URL
+      pública del producto (`{origin}/producto/{id}`, ruta que ya existe), 100%
+      frontend (`qrcode` para generarlo, `@zxing/browser` para leerlo con la
+      cámara).
+    - `Permission.SHIFTS_MANAGE` sumado a `DataSeeder` para "Administrador"/
+      "Vendedor" — **no** retroactivo (`ensureRole` sólo siembra roles que no
+      existen), así que se agregó a mano en la DB real
+      (`INSERT INTO role_permission ...`) para esos dos roles ya existentes.
+    - `schema.sql` actualizado: columnas nuevas en `orders`/`exchange`, tabla
+      `shift` nueva. Sin migración (`ddl-auto=update`).
+    - Probado en vivo: turno abierto → venta en el local dejada pendiente →
+      confirmada desde `/admin/pedidos` (mismo usuario en esta prueba, por
+      falta de una segunda cuenta a mano) → caja del turno reflejó el total →
+      turno cerrado. QR de un producto impreso. Todo revertido/limpiado de la
+      base real después (pedido, línea, turno borrados; stock restaurado).

@@ -19,6 +19,8 @@ public enum Permission {
     EXCHANGES_USE("Registrar cambios de prenda"),
     /** Ver el cierre de caja del día. */
     CASH_REGISTER_VIEW("Ver la caja (cierre del día)"),
+    /** Abrir/cerrar el propio turno y ver su caja. */
+    SHIFTS_MANAGE("Turnos"),
     /** Editar parametrías (clasificación de prendas). */
     PARAMS_MANAGE("Parametrías"),
     /** Editar escalas de talle. */

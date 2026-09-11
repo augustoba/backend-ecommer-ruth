@@ -12,6 +12,7 @@ import com.estilospequenos.model.OrderLine;
 import com.estilospequenos.model.OrderStatus;
 import com.estilospequenos.model.Product;
 import com.estilospequenos.model.ProductParam;
+import com.estilospequenos.repository.AdminUserRepository;
 import com.estilospequenos.repository.OrderRepository;
 import com.estilospequenos.repository.ProductRepository;
 import com.estilospequenos.service.DiscountService.CartLineInput;
@@ -39,15 +40,23 @@ public class OrderService {
     private final ProductService productService;
     private final DiscountService discountService;
     private final CouponService couponService;
+    private final AdminUserRepository adminUsers;
 
     public OrderService(OrderRepository repo, ProductRepository productRepo,
                         ProductService productService, DiscountService discountService,
-                        CouponService couponService) {
+                        CouponService couponService, AdminUserRepository adminUsers) {
         this.repo = repo;
         this.productRepo = productRepo;
         this.productService = productService;
         this.discountService = discountService;
         this.couponService = couponService;
+        this.adminUsers = adminUsers;
+    }
+
+    /** Resuelve el nombre a mostrar de un usuario del panel a partir de su DNI. */
+    private String nameByDni(String dni) {
+        if (dni == null || dni.isBlank()) return null;
+        return adminUsers.findByDni(dni).map(u -> u.getNombre() + " " + u.getApellido()).orElse(null);
     }
 
     @Transactional(readOnly = true)
@@ -214,16 +223,18 @@ public class OrderService {
     }
 
     /**
-     * Venta cargada en el local (POS): crea el pedido, lo marca como canal LOCAL
-     * y lo confirma en el acto (descuenta stock, queda PROCESADO). Si falta stock,
-     * el confirm tira 400 y no se guarda nada (misma transacción).
+     * Venta armada en el local (POS): crea el pedido como canal LOCAL, queda
+     * PENDIENTE ("armado, pendiente de cobro"). Registra quién lo armó.
+     * El cobro es un paso aparte ({@link #confirm}) — puede hacerlo la misma
+     * persona (encadenado desde el frontend) u otra (cajero).
      */
-    public Order createPos(CreateOrderRequest req) {
+    public Order createPos(CreateOrderRequest req, String createdByDni) {
         Order order = create(req);
         order.setChannel(com.estilospequenos.model.SaleChannel.LOCAL);
         order.setDeliveryMethod(DeliveryMethod.PICKUP);
-        repo.save(order);
-        return confirm(order.getId());
+        order.setCreatedByDni(createdByDni);
+        order.setCreatedByName(nameByDni(createdByDni));
+        return repo.save(order);
     }
 
     /** Tilda/destilda ítems (solo mientras el pedido está pendiente). */
@@ -243,9 +254,10 @@ public class OrderService {
     /**
      * Confirma: descuenta stock de las líneas aceptadas y marca PROCESADO.
      * <b>Estricto</b>: si alguna línea aceptada no tiene stock suficiente, no
-     * confirma nada y devuelve 400 con el detalle de lo que falta.
+     * confirma nada y devuelve 400 con el detalle de lo que falta. Registra
+     * quién cobró/confirmó (puede ser distinto de quién armó el pedido).
      */
-    public Order confirm(String orderId) {
+    public Order confirm(String orderId, String confirmedByDni) {
         Order order = get(orderId);
         if (order.getStatus() != OrderStatus.PENDIENTE) {
             throw new BadRequestException("El pedido ya fue procesado o cancelado.");
@@ -278,6 +290,8 @@ public class OrderService {
         }
         order.setStatus(OrderStatus.PROCESADO);
         order.setProcessedAt(Instant.now());
+        order.setConfirmedByDni(confirmedByDni);
+        order.setConfirmedByName(nameByDni(confirmedByDni));
         return repo.save(order);
     }
 

@@ -57,6 +57,13 @@ public class Exchange {
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
+    /** DNI de quién lo procesó (null en cambios viejos). */
+    @Column(length = 20)
+    private String processedByDni;
+    /** Snapshot del nombre. */
+    @Column(length = 200)
+    private String processedByName;
+
     @OneToMany(mappedBy = "exchange", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderColumn(name = "idx")
     private List<ExchangeLine> lines = new ArrayList<>();

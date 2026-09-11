@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -39,11 +40,11 @@ public class OrderController {
         return PublicOrderResponse.from(service.lookup(code, name));
     }
 
-    /** Venta en el local (POS): crea y confirma el pedido en el acto. */
+    /** Venta armada en el local (POS): queda pendiente de cobro (ver {@link #confirm}). */
     @PostMapping("/api/admin/orders/pos")
     @PreAuthorize("hasAuthority('POS_USE')")
-    public ResponseEntity<OrderResponse> createPos(@Valid @RequestBody CreateOrderRequest req) {
-        return ResponseEntity.status(201).body(OrderResponse.from(service.createPos(req)));
+    public ResponseEntity<OrderResponse> createPos(@Valid @RequestBody CreateOrderRequest req, Authentication auth) {
+        return ResponseEntity.status(201).body(OrderResponse.from(service.createPos(req, auth.getName())));
     }
 
     // --- Admin ---
@@ -89,8 +90,8 @@ public class OrderController {
 
     @PostMapping("/api/admin/orders/{id}/confirm")
     @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
-    public OrderResponse confirm(@PathVariable String id) {
-        return OrderResponse.from(service.confirm(id));
+    public OrderResponse confirm(@PathVariable String id, Authentication auth) {
+        return OrderResponse.from(service.confirm(id, auth.getName()));
     }
 
     @PostMapping("/api/admin/orders/{id}/cancel")

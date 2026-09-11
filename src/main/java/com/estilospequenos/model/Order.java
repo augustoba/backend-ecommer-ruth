@@ -95,6 +95,19 @@ public class Order {
 
     private Instant processedAt;
 
+    /** DNI de quién armó el pedido (null en el checkout web público). */
+    @Column(length = 20)
+    private String createdByDni;
+    /** Snapshot del nombre — no se rompe si el usuario cambia de nombre o se borra después. */
+    @Column(length = 200)
+    private String createdByName;
+
+    /** DNI de quién lo confirmó/cobró (se completa recién al confirmar). */
+    @Column(length = 20)
+    private String confirmedByDni;
+    @Column(length = 200)
+    private String confirmedByName;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderColumn(name = "idx")
     private List<OrderLine> lines = new ArrayList<>();

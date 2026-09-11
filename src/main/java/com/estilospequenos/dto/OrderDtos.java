@@ -91,6 +91,7 @@ public final class OrderDtos {
             Double shippingLat, Double shippingLng, PaymentMethod paymentMethod,
             String freeShippingNote, String discountNote,
             String couponCode, BigDecimal couponDiscount,
+            String createdByName, String confirmedByName,
             List<OrderLineResponse> lines
     ) {
         public static OrderResponse from(Order o) {
@@ -102,6 +103,7 @@ public final class OrderDtos {
                     o.getShippingLat(), o.getShippingLng(), o.getPaymentMethod(),
                     o.getFreeShippingNote(), o.getDiscountNote(),
                     o.getCouponCode(), o.getCouponDiscount(),
+                    o.getCreatedByName(), o.getConfirmedByName(),
                     o.getLines().stream().map(OrderLineResponse::from).toList());
         }
     }
