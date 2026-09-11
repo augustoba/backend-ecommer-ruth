@@ -1,7 +1,7 @@
 package com.estilospequenos.controller;
 
 import com.estilospequenos.config.JwtService;
-import com.estilospequenos.dto.AccountDtos.RecoverRequest;
+import com.estilospequenos.dto.AccountDtos.ForgotPasswordRequest;
 import com.estilospequenos.dto.AdminUserDtos.MeResponse;
 import com.estilospequenos.dto.LoginRequest;
 import com.estilospequenos.dto.TokenResponse;
@@ -34,14 +34,13 @@ public class AuthController {
     }
 
     /**
-     * Recuperar la cuenta con la frase de recuperación. Setea la contraseña
-     * nueva y devuelve un JWT (queda logueado).
+     * "Olvidé mi contraseña": le genera una nueva al azar y se la manda por
+     * mail. Siempre responde igual, exista o no ese DNI (no revela nada).
      */
-    @PostMapping("/recover")
-    public ResponseEntity<TokenResponse> recover(@Valid @RequestBody RecoverRequest req, HttpServletRequest http) {
-        JwtService.TokenData data =
-                authService.recover(req.dni(), req.recoveryPhrase(), req.newPassword(), clientIp(http));
-        return ResponseEntity.ok(TokenResponse.bearer(data.token(), data.expiresAt()));
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req, HttpServletRequest http) {
+        authService.forgotPassword(req.dni(), clientIp(http));
+        return ResponseEntity.noContent().build();
     }
 
     /** Quién soy y qué permisos tengo (para que el panel muestre/oculte cosas). */

@@ -4,8 +4,11 @@ import com.estilospequenos.config.AppProperties;
 import com.estilospequenos.dto.PlatformMailDtos.PlatformMailSettingsRequest;
 import com.estilospequenos.model.PlatformMailSettings;
 import com.estilospequenos.repository.PlatformMailSettingsRepository;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Properties;
 
 @Service
 @Transactional
@@ -43,5 +46,19 @@ public class PlatformMailSettingsService {
         }
         s.setFromAddress(req.fromAddress().trim());
         return repo.save(s);
+    }
+
+    /** Arma un `JavaMailSender` nuevo con las credenciales guardadas. */
+    public JavaMailSenderImpl buildSender() {
+        PlatformMailSettings cfg = get();
+        JavaMailSenderImpl sender = new JavaMailSenderImpl();
+        sender.setHost(cfg.getHost());
+        sender.setPort(cfg.getPort());
+        sender.setUsername(cfg.getUsername());
+        sender.setPassword(cfg.getPassword());
+        Properties props = sender.getJavaMailProperties();
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", "true");
+        return sender;
     }
 }

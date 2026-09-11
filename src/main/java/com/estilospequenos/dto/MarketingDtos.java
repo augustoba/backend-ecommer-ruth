@@ -6,6 +6,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -21,16 +22,22 @@ public final class MarketingDtos {
             @NotNull @DecimalMin("0.0") BigDecimal spendThreshold,
             @Min(1) @Max(1000) int dailyEmailCap,
             @Min(1) int couponValidityDays,
-            @Min(0) int cooldownDays
+            @Min(0) int cooldownDays,
+            @Size(max = 300) String emailSubject,
+            @Size(max = 4000) String emailBody,
+            /** Data URI. Vacío/null = sin imagen. */
+            @Size(max = 5_000_000) String emailImageUrl
     ) {}
 
     public record MarketingConfigResponse(
             boolean enabled, int discountPercent, int inactivityDays, BigDecimal spendThreshold,
-            int dailyEmailCap, int couponValidityDays, int cooldownDays
+            int dailyEmailCap, int couponValidityDays, int cooldownDays,
+            String emailSubject, String emailBody, String emailImageUrl
     ) {
         public static MarketingConfigResponse from(MarketingConfig c) {
             return new MarketingConfigResponse(c.isEnabled(), c.getDiscountPercent(), c.getInactivityDays(),
-                    c.getSpendThreshold(), c.getDailyEmailCap(), c.getCouponValidityDays(), c.getCooldownDays());
+                    c.getSpendThreshold(), c.getDailyEmailCap(), c.getCouponValidityDays(), c.getCooldownDays(),
+                    c.getEmailSubject(), c.getEmailBody(), c.getEmailImageUrl());
         }
     }
 

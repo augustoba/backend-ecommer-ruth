@@ -41,8 +41,6 @@ public class AppProperties {
         private String dni = "11111111";
         private String email = "ruth@gmail.com";
         private String password = "ruth123";
-        /** Frase de recuperación inicial (cambiala desde /admin/cuenta). */
-        private String recoveryPhrase = "frase-de-recuperacion-cambiar";
     }
 
     /**

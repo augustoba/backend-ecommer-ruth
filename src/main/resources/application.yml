@@ -41,7 +41,6 @@ app:
     dni: ${ADMIN_DNI:11111111}
     email: ${ADMIN_EMAIL:ruth@gmail.com}
     password: ${ADMIN_PASSWORD:ruth123}
-    recovery-phrase: ${ADMIN_RECOVERY:frase-de-recuperacion-cambiar}
   # Superadmin inicial (dueño de la plataforma): rol "Superadmin" (system, todos
   # los permisos). En otro deploy, sobreescribir con las variables de entorno.
   superadmin:

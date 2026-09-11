@@ -63,42 +63,49 @@ class AuthFlowTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    /**
+     * DNI que no existe: responde igual (204, sin revelar nada) y no intenta
+     * mandar ningún mail (evita depender de una conexión SMTP real en tests).
+     */
     @Test
-    void wrongRecoveryPhraseIsRejected() throws Exception {
-        mvc.perform(post("/api/auth/recover")
+    void forgotPasswordForUnknownDniReturnsNoContent() throws Exception {
+        mvc.perform(post("/api/auth/forgot-password")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"dni\":\"11111111\",\"recoveryPhrase\":\"mal\",\"newPassword\":\"nueva123\"}"))
-                .andExpect(status().isUnauthorized());
+                        .content("{\"dni\":\"99999999\"}"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
-    void recoverThenChangePasswordFlow() throws Exception {
-        // 1) recuperar con la frase por defecto → nueva pass + token
-        String recBody = mvc.perform(post("/api/auth/recover")
+    void changePasswordFlow() throws Exception {
+        String body = mvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"dni\":\"11111111\",\"recoveryPhrase\":\"frase-de-recuperacion-cambiar\",\"newPassword\":\"recuperada9\"}"))
-                .andExpect(status().isOk())
+                        .content("{\"dni\":\"11111111\",\"password\":\"test-pass\"}"))
                 .andReturn().getResponse().getContentAsString();
-        String token = mapper.readTree(recBody).get("token").asText();
+        String token = mapper.readTree(body).get("token").asText();
 
-        // 2) login con la pass nueva funciona
-        mvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"dni\":\"11111111\",\"password\":\"recuperada9\"}"))
-                .andExpect(status().isOk());
-
-        // 3) cambiar la pass (y dejarla como estaba para no romper otros tests)
-        mvc.perform(put("/api/admin/account/password")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"currentPassword\":\"recuperada9\",\"newPassword\":\"test-pass\"}"))
-                .andExpect(status().isNoContent());
-
-        // 4) con la pass actual mal → 401
+        // con la pass actual mal → 401
         mvc.perform(put("/api/admin/account/password")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currentPassword\":\"xxx\",\"newPassword\":\"otra1234\"}"))
                 .andExpect(status().isUnauthorized());
+
+        // cambio real, y lo vuelvo a dejar como estaba para no romper otros tests
+        mvc.perform(put("/api/admin/account/password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"test-pass\",\"newPassword\":\"temporal99\"}"))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"dni\":\"11111111\",\"password\":\"temporal99\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(put("/api/admin/account/password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"temporal99\",\"newPassword\":\"test-pass\"}"))
+                .andExpect(status().isNoContent());
     }
 }

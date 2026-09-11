@@ -78,7 +78,6 @@ CREATE TABLE IF NOT EXISTS admin_user (
     apellido      VARCHAR(255) NOT NULL,
     email         VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    recovery_hash VARCHAR(255),                -- frase de recuperación (BCrypt)
     enabled       BIT          NOT NULL,
     role_id       VARCHAR(255),                -- rol (define los permisos)
     created_at    DATETIME(6)  NOT NULL,

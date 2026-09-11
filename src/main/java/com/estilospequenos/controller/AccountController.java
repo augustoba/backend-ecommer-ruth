@@ -2,7 +2,6 @@ package com.estilospequenos.controller;
 
 import com.estilospequenos.dto.AccountDtos.AccountResponse;
 import com.estilospequenos.dto.AccountDtos.ChangePasswordRequest;
-import com.estilospequenos.dto.AccountDtos.ChangeRecoveryRequest;
 import com.estilospequenos.model.AdminUser;
 import com.estilospequenos.service.AuthService;
 import jakarta.validation.Valid;
@@ -24,21 +23,13 @@ public class AccountController {
     @GetMapping
     public AccountResponse me(Authentication auth) {
         AdminUser user = authService.get(auth.getName());
-        return new AccountResponse(user.getNombre(), user.getApellido(), user.getDni(),
-                user.getEmail(), user.getRecoveryHash() != null);
+        return new AccountResponse(user.getNombre(), user.getApellido(), user.getDni(), user.getEmail());
     }
 
     @PutMapping("/password")
     public ResponseEntity<Void> changePassword(Authentication auth,
                                                @Valid @RequestBody ChangePasswordRequest req) {
         authService.changePassword(auth.getName(), req.currentPassword(), req.newPassword());
-        return ResponseEntity.noContent().build();
-    }
-
-    @PutMapping("/recovery")
-    public ResponseEntity<Void> changeRecovery(Authentication auth,
-                                               @Valid @RequestBody ChangeRecoveryRequest req) {
-        authService.changeRecoveryPhrase(auth.getName(), req.currentPassword(), req.recoveryPhrase());
         return ResponseEntity.noContent().build();
     }
 }

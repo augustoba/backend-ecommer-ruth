@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.util.UUID;
 
 @Service
@@ -20,6 +21,8 @@ import java.util.UUID;
 public class AuthService {
 
     private static final int MIN_PASSWORD = 4;
+    private static final String TEMP_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    private final SecureRandom random = new SecureRandom();
 
     private final AdminUserRepository users;
     private final PasswordEncoder passwordEncoder;
@@ -27,16 +30,19 @@ public class AuthService {
     private final AppProperties props;
     private final LoginAttemptService loginAttempts;
     private final RoleRepository roles;
+    private final AccountMailService accountMailService;
 
     public AuthService(AdminUserRepository users, PasswordEncoder passwordEncoder,
                        JwtService jwtService, AppProperties props,
-                       LoginAttemptService loginAttempts, RoleRepository roles) {
+                       LoginAttemptService loginAttempts, RoleRepository roles,
+                       AccountMailService accountMailService) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.props = props;
         this.loginAttempts = loginAttempts;
         this.roles = roles;
+        this.accountMailService = accountMailService;
     }
 
     /**
@@ -57,22 +63,26 @@ public class AuthService {
     }
 
     /**
-     * Recupera la cuenta: si la frase de recuperación es correcta, setea una
-     * contraseña nueva y devuelve un JWT (queda logueado). Público.
+     * Recupera la cuenta: le genera una contraseña nueva al azar, se la manda
+     * por mail (todo usuario tiene email, es obligatorio) y la deja cargada.
+     * Público. No revela si el DNI existe o no (siempre responde igual).
      */
-    public JwtService.TokenData recover(String dni, String recoveryPhrase, String newPassword, String clientIp) {
+    public void forgotPassword(String dni, String clientIp) {
         loginAttempts.assertNotBlocked(clientIp, dni);
         AdminUser user = users.findByDni(dni == null ? "" : dni.trim())
                 .filter(AdminUser::isEnabled)
                 .orElse(null);
-        if (user == null || user.getRecoveryHash() == null
-                || !passwordEncoder.matches(recoveryPhrase, user.getRecoveryHash())) {
+        if (user == null) {
             loginAttempts.recordFailure(clientIp, dni);
-            throw new BadCredentialsException("La frase de recuperación no coincide.");
+            return;
         }
         loginAttempts.recordSuccess(clientIp, dni);
-        setPassword(user, newPassword);
-        return jwtService.generate(user.getDni());
+        String tempPassword = generateTempPassword();
+        // Manda el mail ANTES de tocar la contraseña: si falla el envío, el
+        // usuario no se queda sin poder entrar con la que ya tenía.
+        accountMailService.sendTempPassword(user.getEmail(), user.getNombre(), tempPassword);
+        user.setPasswordHash(passwordEncoder.encode(tempPassword));
+        users.save(user);
     }
 
     /** Cambia la contraseña (requiere la actual). */
@@ -84,17 +94,12 @@ public class AuthService {
         setPassword(user, newPassword);
     }
 
-    /** Cambia la frase de recuperación (requiere la contraseña actual). */
-    public void changeRecoveryPhrase(String dni, String currentPassword, String newPhrase) {
-        AdminUser user = enabledByDni(dni);
-        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
-            throw new BadCredentialsException("La contraseña actual no es correcta.");
+    private String generateTempPassword() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 10; i++) {
+            sb.append(TEMP_PASSWORD_CHARS.charAt(random.nextInt(TEMP_PASSWORD_CHARS.length())));
         }
-        if (newPhrase == null || newPhrase.trim().length() < MIN_PASSWORD) {
-            throw new BadRequestException("La frase de recuperación es muy corta.");
-        }
-        user.setRecoveryHash(passwordEncoder.encode(newPhrase.trim()));
-        users.save(user);
+        return sb.toString();
     }
 
     @Transactional(readOnly = true)
@@ -104,30 +109,24 @@ public class AuthService {
     }
 
     /**
-     * Crea la cuenta inicial de la dueña de la tienda si no existe (password +
-     * frase de recuperación desde `app.admin.*`, hasheados), con rol
-     * "Administrador" (normal, no system). Se llama desde el DataSeeder.
+     * Crea la cuenta inicial de la dueña de la tienda si no existe (password
+     * desde `app.admin.*`, hasheada), con rol "Administrador" (normal, no
+     * system). Se llama desde el DataSeeder.
      */
     public void ensureInitialAdmin() {
         Role adminRole = roles.findByNameIgnoreCase("Administrador").orElse(null);
         String dni = props.getAdmin().getDni();
-        AdminUser admin = users.findByDni(dni).orElse(null);
-        if (admin == null) {
-            admin = new AdminUser();
-            admin.setId(UUID.randomUUID().toString());
-            admin.setDni(dni);
-            admin.setNombre(props.getAdmin().getNombre());
-            admin.setApellido(props.getAdmin().getApellido());
-            admin.setEmail(props.getAdmin().getEmail());
-            admin.setPasswordHash(passwordEncoder.encode(props.getAdmin().getPassword()));
-            admin.setRecoveryHash(passwordEncoder.encode(props.getAdmin().getRecoveryPhrase()));
-            admin.setEnabled(true);
-            admin.setRole(adminRole);
-            users.save(admin);
-        } else if (admin.getRecoveryHash() == null) {
-            admin.setRecoveryHash(passwordEncoder.encode(props.getAdmin().getRecoveryPhrase()));
-            users.save(admin);
-        }
+        if (users.findByDni(dni).isPresent()) return;
+        AdminUser admin = new AdminUser();
+        admin.setId(UUID.randomUUID().toString());
+        admin.setDni(dni);
+        admin.setNombre(props.getAdmin().getNombre());
+        admin.setApellido(props.getAdmin().getApellido());
+        admin.setEmail(props.getAdmin().getEmail());
+        admin.setPasswordHash(passwordEncoder.encode(props.getAdmin().getPassword()));
+        admin.setEnabled(true);
+        admin.setRole(adminRole);
+        users.save(admin);
     }
 
     /**

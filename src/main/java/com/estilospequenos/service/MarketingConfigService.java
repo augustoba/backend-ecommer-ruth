@@ -34,6 +34,13 @@ public class MarketingConfigService {
         c.setDailyEmailCap(req.dailyEmailCap());
         c.setCouponValidityDays(req.couponValidityDays());
         c.setCooldownDays(req.cooldownDays());
+        c.setEmailSubject(blankToNull(req.emailSubject()));
+        c.setEmailBody(blankToNull(req.emailBody()));
+        c.setEmailImageUrl(blankToNull(req.emailImageUrl()));
         return repo.save(c);
+    }
+
+    private static String blankToNull(String v) {
+        return (v == null || v.isBlank()) ? null : v.trim();
     }
 }

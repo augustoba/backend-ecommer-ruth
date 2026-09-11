@@ -8,12 +8,8 @@ public final class AccountDtos {
 
     private AccountDtos() {}
 
-    /** POST /api/auth/recover — público. */
-    public record RecoverRequest(
-            @NotBlank String dni,
-            @NotBlank String recoveryPhrase,
-            @NotBlank @Size(min = 4) String newPassword
-    ) {}
+    /** POST /api/auth/forgot-password — público. */
+    public record ForgotPasswordRequest(@NotBlank String dni) {}
 
     /** PUT /api/admin/account/password */
     public record ChangePasswordRequest(
@@ -21,14 +17,6 @@ public final class AccountDtos {
             @NotBlank @Size(min = 4) String newPassword
     ) {}
 
-    /** PUT /api/admin/account/recovery */
-    public record ChangeRecoveryRequest(
-            @NotBlank String currentPassword,
-            @NotBlank @Size(min = 4) String recoveryPhrase
-    ) {}
-
     /** GET /api/admin/account */
-    public record AccountResponse(
-            String nombre, String apellido, String dni, String email, boolean hasRecoveryPhrase
-    ) {}
+    public record AccountResponse(String nombre, String apellido, String dni, String email) {}
 }

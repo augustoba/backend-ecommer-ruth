@@ -101,7 +101,7 @@ public class MarketingCampaignService {
                         candidate.reason() == MarketingSend.Reason.VIP ? "Campaña: VIP" : "Campaña: inactivo");
                 Coupon coupon = couponService.create(couponReq).get(0);
                 record.setCouponCode(coupon.getCode());
-                mailService.sendCoupon(candidate.email(), coupon.getCode(), cfg.getDiscountPercent(), expiresAt);
+                mailService.sendCoupon(candidate.email(), cfg, coupon.getCode(), expiresAt);
                 record.setStatus(MarketingSend.Status.SENT);
                 sent++;
             } catch (Exception e) {

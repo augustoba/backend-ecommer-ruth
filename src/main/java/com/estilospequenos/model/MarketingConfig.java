@@ -50,4 +50,18 @@ public class MarketingConfig {
     /** Días sin volver a mandarle una campaña al mismo email, aunque siga calificando. */
     @Column(nullable = false)
     private int cooldownDays = 30;
+
+    /**
+     * Contenido del mail. Admiten los tokens {tienda}, {codigo}, {porcentaje} y
+     * {vencimiento} (se reemplazan solos). null/blank = usar el texto por defecto.
+     */
+    @Column(length = 300)
+    private String emailSubject;
+
+    @Column(length = 4000)
+    private String emailBody;
+
+    /** Imagen que se muestra arriba del mail (data URI). null = sin imagen. */
+    @Column(length = 5_000_000)
+    private String emailImageUrl;
 }

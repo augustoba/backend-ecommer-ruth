@@ -39,13 +39,6 @@ public class AdminUser {
     @Column(nullable = false)
     private String passwordHash;
 
-    /**
-     * Hash BCrypt de la "frase de recuperación": un segundo secreto para poder
-     * recuperar la cuenta si se olvida la contraseña, sin depender de email.
-     */
-    @Column
-    private String recoveryHash;
-
     @Column(nullable = false)
     private boolean enabled = true;
 
