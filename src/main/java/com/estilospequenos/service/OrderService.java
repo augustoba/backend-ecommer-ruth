@@ -126,6 +126,7 @@ public class OrderService {
         order.setCustomerName(
                 req.customerName() == null || req.customerName().isBlank()
                         ? "Sin nombre" : req.customerName().trim());
+        order.setCustomerEmail(normalizeEmail(req.customerEmail()));
         order.setCreatedAt(Instant.now());
         order.setStatus(OrderStatus.PENDIENTE);
 
@@ -293,6 +294,12 @@ public class OrderService {
 
     private static String blankToNull(String v) {
         return (v == null || v.isBlank()) ? null : v.trim();
+    }
+
+    /** Normaliza a minúsculas/sin espacios para que las queries de segmentación de marketing no necesiten LOWER(). */
+    private static String normalizeEmail(String v) {
+        String trimmed = blankToNull(v);
+        return trimmed == null ? null : trimmed.toLowerCase();
     }
 
     private static Map<String, List<String>> paramsOf(Product p) {

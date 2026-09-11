@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS site_settings (
 CREATE TABLE IF NOT EXISTS `role` (
     id         VARCHAR(255) NOT NULL,
     name       VARCHAR(60)  NOT NULL,
-    `system`   BIT          NOT NULL DEFAULT 0,   -- rol "Administrador": todos los permisos, no editable
+    `system`   BIT          NOT NULL DEFAULT 0,   -- rol "Superadmin": todos los permisos, no editable
     created_at DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT uk_role_name UNIQUE (name)
@@ -73,15 +73,30 @@ CREATE TABLE IF NOT EXISTS role_permission (
 
 CREATE TABLE IF NOT EXISTS admin_user (
     id            VARCHAR(255) NOT NULL,
-    username      VARCHAR(255) NOT NULL,
+    dni           VARCHAR(20)  NOT NULL,      -- identificador de login (reemplaza al username viejo)
+    nombre        VARCHAR(255) NOT NULL,
+    apellido      VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     recovery_hash VARCHAR(255),                -- frase de recuperación (BCrypt)
     enabled       BIT          NOT NULL,
     role_id       VARCHAR(255),                -- rol (define los permisos)
     created_at    DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
-    CONSTRAINT uk_admin_user_username UNIQUE (username),
+    CONSTRAINT uk_admin_user_dni UNIQUE (dni),
+    CONSTRAINT uk_admin_user_email UNIQUE (email),
     CONSTRAINT fk_admin_user_role FOREIGN KEY (role_id) REFERENCES `role` (id)
+) ENGINE=InnoDB;
+
+-- Credenciales del servicio de mail (SMTP), fila única. Sólo editable por el superadmin.
+CREATE TABLE IF NOT EXISTS platform_mail_settings (
+    id           VARCHAR(255) NOT NULL,  -- siempre 'config'
+    host         VARCHAR(255) NOT NULL,
+    port         INT          NOT NULL,
+    username     VARCHAR(255) NOT NULL,
+    password     VARCHAR(255) NOT NULL,
+    from_address VARCHAR(255) NOT NULL,
+    PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------

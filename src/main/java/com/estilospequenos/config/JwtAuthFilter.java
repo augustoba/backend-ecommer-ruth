@@ -43,16 +43,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
-            String username = jwtService.validate(header.substring(7));
-            if (username != null) {
-                AdminUser user = users.findByUsername(username).filter(AdminUser::isEnabled).orElse(null);
+            String dni = jwtService.validate(header.substring(7));
+            if (dni != null) {
+                AdminUser user = users.findByDni(dni).filter(AdminUser::isEnabled).orElse(null);
                 if (user != null) {
                     List<SimpleGrantedAuthority> authorities = new ArrayList<>();
                     authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
                     for (Permission p : user.permissions()) {
                         authorities.add(new SimpleGrantedAuthority(p.name()));
                     }
-                    var auth = new UsernamePasswordAuthenticationToken(username, null, authorities);
+                    var auth = new UsernamePasswordAuthenticationToken(dni, null, authorities);
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }

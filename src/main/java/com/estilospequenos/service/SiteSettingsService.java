@@ -1,6 +1,7 @@
 package com.estilospequenos.service;
 
-import com.estilospequenos.dto.SiteSettingsDtos.SettingsRequest;
+import com.estilospequenos.dto.SiteSettingsDtos.PaymentsSettingsRequest;
+import com.estilospequenos.dto.SiteSettingsDtos.PlatformSettingsRequest;
 import com.estilospequenos.model.SiteSettings;
 import com.estilospequenos.repository.SiteSettingsRepository;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,7 @@ public class SiteSettingsService {
     public static final String DEFAULT_WHATSAPP_CLOSING =
             "Quedo atento/a a que me pases el alias o el link de Mercado Pago para coordinar el pago. ¡Gracias!";
 
-    public SiteSettings update(SettingsRequest req) {
+    public SiteSettings updatePlatform(PlatformSettingsRequest req) {
         SiteSettings s = get();
         s.setStoreName(req.storeName().trim());
         s.setWhatsappNumber(req.whatsappNumber().trim());
@@ -39,6 +40,11 @@ public class SiteSettingsService {
         s.setStoreAddress(blankToNull(req.storeAddress()));
         s.setHelpText(blankToNull(req.helpText()));
         s.setFaqText(blankToNull(req.faqText()));
+        return repo.save(s);
+    }
+
+    public SiteSettings updatePayments(PaymentsSettingsRequest req) {
+        SiteSettings s = get();
         s.setPaymentTransferEnabled(Boolean.TRUE.equals(req.paymentTransferEnabled()));
         s.setPaymentTransferAlias(blankToNull(req.paymentTransferAlias()));
         s.setPaymentQrTransferEnabled(Boolean.TRUE.equals(req.paymentQrTransferEnabled()));

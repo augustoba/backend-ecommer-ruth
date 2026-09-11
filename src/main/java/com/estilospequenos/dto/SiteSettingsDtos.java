@@ -9,7 +9,8 @@ public final class SiteSettingsDtos {
 
     private SiteSettingsDtos() {}
 
-    public record SettingsRequest(
+    /** Configuración de plataforma (identidad, logo, WhatsApp, redes, textos). Sólo superadmin. */
+    public record PlatformSettingsRequest(
             @NotBlank String storeName,
             @NotBlank
             @Pattern(regexp = "\\d{8,15}", message = "Solo números, sin +, espacios ni 15 (8 a 15 dígitos)")
@@ -23,7 +24,11 @@ public final class SiteSettingsDtos {
             @Size(max = 2000) String whatsappClosing,
             @Size(max = 500) String storeAddress,
             @Size(max = 8000) String helpText,
-            @Size(max = 20000) String faqText,
+            @Size(max = 20000) String faqText
+    ) {}
+
+    /** Medios de pago. Editable por el admin normal de la tienda. */
+    public record PaymentsSettingsRequest(
             Boolean paymentTransferEnabled,
             @Size(max = 200) String paymentTransferAlias,
             Boolean paymentQrTransferEnabled,

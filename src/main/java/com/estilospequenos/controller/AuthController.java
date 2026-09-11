@@ -29,7 +29,7 @@ public class AuthController {
     /** Login del panel de administración. Devuelve el JWT a mandar como Bearer. */
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
-        JwtService.TokenData data = authService.login(req.username(), req.password(), clientIp(http));
+        JwtService.TokenData data = authService.login(req.dni(), req.password(), clientIp(http));
         return ResponseEntity.ok(TokenResponse.bearer(data.token(), data.expiresAt()));
     }
 
@@ -40,7 +40,7 @@ public class AuthController {
     @PostMapping("/recover")
     public ResponseEntity<TokenResponse> recover(@Valid @RequestBody RecoverRequest req, HttpServletRequest http) {
         JwtService.TokenData data =
-                authService.recover(req.username(), req.recoveryPhrase(), req.newPassword(), clientIp(http));
+                authService.recover(req.dni(), req.recoveryPhrase(), req.newPassword(), clientIp(http));
         return ResponseEntity.ok(TokenResponse.bearer(data.token(), data.expiresAt()));
     }
 

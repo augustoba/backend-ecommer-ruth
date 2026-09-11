@@ -27,6 +27,10 @@ public class Order {
     @Column(nullable = false)
     private String customerName;
 
+    /** Opcional: para armar la base de clientes y mandar campañas de marketing. */
+    @Column(length = 200)
+    private String customerEmail;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotal;
 

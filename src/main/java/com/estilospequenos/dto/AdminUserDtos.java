@@ -11,26 +11,33 @@ public final class AdminUserDtos {
     private AdminUserDtos() {}
 
     public record CreateUserRequest(
-            @NotBlank @Size(min = 3, max = 60) String username,
+            @NotBlank @Size(max = 100) String nombre,
+            @NotBlank @Size(max = 100) String apellido,
+            @NotBlank @Size(min = 6, max = 20) String dni,
+            @NotBlank @jakarta.validation.constraints.Email @Size(max = 200) String email,
             @NotBlank @Size(min = 4, max = 100) String password,
             @NotBlank String roleId,
             Boolean enabled
     ) {}
 
-    /** Edición: rol, estado y (opcional) contraseña nueva. */
+    /** Edición: datos, rol, estado y (opcional) contraseña nueva. */
     public record UpdateUserRequest(
+            @Size(max = 100) String nombre,
+            @Size(max = 100) String apellido,
+            @Size(min = 6, max = 20) String dni,
+            @jakarta.validation.constraints.Email @Size(max = 200) String email,
             String roleId,
             Boolean enabled,
             @Size(min = 4, max = 100) String password
     ) {}
 
     public record UserResponse(
-            String id, String username, String roleId, String roleName,
-            boolean systemAdmin, boolean enabled, Instant createdAt
+            String id, String nombre, String apellido, String dni, String email,
+            String roleId, String roleName, boolean systemAdmin, boolean enabled, Instant createdAt
     ) {
         public static UserResponse from(AdminUser u) {
             return new UserResponse(
-                    u.getId(), u.getUsername(),
+                    u.getId(), u.getNombre(), u.getApellido(), u.getDni(), u.getEmail(),
                     u.getRole() != null ? u.getRole().getId() : null,
                     u.getRole() != null ? u.getRole().getName() : null,
                     u.isSystemAdmin(), u.isEnabled(), u.getCreatedAt());
@@ -38,10 +45,13 @@ public final class AdminUserDtos {
     }
 
     /** Respuesta de `/api/auth/me`: quién soy y qué puedo hacer. */
-    public record MeResponse(String username, String roleName, boolean systemAdmin, java.util.List<String> permissions) {
+    public record MeResponse(
+            String id, String nombre, String apellido, String dni, String email,
+            String roleName, boolean systemAdmin, java.util.List<String> permissions
+    ) {
         public static MeResponse from(AdminUser u) {
             return new MeResponse(
-                    u.getUsername(),
+                    u.getId(), u.getNombre(), u.getApellido(), u.getDni(), u.getEmail(),
                     u.getRole() != null ? u.getRole().getName() : null,
                     u.isSystemAdmin(),
                     u.permissions().stream().map(Enum::name).sorted().toList());

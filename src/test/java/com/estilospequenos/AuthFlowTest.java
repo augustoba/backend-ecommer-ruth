@@ -29,7 +29,7 @@ class AuthFlowTest {
 
     @Test
     void adminUserIsSeededWithBcryptHash() {
-        AdminUser admin = adminUsers.findByUsername("admin").orElseThrow();
+        AdminUser admin = adminUsers.findByDni("11111111").orElseThrow();
         assertThat(admin.getPasswordHash()).startsWith("$2");           // BCrypt
         assertThat(admin.getPasswordHash()).isNotEqualTo("test-pass");  // no en texto plano
     }
@@ -44,7 +44,7 @@ class AuthFlowTest {
     void loginThenAccessAdmin() throws Exception {
         String body = mvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"admin\",\"password\":\"test-pass\"}"))
+                        .content("{\"dni\":\"11111111\",\"password\":\"test-pass\"}"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -59,7 +59,7 @@ class AuthFlowTest {
     void wrongPasswordIsRejected() throws Exception {
         mvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"admin\",\"password\":\"nope\"}"))
+                        .content("{\"dni\":\"11111111\",\"password\":\"nope\"}"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -67,7 +67,7 @@ class AuthFlowTest {
     void wrongRecoveryPhraseIsRejected() throws Exception {
         mvc.perform(post("/api/auth/recover")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"admin\",\"recoveryPhrase\":\"mal\",\"newPassword\":\"nueva123\"}"))
+                        .content("{\"dni\":\"11111111\",\"recoveryPhrase\":\"mal\",\"newPassword\":\"nueva123\"}"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -76,7 +76,7 @@ class AuthFlowTest {
         // 1) recuperar con la frase por defecto → nueva pass + token
         String recBody = mvc.perform(post("/api/auth/recover")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"admin\",\"recoveryPhrase\":\"frase-de-recuperacion-cambiar\",\"newPassword\":\"recuperada9\"}"))
+                        .content("{\"dni\":\"11111111\",\"recoveryPhrase\":\"frase-de-recuperacion-cambiar\",\"newPassword\":\"recuperada9\"}"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         String token = mapper.readTree(recBody).get("token").asText();
@@ -84,7 +84,7 @@ class AuthFlowTest {
         // 2) login con la pass nueva funciona
         mvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"admin\",\"password\":\"recuperada9\"}"))
+                        .content("{\"dni\":\"11111111\",\"password\":\"recuperada9\"}"))
                 .andExpect(status().isOk());
 
         // 3) cambiar la pass (y dejarla como estaba para no romper otros tests)

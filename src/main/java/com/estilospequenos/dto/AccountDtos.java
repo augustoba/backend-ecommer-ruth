@@ -10,7 +10,7 @@ public final class AccountDtos {
 
     /** POST /api/auth/recover — público. */
     public record RecoverRequest(
-            @NotBlank String username,
+            @NotBlank String dni,
             @NotBlank String recoveryPhrase,
             @NotBlank @Size(min = 4) String newPassword
     ) {}
@@ -28,5 +28,7 @@ public final class AccountDtos {
     ) {}
 
     /** GET /api/admin/account */
-    public record AccountResponse(String username, boolean hasRecoveryPhrase) {}
+    public record AccountResponse(
+            String nombre, String apellido, String dni, String email, boolean hasRecoveryPhrase
+    ) {}
 }

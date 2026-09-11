@@ -24,7 +24,8 @@ public class AccountController {
     @GetMapping
     public AccountResponse me(Authentication auth) {
         AdminUser user = authService.get(auth.getName());
-        return new AccountResponse(user.getUsername(), user.getRecoveryHash() != null);
+        return new AccountResponse(user.getNombre(), user.getApellido(), user.getDni(),
+                user.getEmail(), user.getRecoveryHash() != null);
     }
 
     @PutMapping("/password")

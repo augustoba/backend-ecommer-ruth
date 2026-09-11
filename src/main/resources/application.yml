@@ -33,15 +33,35 @@ app:
     # En produccion: definir JWT_SECRET (>= 32 chars). El default es solo para desarrollo local.
     secret: ${JWT_SECRET:dev-secret-estilos-pequenos-cambiar-en-produccion-1234567890}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:720}
-  # Admin inicial: se siembra en la tabla admin_user (hasheado) si no hay ninguno.
+  # Admin inicial (dueña de la tienda): se siembra en admin_user (hasheado) si no
+  # hay ningún usuario con ese DNI. Rol "Administrador".
   admin:
-    username: ${ADMIN_USER:admin}
+    nombre: ${ADMIN_NOMBRE:Ruth}
+    apellido: ${ADMIN_APELLIDO:Basaury}
+    dni: ${ADMIN_DNI:11111111}
+    email: ${ADMIN_EMAIL:ruth@gmail.com}
     password: ${ADMIN_PASSWORD:ruth123}
     recovery-phrase: ${ADMIN_RECOVERY:frase-de-recuperacion-cambiar}
+  # Superadmin inicial (dueño de la plataforma): rol "Superadmin" (system, todos
+  # los permisos). En otro deploy, sobreescribir con las variables de entorno.
+  superadmin:
+    nombre: ${SUPERADMIN_NOMBRE:Augusto}
+    apellido: ${SUPERADMIN_APELLIDO:Basaury}
+    dni: ${SUPERADMIN_DNI:33756194}
+    email: ${SUPERADMIN_EMAIL:basauryaugusto@gmail.com}
+    password: ${SUPERADMIN_PASSWORD:augusto123}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200,http://localhost:4300}
   seed:
     enabled: ${SEED_ENABLED:true}
+  # Valores iniciales del servicio de mail (Brevo SMTP) — sólo siembran
+  # PlatformMailSettings la primera vez; después se editan desde el panel.
+  mail:
+    host: ${BREVO_SMTP_HOST:smtp-relay.brevo.com}
+    port: ${BREVO_SMTP_PORT:587}
+    username: ${BREVO_SMTP_USER:changeme@smtp-brevo.com}
+    password: ${BREVO_SMTP_KEY:changeme}
+    from-address: ${MARKETING_FROM_EMAIL:no-responder@estilospequenos.com}
 
 logging:
   level:

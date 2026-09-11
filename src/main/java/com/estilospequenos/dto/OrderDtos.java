@@ -30,6 +30,8 @@ public final class OrderDtos {
 
     public record CreateOrderRequest(
             String customerName,
+            /** Opcional: para la base de clientes y campañas de marketing. */
+            @Size(max = 200) String customerEmail,
             @NotEmpty List<CartItem> items,
             /** null = PICKUP (compat con clientes viejos). */
             DeliveryMethod deliveryMethod,
@@ -81,7 +83,7 @@ public final class OrderDtos {
     }
 
     public record OrderResponse(
-            String id, String code, String customerName,
+            String id, String code, String customerName, String customerEmail,
             BigDecimal subtotal, int discountPercent, BigDecimal discountAmount, BigDecimal total,
             OrderStatus status, com.estilospequenos.model.SaleChannel channel,
             Instant createdAt, Instant processedAt,
@@ -93,7 +95,7 @@ public final class OrderDtos {
     ) {
         public static OrderResponse from(Order o) {
             return new OrderResponse(
-                    o.getId(), o.getCode(), o.getCustomerName(),
+                    o.getId(), o.getCode(), o.getCustomerName(), o.getCustomerEmail(),
                     o.getSubtotal(), o.getDiscountPercent(), o.getDiscountAmount(), o.getTotal(),
                     o.getStatus(), o.getChannel(), o.getCreatedAt(), o.getProcessedAt(),
                     o.getDeliveryMethod(), o.getShippingAddress(), o.getShippingReference(),

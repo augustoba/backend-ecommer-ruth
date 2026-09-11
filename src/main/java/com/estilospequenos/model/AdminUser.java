@@ -22,8 +22,18 @@ public class AdminUser {
     @Id
     private String id;
 
+    /** Documento de identidad: es el identificador de login (reemplaza al username viejo). */
+    @Column(nullable = false, unique = true, length = 20)
+    private String dni;
+
+    @Column(nullable = false)
+    private String nombre;
+
+    @Column(nullable = false)
+    private String apellido;
+
     @Column(nullable = false, unique = true)
-    private String username;
+    private String email;
 
     /** Hash BCrypt de la contraseña. */
     @Column(nullable = false)

@@ -7,8 +7,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface AdminUserRepository extends JpaRepository<AdminUser, String> {
-    Optional<AdminUser> findByUsername(String username);
-    boolean existsByUsernameIgnoreCase(String username);
+    Optional<AdminUser> findByDni(String dni);
+    boolean existsByDniIgnoreCase(String dni);
+    boolean existsByEmailIgnoreCase(String email);
     List<AdminUser> findAllByOrderByCreatedAtAsc();
     long countByRoleId(String roleId);
     long countByEnabledTrue();

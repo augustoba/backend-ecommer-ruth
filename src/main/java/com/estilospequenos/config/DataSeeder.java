@@ -44,13 +44,23 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        // Roles, config del sitio y admin inicial: siempre (no son "datos de ejemplo").
-        roleService.ensureSystemRole();
+        // Roles, config del sitio y usuarios iniciales: siempre (no son "datos de ejemplo").
+        roleService.ensureSystemRole(); // "Superadmin": system=true, siempre todos los permisos.
+        // "Administrador": todo lo operativo de la tienda, salvo la config de plataforma
+        // (identidad/logo/whatsapp/redes/textos/carrusel/mail) que queda reservada al superadmin.
+        roleService.ensureRole("Administrador",
+                Permission.PRODUCTS_VIEW, Permission.PRODUCTS_MANAGE,
+                Permission.ORDERS_VIEW, Permission.ORDERS_MANAGE,
+                Permission.POS_USE, Permission.EXCHANGES_USE, Permission.CASH_REGISTER_VIEW,
+                Permission.PARAMS_MANAGE, Permission.SIZE_SCALES_MANAGE, Permission.SUPPLIERS_MANAGE,
+                Permission.DISCOUNTS_MANAGE, Permission.COUPONS_MANAGE, Permission.MARKETING_MANAGE,
+                Permission.METRICS_VIEW, Permission.PAYMENTS_MANAGE, Permission.USERS_MANAGE);
         roleService.ensureRole("Vendedor",
                 Permission.ORDERS_VIEW, Permission.ORDERS_MANAGE,
                 Permission.POS_USE, Permission.EXCHANGES_USE,
                 Permission.CASH_REGISTER_VIEW, Permission.METRICS_VIEW);
         authService.ensureInitialAdmin();
+        authService.ensureInitialSuperadmin();
         siteSettingsService.get();
 
         if (!props.getSeed().isEnabled()) return;

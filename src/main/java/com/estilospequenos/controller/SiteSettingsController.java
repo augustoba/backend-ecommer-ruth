@@ -1,6 +1,7 @@
 package com.estilospequenos.controller;
 
-import com.estilospequenos.dto.SiteSettingsDtos.SettingsRequest;
+import com.estilospequenos.dto.SiteSettingsDtos.PaymentsSettingsRequest;
+import com.estilospequenos.dto.SiteSettingsDtos.PlatformSettingsRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.SettingsResponse;
 import com.estilospequenos.service.SiteSettingsService;
 import jakarta.validation.Valid;
@@ -23,14 +24,22 @@ public class SiteSettingsController {
     }
 
     @GetMapping("/api/admin/settings")
-    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('PLATFORM_SETTINGS_MANAGE', 'PAYMENTS_MANAGE')")
     public SettingsResponse adminSettings() {
         return SettingsResponse.from(service.get());
     }
 
-    @PutMapping("/api/admin/settings")
-    @PreAuthorize("hasAuthority('SETTINGS_MANAGE')")
-    public SettingsResponse update(@Valid @RequestBody SettingsRequest req) {
-        return SettingsResponse.from(service.update(req));
+    /** Identidad, logo, WhatsApp, redes, textos. Sólo superadmin. */
+    @PutMapping("/api/admin/settings/platform")
+    @PreAuthorize("hasAuthority('PLATFORM_SETTINGS_MANAGE')")
+    public SettingsResponse updatePlatform(@Valid @RequestBody PlatformSettingsRequest req) {
+        return SettingsResponse.from(service.updatePlatform(req));
+    }
+
+    /** Medios de pago. Lo edita el admin normal de la tienda. */
+    @PutMapping("/api/admin/settings/payments")
+    @PreAuthorize("hasAuthority('PAYMENTS_MANAGE')")
+    public SettingsResponse updatePayments(@Valid @RequestBody PaymentsSettingsRequest req) {
+        return SettingsResponse.from(service.updatePayments(req));
     }
 }

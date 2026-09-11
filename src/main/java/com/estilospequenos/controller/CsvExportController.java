@@ -3,10 +3,12 @@ package com.estilospequenos.controller;
 import com.estilospequenos.common.Csv;
 import com.estilospequenos.model.Exchange;
 import com.estilospequenos.model.ExchangeLine;
+import com.estilospequenos.model.MarketingSend;
 import com.estilospequenos.model.Order;
 import com.estilospequenos.model.OrderStatus;
 import com.estilospequenos.model.Product;
 import com.estilospequenos.model.SizeStock;
+import com.estilospequenos.repository.MarketingSendRepository;
 import com.estilospequenos.service.ExchangeService;
 import com.estilospequenos.service.OrderService;
 import com.estilospequenos.service.ProductService;
@@ -32,13 +34,16 @@ public class CsvExportController {
     private final OrderService orders;
     private final ExchangeService exchanges;
     private final SupplierService suppliers;
+    private final MarketingSendRepository marketingSends;
 
     public CsvExportController(ProductService products, OrderService orders,
-                              ExchangeService exchanges, SupplierService suppliers) {
+                              ExchangeService exchanges, SupplierService suppliers,
+                              MarketingSendRepository marketingSends) {
         this.products = products;
         this.orders = orders;
         this.exchanges = exchanges;
         this.suppliers = suppliers;
+        this.marketingSends = marketingSends;
     }
 
     @GetMapping("/products.csv")
@@ -110,6 +115,21 @@ public class CsvExportController {
                     e.getNote() != null ? e.getNote() : "");
         }
         return download(csv, "cambios.csv");
+    }
+
+    @GetMapping("/marketing.csv")
+    @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
+    public ResponseEntity<String> marketingCsv() {
+        var page = marketingSends.search(null, null, null, null,
+                org.springframework.data.domain.PageRequest.of(0, 100_000));
+
+        Csv csv = Csv.withHeader("Fecha", "Email", "Motivo", "Cupon", "Estado", "Error");
+        for (MarketingSend s : page.getContent()) {
+            csv.row(s.getSentAt(), s.getEmail(), s.getReason(),
+                    s.getCouponCode() != null ? s.getCouponCode() : "",
+                    s.getStatus(), s.getErrorMessage() != null ? s.getErrorMessage() : "");
+        }
+        return download(csv, "marketing.csv");
     }
 
     private ResponseEntity<String> download(Csv csv, String filename) {

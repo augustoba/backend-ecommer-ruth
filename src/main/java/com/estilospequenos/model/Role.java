@@ -13,8 +13,9 @@ import java.util.Set;
 /**
  * Rol del panel: un nombre + un conjunto de {@link Permission}. El admin puede
  * crear roles y tildarles/destildarles permisos. El rol {@code system}
- * ("Administrador") tiene todos los permisos siempre y no se puede editar ni
- * borrar.
+ * ("Superadmin") tiene todos los permisos siempre y no se puede editar ni
+ * borrar. "Administrador" es un rol normal (editable) con un subconjunto fijo
+ * de permisos — ver {@code RoleService.ensureRole}.
  */
 @Entity
 @Table(name = "role")
@@ -29,7 +30,7 @@ public class Role {
     @Column(nullable = false, unique = true, length = 60)
     private String name;
 
-    /** true = rol de sistema ("Administrador"): todos los permisos, no editable. */
+    /** true = rol de sistema ("Superadmin"): todos los permisos, no editable. */
     @Column(nullable = false)
     private boolean system = false;
 

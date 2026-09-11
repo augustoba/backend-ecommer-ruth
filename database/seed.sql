@@ -25,17 +25,19 @@ INSERT INTO site_settings (id, store_name, whatsapp_number, about_text, instagra
 ON DUPLICATE KEY UPDATE id = id;
 
 -- ---------------------------------------------------------------------------
---  Admin inicial
---    usuario: admin
---    contraseña: ruth123
+--  Admin inicial (dueña de la tienda)
+--    DNI: 11111111 · contraseña: ruth123
 --    frase de recuperación: frase-de-recuperacion-cambiar
 --  Los hash son BCrypt (cost 10). Cambiá contraseña y frase desde /admin/cuenta.
+--  El rol se lo asigna la app en el primer arranque (DataSeeder / ensureInitialAdmin),
+--  no hace falta cargarlo acá — pero necesita haber arrancado la app al menos una
+--  vez antes para que exista el rol "Administrador".
 -- ---------------------------------------------------------------------------
-INSERT INTO admin_user (id, username, password_hash, recovery_hash, enabled, created_at) VALUES
-  ('seed-admin', 'admin',
+INSERT INTO admin_user (id, dni, nombre, apellido, email, password_hash, recovery_hash, enabled, created_at) VALUES
+  ('seed-admin', '11111111', 'Ruth', 'Basaury', 'ruth@gmail.com',
    '$2a$10$ZFLQwovN0/tK/ii7RXNC4eM9BIQNgqFdSysjNaSM6pK4CRMXeOL/G',
    '$2a$10$.eOoZ23Uu4k.1DEj1NpOLekpl.PdGxt9NRMaxGN8J.DPQcIgBdbaW', 1, NOW(6))
-ON DUPLICATE KEY UPDATE username = username;
+ON DUPLICATE KEY UPDATE dni = dni;
 
 -- ---------------------------------------------------------------------------
 --  Parametrías

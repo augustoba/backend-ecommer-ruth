@@ -56,7 +56,7 @@ public class RoleService {
     public Role update(String id, RoleRequest req) {
         Role r = get(id);
         if (r.isSystem()) {
-            throw new BadRequestException("El rol Administrador no se puede editar (tiene todos los permisos).");
+            throw new BadRequestException("El rol Superadmin no se puede editar (tiene todos los permisos).");
         }
         String name = req.name().trim();
         if (!name.equalsIgnoreCase(r.getName()) && repo.existsByNameIgnoreCase(name)) {
@@ -70,7 +70,7 @@ public class RoleService {
     public void delete(String id) {
         Role r = get(id);
         if (r.isSystem()) {
-            throw new BadRequestException("El rol Administrador no se puede borrar.");
+            throw new BadRequestException("El rol Superadmin no se puede borrar.");
         }
         if (users.countByRoleId(id) > 0) {
             throw new BadRequestException("Hay usuarios con este rol. Cambiales el rol antes de borrarlo.");
@@ -78,15 +78,20 @@ public class RoleService {
         repo.delete(r);
     }
 
-    /** Crea los roles iniciales si no existen (se llama desde el DataSeeder). */
+    /**
+     * Rol del sistema: siempre TODOS los permisos (incluidos los que se agreguen a
+     * futuro), no se puede editar ni borrar. Pensado para el desarrollador/dueño de
+     * la plataforma, no para el admin de cada tienda (ver {@link #ensureRole}).
+     * Se llama desde el DataSeeder.
+     */
     public Role ensureSystemRole() {
         return repo.findFirstBySystemTrue().orElseGet(() -> {
-            Role admin = new Role();
-            admin.setId(UUID.randomUUID().toString());
-            admin.setName("Administrador");
-            admin.setSystem(true);
-            admin.setPermissions(EnumSet.allOf(Permission.class));
-            return repo.save(admin);
+            Role superadmin = new Role();
+            superadmin.setId(UUID.randomUUID().toString());
+            superadmin.setName("Superadmin");
+            superadmin.setSystem(true);
+            superadmin.setPermissions(EnumSet.allOf(Permission.class));
+            return repo.save(superadmin);
         });
     }
 

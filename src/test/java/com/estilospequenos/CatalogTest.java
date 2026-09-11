@@ -49,9 +49,10 @@ class CatalogTest {
     @Test
     void adminEditsLogoAndWhatsappTexts() throws Exception {
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        // La config de plataforma es sólo-superadmin: logueamos con esa cuenta, no con la de Ruth.
         String login = mvc.perform(post("/api/auth/login")
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"admin\",\"password\":\"test-pass\"}"))
+                        .content("{\"dni\":\"33756194\",\"password\":\"augusto123\"}"))
                 .andReturn().getResponse().getContentAsString();
         String token = mapper.readTree(login).get("token").asText();
 
@@ -60,7 +61,7 @@ class CatalogTest {
                 + "\"whatsappIntro\":\"Hola desde {tienda}\",\"whatsappClosing\":\"Pagá al alias mi.alias\"}";
 
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .put("/api/admin/settings").header("Authorization", "Bearer " + token)
+                        .put("/api/admin/settings/platform").header("Authorization", "Bearer " + token)
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.logoUrl").value("data:image/png;base64,ABC123"))
@@ -71,7 +72,7 @@ class CatalogTest {
         String cleared = "{\"storeName\":\"Estilos Pequeños\",\"whatsappNumber\":\"5491122334455\","
                 + "\"logoUrl\":\"\",\"whatsappIntro\":\"\",\"whatsappClosing\":\"  \"}";
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .put("/api/admin/settings").header("Authorization", "Bearer " + token)
+                        .put("/api/admin/settings/platform").header("Authorization", "Bearer " + token)
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(cleared))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.logoUrl").value(org.hamcrest.Matchers.nullValue()))
@@ -82,7 +83,7 @@ class CatalogTest {
                 + "\"aboutText\":\"Somos Estilos Pequeños.\",\"instagram\":\"estilospequenos_\","
                 + "\"facebookUrl\":\"https://www.facebook.com/share/1NZXdYgick/\"}";
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .put("/api/admin/settings").header("Authorization", "Bearer " + token)
+                        .put("/api/admin/settings/platform").header("Authorization", "Bearer " + token)
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(restore))
                 .andExpect(status().isOk());
     }
@@ -92,7 +93,7 @@ class CatalogTest {
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
         String login = mvc.perform(post("/api/auth/login")
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"admin\",\"password\":\"test-pass\"}"))
+                        .content("{\"dni\":\"11111111\",\"password\":\"test-pass\"}"))
                 .andReturn().getResponse().getContentAsString();
         String token = mapper.readTree(login).get("token").asText();
 

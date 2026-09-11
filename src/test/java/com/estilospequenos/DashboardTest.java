@@ -26,7 +26,7 @@ class DashboardTest {
     private String token() throws Exception {
         String body = mvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"admin\",\"password\":\"test-pass\"}"))
+                        .content("{\"dni\":\"11111111\",\"password\":\"test-pass\"}"))
                 .andReturn().getResponse().getContentAsString();
         return mapper.readTree(body).get("token").asText();
     }

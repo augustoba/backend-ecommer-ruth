@@ -40,44 +40,44 @@ public class AuthService {
     }
 
     /**
-     * Valida usuario/contraseña contra la tabla admin_user y devuelve un JWT.
+     * Valida DNI/contraseña contra la tabla admin_user y devuelve un JWT.
      * {@code clientIp} se usa para el rate-limiting (ver LoginAttemptService).
      */
-    public JwtService.TokenData login(String username, String rawPassword, String clientIp) {
-        loginAttempts.assertNotBlocked(clientIp, username);
-        AdminUser user = users.findByUsername(username == null ? "" : username.trim())
+    public JwtService.TokenData login(String dni, String rawPassword, String clientIp) {
+        loginAttempts.assertNotBlocked(clientIp, dni);
+        AdminUser user = users.findByDni(dni == null ? "" : dni.trim())
                 .filter(AdminUser::isEnabled)
                 .orElse(null);
         if (user == null || !passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
-            loginAttempts.recordFailure(clientIp, username);
-            throw new BadCredentialsException("Usuario o contraseña incorrectos");
+            loginAttempts.recordFailure(clientIp, dni);
+            throw new BadCredentialsException("DNI o contraseña incorrectos");
         }
-        loginAttempts.recordSuccess(clientIp, username);
-        return jwtService.generate(user.getUsername());
+        loginAttempts.recordSuccess(clientIp, dni);
+        return jwtService.generate(user.getDni());
     }
 
     /**
      * Recupera la cuenta: si la frase de recuperación es correcta, setea una
      * contraseña nueva y devuelve un JWT (queda logueado). Público.
      */
-    public JwtService.TokenData recover(String username, String recoveryPhrase, String newPassword, String clientIp) {
-        loginAttempts.assertNotBlocked(clientIp, username);
-        AdminUser user = users.findByUsername(username == null ? "" : username.trim())
+    public JwtService.TokenData recover(String dni, String recoveryPhrase, String newPassword, String clientIp) {
+        loginAttempts.assertNotBlocked(clientIp, dni);
+        AdminUser user = users.findByDni(dni == null ? "" : dni.trim())
                 .filter(AdminUser::isEnabled)
                 .orElse(null);
         if (user == null || user.getRecoveryHash() == null
                 || !passwordEncoder.matches(recoveryPhrase, user.getRecoveryHash())) {
-            loginAttempts.recordFailure(clientIp, username);
+            loginAttempts.recordFailure(clientIp, dni);
             throw new BadCredentialsException("La frase de recuperación no coincide.");
         }
-        loginAttempts.recordSuccess(clientIp, username);
+        loginAttempts.recordSuccess(clientIp, dni);
         setPassword(user, newPassword);
-        return jwtService.generate(user.getUsername());
+        return jwtService.generate(user.getDni());
     }
 
     /** Cambia la contraseña (requiere la actual). */
-    public void changePassword(String username, String currentPassword, String newPassword) {
-        AdminUser user = enabledByUsername(username);
+    public void changePassword(String dni, String currentPassword, String newPassword) {
+        AdminUser user = enabledByDni(dni);
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw new BadCredentialsException("La contraseña actual no es correcta.");
         }
@@ -85,8 +85,8 @@ public class AuthService {
     }
 
     /** Cambia la frase de recuperación (requiere la contraseña actual). */
-    public void changeRecoveryPhrase(String username, String currentPassword, String newPhrase) {
-        AdminUser user = enabledByUsername(username);
+    public void changeRecoveryPhrase(String dni, String currentPassword, String newPhrase) {
+        AdminUser user = enabledByDni(dni);
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw new BadCredentialsException("La contraseña actual no es correcta.");
         }
@@ -98,57 +98,63 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public AdminUser get(String username) {
-        return users.findByUsername(username.trim())
-                .orElseThrow(() -> ResourceNotFoundException.of("Usuario", username));
+    public AdminUser get(String dni) {
+        return users.findByDni(dni.trim())
+                .orElseThrow(() -> ResourceNotFoundException.of("Usuario", dni));
     }
 
     /**
-     * Crea el admin inicial si no existe (password + frase de recuperación desde
-     * `app.admin.*`, hasheados). Si ya existe pero le falta la frase de
-     * recuperación, se la completa. Se llama desde el DataSeeder.
+     * Crea la cuenta inicial de la dueña de la tienda si no existe (password +
+     * frase de recuperación desde `app.admin.*`, hasheados), con rol
+     * "Administrador" (normal, no system). Se llama desde el DataSeeder.
      */
     public void ensureInitialAdmin() {
-        Role systemRole = roles.findFirstBySystemTrue().orElse(null);
-        String username = props.getAdmin().getUsername();
-        AdminUser admin = users.findByUsername(username).orElse(null);
+        Role adminRole = roles.findByNameIgnoreCase("Administrador").orElse(null);
+        String dni = props.getAdmin().getDni();
+        AdminUser admin = users.findByDni(dni).orElse(null);
         if (admin == null) {
             admin = new AdminUser();
             admin.setId(UUID.randomUUID().toString());
-            admin.setUsername(username);
+            admin.setDni(dni);
+            admin.setNombre(props.getAdmin().getNombre());
+            admin.setApellido(props.getAdmin().getApellido());
+            admin.setEmail(props.getAdmin().getEmail());
             admin.setPasswordHash(passwordEncoder.encode(props.getAdmin().getPassword()));
             admin.setRecoveryHash(passwordEncoder.encode(props.getAdmin().getRecoveryPhrase()));
             admin.setEnabled(true);
-            admin.setRole(systemRole);
+            admin.setRole(adminRole);
             users.save(admin);
-        } else {
-            boolean dirty = false;
-            if (admin.getRecoveryHash() == null) {
-                admin.setRecoveryHash(passwordEncoder.encode(props.getAdmin().getRecoveryPhrase()));
-                dirty = true;
-            }
-            // Backfill: usuarios viejos sin rol → Administrador.
-            if (admin.getRole() == null && systemRole != null) {
-                admin.setRole(systemRole);
-                dirty = true;
-            }
-            if (dirty) users.save(admin);
-        }
-        // Cualquier otro usuario sin rol (datos viejos) también queda como Administrador.
-        if (systemRole != null) {
-            for (AdminUser u : users.findAll()) {
-                if (u.getRole() == null) {
-                    u.setRole(systemRole);
-                    users.save(u);
-                }
-            }
+        } else if (admin.getRecoveryHash() == null) {
+            admin.setRecoveryHash(passwordEncoder.encode(props.getAdmin().getRecoveryPhrase()));
+            users.save(admin);
         }
     }
 
-    private AdminUser enabledByUsername(String username) {
-        return users.findByUsername(username == null ? "" : username.trim())
+    /**
+     * Crea la cuenta inicial del superadmin (dueño de la plataforma) si no
+     * existe, con el rol system (todos los permisos siempre). Se llama desde
+     * el DataSeeder, después de {@link #ensureInitialAdmin()}.
+     */
+    public void ensureInitialSuperadmin() {
+        Role superadminRole = roles.findFirstBySystemTrue().orElse(null);
+        String dni = props.getSuperadmin().getDni();
+        if (users.findByDni(dni).isPresent()) return;
+        AdminUser superadmin = new AdminUser();
+        superadmin.setId(UUID.randomUUID().toString());
+        superadmin.setDni(dni);
+        superadmin.setNombre(props.getSuperadmin().getNombre());
+        superadmin.setApellido(props.getSuperadmin().getApellido());
+        superadmin.setEmail(props.getSuperadmin().getEmail());
+        superadmin.setPasswordHash(passwordEncoder.encode(props.getSuperadmin().getPassword()));
+        superadmin.setEnabled(true);
+        superadmin.setRole(superadminRole);
+        users.save(superadmin);
+    }
+
+    private AdminUser enabledByDni(String dni) {
+        return users.findByDni(dni == null ? "" : dni.trim())
                 .filter(AdminUser::isEnabled)
-                .orElseThrow(() -> new BadCredentialsException("Usuario o contraseña incorrectos"));
+                .orElseThrow(() -> new BadCredentialsException("DNI o contraseña incorrectos"));
     }
 
     private void setPassword(AdminUser user, String newPassword) {

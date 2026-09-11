@@ -8,10 +8,18 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
 public interface OrderRepository extends JpaRepository<Order, String> {
+
+    /** Proyección para segmentar clientes por email (marketing): última compra y gasto total. */
+    interface CustomerAggregateRow {
+        String getEmail();
+        Instant getLastOrderAt();
+        BigDecimal getLifetimeSpend();
+    }
 
     List<Order> findAllByOrderByCreatedAtDesc();
 
@@ -49,4 +57,26 @@ public interface OrderRepository extends JpaRepository<Order, String> {
 
     @Query("select coalesce(max(o.number), 0) from Order o")
     long maxNumber();
+
+    /** Segmento "inactivos": clientes cuyo último pedido procesado es anterior a `cutoff`. */
+    @Query("""
+            select o.customerEmail as email, max(o.processedAt) as lastOrderAt, sum(o.total) as lifetimeSpend
+            from Order o
+            where o.status = com.estilospequenos.model.OrderStatus.PROCESADO
+              and o.customerEmail is not null
+            group by o.customerEmail
+            having max(o.processedAt) < :cutoff
+            """)
+    List<CustomerAggregateRow> findInactiveCustomers(@Param("cutoff") Instant cutoff);
+
+    /** Segmento "VIP": clientes cuyo gasto acumulado (pedidos procesados) supera `threshold`. */
+    @Query("""
+            select o.customerEmail as email, max(o.processedAt) as lastOrderAt, sum(o.total) as lifetimeSpend
+            from Order o
+            where o.status = com.estilospequenos.model.OrderStatus.PROCESADO
+              and o.customerEmail is not null
+            group by o.customerEmail
+            having sum(o.total) > :threshold
+            """)
+    List<CustomerAggregateRow> findHighSpendCustomers(@Param("threshold") BigDecimal threshold);
 }

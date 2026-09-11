@@ -27,11 +27,11 @@ public class JwtService {
         this.expirationMinutes = props.getJwt().getExpirationMinutes();
     }
 
-    public TokenData generate(String username) {
+    public TokenData generate(String dni) {
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(expirationMinutes * 60);
         String token = Jwts.builder()
-                .subject(username)
+                .subject(dni)
                 .claim("role", "ADMIN")
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(exp))
@@ -40,7 +40,7 @@ public class JwtService {
         return new TokenData(token, exp);
     }
 
-    /** @return el username (subject) si el token es válido; null si no. */
+    /** @return el DNI (subject) si el token es válido; null si no. */
     public String validate(String token) {
         try {
             Claims claims = Jwts.parser()
