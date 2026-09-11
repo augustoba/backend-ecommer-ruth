@@ -53,7 +53,14 @@ public final class SiteSettingsDtos {
             boolean paymentQrCardEnabled,
             String paymentQrCardImage,
             String paymentCardLink,
-            boolean paymentCashEnabled
+            boolean paymentCashEnabled,
+            /**
+             * Cuenta de Cloudinary para subir imágenes desde el panel. Sólo lectura acá
+             * (se necesitan en cualquier sesión de admin para poder subir fotos); se
+             * editan aparte, en `/api/admin/settings/cloudinary` (sólo superadmin).
+             */
+            String cloudinaryCloudName,
+            String cloudinaryUploadPreset
     ) {
         public static SettingsResponse from(SiteSettings s) {
             return new SettingsResponse(
@@ -64,7 +71,47 @@ public final class SiteSettingsDtos {
                     s.isPaymentTransferEnabled(), s.getPaymentTransferAlias(),
                     s.isPaymentQrTransferEnabled(), s.getPaymentQrTransferImage(),
                     s.isPaymentQrCardEnabled(), s.getPaymentQrCardImage(),
-                    s.getPaymentCardLink(), s.isPaymentCashEnabled());
+                    s.getPaymentCardLink(), s.isPaymentCashEnabled(),
+                    s.getCloudinaryCloudName(), s.getCloudinaryUploadPreset());
+        }
+    }
+
+    /** Config de Cloudinary: sólo la puede ver/editar un superadmin. */
+    public record CloudinaryConfigRequest(
+            @Size(max = 200) String cloudName,
+            @Size(max = 200) String uploadPreset
+    ) {}
+
+    public record CloudinaryConfigResponse(String cloudName, String uploadPreset) {
+        public static CloudinaryConfigResponse from(SiteSettings s) {
+            return new CloudinaryConfigResponse(s.getCloudinaryCloudName(), s.getCloudinaryUploadPreset());
+        }
+    }
+
+    /**
+     * Config de SMTP (recuperación de cuenta por mail): sólo la puede ver/editar
+     * un superadmin. {@code password} vacío/null = no cambiar la que ya está
+     * guardada (mismo patrón que el cambio de contraseña de un AdminUser).
+     */
+    public record MailConfigRequest(
+            @Size(max = 300) String host,
+            Integer port,
+            @Size(max = 300) String username,
+            @Size(max = 500) String password,
+            @Size(max = 300) String fromEmail,
+            @Size(max = 200) String fromName
+    ) {}
+
+    /** {@code password} nunca se devuelve: sólo si hay una guardada (passwordSet). */
+    public record MailConfigResponse(
+            String host, Integer port, String username,
+            boolean passwordSet, String fromEmail, String fromName
+    ) {
+        public static MailConfigResponse from(SiteSettings s) {
+            return new MailConfigResponse(
+                    s.getSmtpHost(), s.getSmtpPort(), s.getSmtpUsername(),
+                    s.getSmtpPassword() != null && !s.getSmtpPassword().isBlank(),
+                    s.getSmtpFromEmail(), s.getSmtpFromName());
         }
     }
 }

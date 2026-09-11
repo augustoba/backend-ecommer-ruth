@@ -11,3 +11,10 @@ spring:
 app:
   jwt:
     secret: pon-aca-un-secreto-largo-de-al-menos-32-caracteres-para-dev
+  # Opcional: tu cuenta superadmin (acceso a /admin/superadmin/*, ej. Cloudinary).
+  # El username es tu DNI (así se loguean las cuentas nuevas).
+  # superadmin:
+  #   username: tu-dni
+  #   password: poné-una-contraseña-fuerte-aca
+  #   first-name: Nombre
+  #   last-name: Apellido

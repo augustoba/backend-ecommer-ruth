@@ -54,6 +54,9 @@ public class AdminUserService {
         u.setPasswordHash(passwordEncoder.encode(req.password()));
         u.setRole(role);
         u.setEnabled(req.enabled() == null || req.enabled());
+        u.setFirstName(blankToNull(req.firstName()));
+        u.setLastName(blankToNull(req.lastName()));
+        u.setEmail(blankToNull(req.email()));
         return users.save(u);
     }
 
@@ -78,7 +81,14 @@ public class AdminUserService {
         if (req.password() != null && !req.password().isBlank()) {
             u.setPasswordHash(passwordEncoder.encode(req.password()));
         }
+        if (req.firstName() != null) u.setFirstName(blankToNull(req.firstName()));
+        if (req.lastName() != null) u.setLastName(blankToNull(req.lastName()));
+        if (req.email() != null) u.setEmail(blankToNull(req.email()));
         return users.save(u);
+    }
+
+    private static String blankToNull(String v) {
+        return (v == null || v.isBlank()) ? null : v.trim();
     }
 
     public void delete(String id, String actingUsername) {

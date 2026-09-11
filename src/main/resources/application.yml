@@ -38,6 +38,14 @@ app:
     username: ${ADMIN_USER:admin}
     password: ${ADMIN_PASSWORD:ruth123}
     recovery-phrase: ${ADMIN_RECOVERY:frase-de-recuperacion-cambiar}
+  # Cuenta superadmin (opcional): si se setean las dos, se siembra con
+  # AdminUser.superAdmin=true (acceso a Cloudinary y futura config de infraestructura).
+  # Vacío = no se crea ninguna.
+  superadmin:
+    username: ${SUPERADMIN_USER:}
+    password: ${SUPERADMIN_PASSWORD:}
+    first-name: ${SUPERADMIN_FIRST_NAME:}
+    last-name: ${SUPERADMIN_LAST_NAME:}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200,http://localhost:4300}
   seed:

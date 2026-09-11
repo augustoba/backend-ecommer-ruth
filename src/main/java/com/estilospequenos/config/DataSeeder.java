@@ -69,6 +69,7 @@ public class DataSeeder implements CommandLineRunner {
                 Permission.POS_USE, Permission.EXCHANGES_USE,
                 Permission.CASH_REGISTER_VIEW, Permission.METRICS_VIEW);
         authService.ensureInitialAdmin();
+        authService.ensureSuperAdmin();
         siteSettingsService.get();
 
         if (!props.getSeed().isEnabled()) return;

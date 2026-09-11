@@ -16,8 +16,31 @@ public class AdminUser {
     @Id
     private String id;
 
+    /**
+     * Identificador de login. Para cuentas nuevas es el **DNI** (así lo pidió el
+     * cliente: "que se logeen con su dni") — el form de alta lo etiqueta "DNI",
+     * pero el campo/columna sigue llamándose `username` para no romper el login,
+     * el JWT (`sub`) ni las cuentas viejas que todavía tienen un username libre
+     * (ej. la cuenta "admin" original).
+     */
     @Column(nullable = false, unique = true)
     private String username;
+
+    /** Nombre de pila. Opcional para no romper cuentas viejas sin backfillear. */
+    @Column(length = 100)
+    private String firstName;
+
+    /** Apellido. */
+    @Column(length = 100)
+    private String lastName;
+
+    /**
+     * Mail para recuperar la cuenta. Hoy la recuperación sigue siendo por
+     * `recoveryHash` (frase secreta) — este campo queda guardado para cuando se
+     * conecte el envío de mail (falta decidir proveedor SMTP).
+     */
+    @Column(length = 200)
+    private String email;
 
     /** Hash BCrypt de la contraseña. */
     @Column(nullable = false)
@@ -32,6 +55,16 @@ public class AdminUser {
 
     @Column(nullable = false)
     private boolean enabled = true;
+
+    /**
+     * Superadmin: acceso a configuraciones de "infraestructura del sitio"
+     * (hoy: credenciales de Cloudinary) que no se gestionan como {@link Permission}
+     * normal porque no deben poder auto-otorgarse desde `/admin/usuarios` (ABM de
+     * roles). Sólo se setea sembrando la cuenta por variables de entorno
+     * (`app.superadmin.*`) o directo en la base — nunca desde la UI de roles.
+     */
+    @Column(nullable = false)
+    private boolean superAdmin = false;
 
     /** Rol del usuario (define sus permisos). */
     @ManyToOne(fetch = FetchType.EAGER)
@@ -66,6 +99,30 @@ public class AdminUser {
         this.username = username;
     }
 
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
     public String getPasswordHash() {
         return passwordHash;
     }
@@ -88,6 +145,14 @@ public class AdminUser {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public boolean isSuperAdmin() {
+        return superAdmin;
+    }
+
+    public void setSuperAdmin(boolean superAdmin) {
+        this.superAdmin = superAdmin;
     }
 
     public Role getRole() {

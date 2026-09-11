@@ -95,6 +95,103 @@ public class SiteSettings {
     @Column(nullable = false)
     private boolean paymentCashEnabled = false;
 
+    // --- Cloudinary (subida de imágenes desde el panel) ---
+    // Editable solo por superadmin (ver AdminUser.superAdmin); se leen desde el
+    // endpoint público de settings porque cualquier sesión de admin las necesita
+    // para poder subir fotos. No son secretas (unsigned upload preset).
+
+    @Column(length = 200)
+    private String cloudinaryCloudName;
+
+    @Column(length = 200)
+    private String cloudinaryUploadPreset;
+
+    public String getCloudinaryCloudName() {
+        return cloudinaryCloudName;
+    }
+
+    public void setCloudinaryCloudName(String cloudinaryCloudName) {
+        this.cloudinaryCloudName = cloudinaryCloudName;
+    }
+
+    public String getCloudinaryUploadPreset() {
+        return cloudinaryUploadPreset;
+    }
+
+    public void setCloudinaryUploadPreset(String cloudinaryUploadPreset) {
+        this.cloudinaryUploadPreset = cloudinaryUploadPreset;
+    }
+
+    // --- SMTP (recuperación de cuenta por mail) ---
+    // Editable solo por superadmin. A diferencia de Cloudinary, `smtpPassword` es
+    // secreto de verdad (una API key de Brevo) — nunca se devuelve en ninguna
+    // respuesta, sólo se puede pisar (ver CloudinaryConfigResponse vs. MailConfigResponse).
+
+    @Column(length = 300)
+    private String smtpHost;
+
+    private Integer smtpPort;
+
+    @Column(length = 300)
+    private String smtpUsername;
+
+    @Column(length = 500)
+    private String smtpPassword;
+
+    @Column(length = 300)
+    private String smtpFromEmail;
+
+    @Column(length = 200)
+    private String smtpFromName;
+
+    public String getSmtpHost() {
+        return smtpHost;
+    }
+
+    public void setSmtpHost(String smtpHost) {
+        this.smtpHost = smtpHost;
+    }
+
+    public Integer getSmtpPort() {
+        return smtpPort;
+    }
+
+    public void setSmtpPort(Integer smtpPort) {
+        this.smtpPort = smtpPort;
+    }
+
+    public String getSmtpUsername() {
+        return smtpUsername;
+    }
+
+    public void setSmtpUsername(String smtpUsername) {
+        this.smtpUsername = smtpUsername;
+    }
+
+    public String getSmtpPassword() {
+        return smtpPassword;
+    }
+
+    public void setSmtpPassword(String smtpPassword) {
+        this.smtpPassword = smtpPassword;
+    }
+
+    public String getSmtpFromEmail() {
+        return smtpFromEmail;
+    }
+
+    public void setSmtpFromEmail(String smtpFromEmail) {
+        this.smtpFromEmail = smtpFromEmail;
+    }
+
+    public String getSmtpFromName() {
+        return smtpFromName;
+    }
+
+    public void setSmtpFromName(String smtpFromName) {
+        this.smtpFromName = smtpFromName;
+    }
+
     public String getId() {
         return id;
     }

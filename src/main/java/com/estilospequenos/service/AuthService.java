@@ -145,6 +145,59 @@ public class AuthService {
         }
     }
 
+    /**
+     * Siembra (u opta-in) la cuenta superadmin desde `app.superadmin.*`. No hace
+     * nada si falta el username o la password (así queda desactivado por defecto).
+     * A diferencia del admin inicial, si la cuenta ya existe NO le toca la
+     * contraseña (para no pisar un cambio hecho desde el panel) — sólo se
+     * asegura de que {@code superAdmin=true} y tenga un rol asignado.
+     */
+    public void ensureSuperAdmin() {
+        String username = props.getSuperadmin().getUsername();
+        String password = props.getSuperadmin().getPassword();
+        if (username == null || username.isBlank() || password == null || password.isBlank()) return;
+
+        Role systemRole = roles.findFirstBySystemTrue().orElse(null);
+        AdminUser user = users.findByUsername(username.trim()).orElse(null);
+        String firstName = blankToNull(props.getSuperadmin().getFirstName());
+        String lastName = blankToNull(props.getSuperadmin().getLastName());
+        if (user == null) {
+            user = new AdminUser();
+            user.setId(UUID.randomUUID().toString());
+            user.setUsername(username.trim());
+            user.setPasswordHash(passwordEncoder.encode(password));
+            user.setEnabled(true);
+            user.setRole(systemRole);
+            user.setSuperAdmin(true);
+            user.setFirstName(firstName);
+            user.setLastName(lastName);
+            users.save(user);
+        } else {
+            boolean dirty = false;
+            if (!user.isSuperAdmin()) {
+                user.setSuperAdmin(true);
+                dirty = true;
+            }
+            if (user.getRole() == null && systemRole != null) {
+                user.setRole(systemRole);
+                dirty = true;
+            }
+            if (user.getFirstName() == null && firstName != null) {
+                user.setFirstName(firstName);
+                dirty = true;
+            }
+            if (user.getLastName() == null && lastName != null) {
+                user.setLastName(lastName);
+                dirty = true;
+            }
+            if (dirty) users.save(user);
+        }
+    }
+
+    private static String blankToNull(String v) {
+        return (v == null || v.isBlank()) ? null : v.trim();
+    }
+
     private AdminUser enabledByUsername(String username) {
         return users.findByUsername(username == null ? "" : username.trim())
                 .filter(AdminUser::isEnabled)

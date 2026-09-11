@@ -10,6 +10,7 @@ public class AppProperties {
 
     private Jwt jwt = new Jwt();
     private Admin admin = new Admin();
+    private SuperAdmin superadmin = new SuperAdmin();
     private Cors cors = new Cors();
     private Seed seed = new Seed();
     private LoginThrottle loginThrottle = new LoginThrottle();
@@ -28,6 +29,14 @@ public class AppProperties {
 
     public void setAdmin(Admin admin) {
         this.admin = admin;
+    }
+
+    public SuperAdmin getSuperadmin() {
+        return superadmin;
+    }
+
+    public void setSuperadmin(SuperAdmin superadmin) {
+        this.superadmin = superadmin;
     }
 
     public Cors getCors() {
@@ -108,6 +117,50 @@ public class AppProperties {
 
         public void setRecoveryPhrase(String recoveryPhrase) {
             this.recoveryPhrase = recoveryPhrase;
+        }
+    }
+
+    /**
+     * Cuenta superadmin (vos, no el dueño/a del comercio): acceso a config de
+     * "infraestructura del sitio" (hoy: Cloudinary). Vacío por defecto → no se
+     * siembra ninguna cuenta; se activa seteando ambas env vars.
+     */
+    public static class SuperAdmin {
+        private String username = "";
+        private String password = "";
+        private String firstName = "";
+        private String lastName = "";
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+
+        public String getFirstName() {
+            return firstName;
+        }
+
+        public void setFirstName(String firstName) {
+            this.firstName = firstName;
+        }
+
+        public String getLastName() {
+            return lastName;
+        }
+
+        public void setLastName(String lastName) {
+            this.lastName = lastName;
         }
     }
 
