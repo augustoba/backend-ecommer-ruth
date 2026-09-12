@@ -131,23 +131,41 @@ public class AuthService {
 
     /**
      * Crea la cuenta inicial del superadmin (dueño de la plataforma) si no
-     * existe, con el rol system (todos los permisos siempre). Se llama desde
-     * el DataSeeder, después de {@link #ensureInitialAdmin()}.
+     * existe, con el rol system (todos los permisos siempre) y el flag
+     * {@code superAdmin=true} (acceso aparte a Cloudinary/mail, ver
+     * {@link AdminUser#isSuperAdmin()}). Se llama desde el DataSeeder, después
+     * de {@link #ensureInitialAdmin()}. Si la cuenta ya existe, sólo se asegura
+     * de que tenga el flag y el rol seteados (no le toca la contraseña, para no
+     * pisar un cambio hecho desde el panel).
      */
     public void ensureInitialSuperadmin() {
         Role superadminRole = roles.findFirstBySystemTrue().orElse(null);
         String dni = props.getSuperadmin().getDni();
-        if (users.findByDni(dni).isPresent()) return;
-        AdminUser superadmin = new AdminUser();
-        superadmin.setId(UUID.randomUUID().toString());
-        superadmin.setDni(dni);
-        superadmin.setNombre(props.getSuperadmin().getNombre());
-        superadmin.setApellido(props.getSuperadmin().getApellido());
-        superadmin.setEmail(props.getSuperadmin().getEmail());
-        superadmin.setPasswordHash(passwordEncoder.encode(props.getSuperadmin().getPassword()));
-        superadmin.setEnabled(true);
-        superadmin.setRole(superadminRole);
-        users.save(superadmin);
+        AdminUser superadmin = users.findByDni(dni).orElse(null);
+        if (superadmin == null) {
+            superadmin = new AdminUser();
+            superadmin.setId(UUID.randomUUID().toString());
+            superadmin.setDni(dni);
+            superadmin.setNombre(props.getSuperadmin().getNombre());
+            superadmin.setApellido(props.getSuperadmin().getApellido());
+            superadmin.setEmail(props.getSuperadmin().getEmail());
+            superadmin.setPasswordHash(passwordEncoder.encode(props.getSuperadmin().getPassword()));
+            superadmin.setEnabled(true);
+            superadmin.setRole(superadminRole);
+            superadmin.setSuperAdmin(true);
+            users.save(superadmin);
+            return;
+        }
+        boolean dirty = false;
+        if (!superadmin.isSuperAdmin()) {
+            superadmin.setSuperAdmin(true);
+            dirty = true;
+        }
+        if (superadmin.getRole() == null && superadminRole != null) {
+            superadmin.setRole(superadminRole);
+            dirty = true;
+        }
+        if (dirty) users.save(superadmin);
     }
 
     private AdminUser enabledByDni(String dni) {

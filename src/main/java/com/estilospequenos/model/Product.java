@@ -1,9 +1,6 @@
 package com.estilospequenos.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -14,9 +11,6 @@ import java.util.Set;
 
 @Entity
 @Table(name = "product")
-@Getter
-@Setter
-@NoArgsConstructor
 public class Product {
 
     @Id
@@ -44,6 +38,10 @@ public class Product {
     @OrderColumn(name = "idx")
     @Column(name = "url", nullable = false, length = 5_000_000)
     private List<String> images = new ArrayList<>();
+
+    /** Link a un video de la prenda (YouTube). Opcional — se muestra embebido en la ficha. */
+    @Column(length = 500)
+    private String videoUrl;
 
     @Column(nullable = false)
     private boolean active = true;
@@ -97,5 +95,141 @@ public class Product {
     @Transient
     public String getImageUrl() {
         return images.isEmpty() ? null : images.get(0);
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
+    public String getAgeRange() {
+        return ageRange;
+    }
+
+    public void setAgeRange(String ageRange) {
+        this.ageRange = ageRange;
+    }
+
+    public List<String> getImages() {
+        return images;
+    }
+
+    public void setImages(List<String> images) {
+        this.images = images;
+    }
+
+    public String getVideoUrl() {
+        return videoUrl;
+    }
+
+    public void setVideoUrl(String videoUrl) {
+        this.videoUrl = videoUrl;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public boolean isDiscontinued() {
+        return discontinued;
+    }
+
+    public void setDiscontinued(boolean discontinued) {
+        this.discontinued = discontinued;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getSizeScaleId() {
+        return sizeScaleId;
+    }
+
+    public void setSizeScaleId(String sizeScaleId) {
+        this.sizeScaleId = sizeScaleId;
+    }
+
+    public String getSupplierId() {
+        return supplierId;
+    }
+
+    public void setSupplierId(String supplierId) {
+        this.supplierId = supplierId;
+    }
+
+    public BigDecimal getCostPrice() {
+        return costPrice;
+    }
+
+    public void setCostPrice(BigDecimal costPrice) {
+        this.costPrice = costPrice;
+    }
+
+    public Integer getLowStockThreshold() {
+        return lowStockThreshold;
+    }
+
+    public void setLowStockThreshold(Integer lowStockThreshold) {
+        this.lowStockThreshold = lowStockThreshold;
+    }
+
+    public List<SizeStock> getSizeStocks() {
+        return sizeStocks;
+    }
+
+    public void setSizeStocks(List<SizeStock> sizeStocks) {
+        this.sizeStocks = sizeStocks;
+    }
+
+    public Set<ProductParam> getParams() {
+        return params;
+    }
+
+    public void setParams(Set<ProductParam> params) {
+        this.params = params;
     }
 }

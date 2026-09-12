@@ -1,9 +1,6 @@
 package com.estilospequenos.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 import java.util.EnumSet;
@@ -19,9 +16,6 @@ import java.util.Set;
  */
 @Entity
 @Table(name = "role")
-@Getter
-@Setter
-@NoArgsConstructor
 public class Role {
 
     @Id
@@ -47,5 +41,45 @@ public class Role {
     public Set<Permission> effectivePermissions() {
         return system ? EnumSet.allOf(Permission.class) : EnumSet.copyOf(
                 permissions.isEmpty() ? EnumSet.noneOf(Permission.class) : permissions);
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public boolean isSystem() {
+        return system;
+    }
+
+    public void setSystem(boolean system) {
+        this.system = system;
+    }
+
+    public Set<Permission> getPermissions() {
+        return permissions;
+    }
+
+    public void setPermissions(Set<Permission> permissions) {
+        this.permissions = permissions;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
     }
 }

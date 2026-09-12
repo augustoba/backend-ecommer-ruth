@@ -1,9 +1,6 @@
 package com.estilospequenos.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 /**
  * Credenciales del servicio de mail (SMTP), una sola fila igual que
@@ -12,9 +9,6 @@ import lombok.Setter;
  */
 @Entity
 @Table(name = "platform_mail_settings")
-@Getter
-@Setter
-@NoArgsConstructor
 public class PlatformMailSettings {
 
     public static final String SINGLETON_ID = "config";
@@ -37,4 +31,52 @@ public class PlatformMailSettings {
 
     @Column(nullable = false)
     private String fromAddress;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host) {
+        this.host = host;
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public void setPort(int port) {
+        this.port = port;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public String getFromAddress() {
+        return fromAddress;
+    }
+
+    public void setFromAddress(String fromAddress) {
+        this.fromAddress = fromAddress;
+    }
 }

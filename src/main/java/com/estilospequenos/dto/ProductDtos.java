@@ -28,6 +28,8 @@ public final class ProductDtos {
             @NotBlank String ageRange,
             /** Fotos del producto, en orden. La primera es la portada. Al menos una. */
             @NotEmpty List<@NotBlank String> images,
+            /** Link a un video de la prenda (YouTube). Opcional. */
+            String videoUrl,
             Boolean active,
             /** true = no se repone más (deja de aparecer en "por reponer"). */
             Boolean discontinued,
@@ -56,6 +58,8 @@ public final class ProductDtos {
             String imageUrl,
             /** Todas las fotos, en orden. */
             List<String> images,
+            /** Link a un video de la prenda (YouTube). null si no tiene. */
+            String videoUrl,
             boolean active,
             boolean discontinued,
             boolean deleted,
@@ -77,7 +81,7 @@ public final class ProductDtos {
                     .toList();
             return new ProductResponse(
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
-                    p.getImageUrl(), List.copyOf(p.getImages()), p.isActive(), p.isDiscontinued(),
+                    p.getImageUrl(), List.copyOf(p.getImages()), p.getVideoUrl(), p.isActive(), p.isDiscontinued(),
                     p.isDeleted(), p.getCreatedAt(), p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(),
                     p.getLowStockThreshold(), params, stocks);
         }

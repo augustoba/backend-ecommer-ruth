@@ -121,6 +121,7 @@ public class ProductService {
         copy.setPrice(src.getPrice());
         copy.setAgeRange(src.getAgeRange());
         copy.getImages().addAll(src.getImages());
+        copy.setVideoUrl(src.getVideoUrl());
         copy.setActive(false);
         copy.setDiscontinued(false);
         copy.setSizeScaleId(src.getSizeScaleId());
@@ -228,6 +229,7 @@ public class ProductService {
             }
         }
 
+        p.setVideoUrl(blankToNull(req.videoUrl()));
         p.setActive(req.active() == null || req.active());
         p.setDiscontinued(req.discontinued() != null && req.discontinued());
         p.setSizeScaleId(blankToNull(req.sizeScaleId()));

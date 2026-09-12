@@ -42,7 +42,8 @@ app:
     email: ${ADMIN_EMAIL:ruth@gmail.com}
     password: ${ADMIN_PASSWORD:ruth123}
   # Superadmin inicial (dueño de la plataforma): rol "Superadmin" (system, todos
-  # los permisos). En otro deploy, sobreescribir con las variables de entorno.
+  # los permisos) + AdminUser.superAdmin=true (acceso aparte a Cloudinary/mail).
+  # En otro deploy, sobreescribir con las variables de entorno.
   superadmin:
     nombre: ${SUPERADMIN_NOMBRE:Augusto}
     apellido: ${SUPERADMIN_APELLIDO:Basaury}

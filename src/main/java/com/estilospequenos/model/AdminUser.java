@@ -1,9 +1,6 @@
 package com.estilospequenos.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 
@@ -14,9 +11,6 @@ import java.time.Instant;
  */
 @Entity
 @Table(name = "admin_user")
-@Getter
-@Setter
-@NoArgsConstructor
 public class AdminUser {
 
     @Id
@@ -42,6 +36,16 @@ public class AdminUser {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    /**
+     * Superadmin: acceso a configuraciones de "infraestructura del sitio"
+     * (Cloudinary, servicio de mail) que no se gestionan como {@link Permission}
+     * normal porque no deben poder auto-otorgarse desde `/admin/usuarios` (ABM de
+     * roles). Sólo se setea sembrando la cuenta por variables de entorno
+     * (`app.superadmin.*`) o directo en la base — nunca desde la UI de roles.
+     */
+    @Column(nullable = false)
+    private boolean superAdmin = false;
+
     /** Rol del usuario (define sus permisos). */
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id")
@@ -57,5 +61,85 @@ public class AdminUser {
 
     public boolean isSystemAdmin() {
         return role != null && role.isSystem();
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getDni() {
+        return dni;
+    }
+
+    public void setDni(String dni) {
+        this.dni = dni;
+    }
+
+    public String getNombre() {
+        return nombre;
+    }
+
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
+
+    public String getApellido() {
+        return apellido;
+    }
+
+    public void setApellido(String apellido) {
+        this.apellido = apellido;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public boolean isSuperAdmin() {
+        return superAdmin;
+    }
+
+    public void setSuperAdmin(boolean superAdmin) {
+        this.superAdmin = superAdmin;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
     }
 }

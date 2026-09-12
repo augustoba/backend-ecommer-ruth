@@ -2,17 +2,9 @@ package com.estilospequenos.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 /** Stock de un talle puntual de un producto. */
 @Embeddable
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class SizeStock {
 
     @Column(name = "size_value", nullable = false)
@@ -20,4 +12,28 @@ public class SizeStock {
 
     @Column(nullable = false)
     private int stock;
+
+    public SizeStock() {
+    }
+
+    public SizeStock(String size, int stock) {
+        this.size = size;
+        this.stock = stock;
+    }
+
+    public String getSize() {
+        return size;
+    }
+
+    public void setSize(String size) {
+        this.size = size;
+    }
+
+    public int getStock() {
+        return stock;
+    }
+
+    public void setStock(int stock) {
+        this.stock = stock;
+    }
 }

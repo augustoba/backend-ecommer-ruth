@@ -68,7 +68,37 @@ public class SiteSettingsService {
         s.setFacebookUrl("https://www.facebook.com/share/1NZXdYgick/");
         s.setWhatsappIntro(DEFAULT_WHATSAPP_INTRO);
         s.setWhatsappClosing(DEFAULT_WHATSAPP_CLOSING);
+        // Cuenta de Cloudinary actual (antes hardcodeada en site-config.ts del
+        // frontend); el superadmin la puede cambiar desde /admin/superadmin/cloudinary.
+        s.setCloudinaryCloudName("jitutkbc");
+        s.setCloudinaryUploadPreset("estilospequenos");
         return s;
+    }
+
+    /** Sólo lo puede llamar el controller gateado por la authority SUPERADMIN. */
+    public SiteSettings updateCloudinary(String cloudName, String uploadPreset) {
+        SiteSettings s = get();
+        s.setCloudinaryCloudName(blankToNull(cloudName));
+        s.setCloudinaryUploadPreset(blankToNull(uploadPreset));
+        return repo.save(s);
+    }
+
+    /**
+     * Sólo lo puede llamar el controller gateado por la authority SUPERADMIN.
+     * {@code password} en blanco = no tocar la que ya está guardada.
+     */
+    public SiteSettings updateMailConfig(String host, Integer port, String username, String password,
+                                         String fromEmail, String fromName) {
+        SiteSettings s = get();
+        s.setSmtpHost(blankToNull(host));
+        s.setSmtpPort(port);
+        s.setSmtpUsername(blankToNull(username));
+        if (password != null && !password.isBlank()) {
+            s.setSmtpPassword(password);
+        }
+        s.setSmtpFromEmail(blankToNull(fromEmail));
+        s.setSmtpFromName(blankToNull(fromName));
+        return repo.save(s);
     }
 
     private static String blankToNull(String v) {

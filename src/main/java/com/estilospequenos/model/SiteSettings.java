@@ -1,9 +1,6 @@
 package com.estilospequenos.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 /**
  * Datos del local editables desde el panel (nombre, WhatsApp, "sobre nosotros",
@@ -12,9 +9,6 @@ import lombok.Setter;
  */
 @Entity
 @Table(name = "site_settings")
-@Getter
-@Setter
-@NoArgsConstructor
 public class SiteSettings {
 
     public static final String SINGLETON_ID = "config";
@@ -100,4 +94,261 @@ public class SiteSettings {
     /** Habilita "efectivo al recibir/retirar". */
     @Column(nullable = false)
     private boolean paymentCashEnabled = false;
+
+    // --- Cloudinary (subida de imágenes desde el panel) ---
+    // Editable solo por superadmin (ver AdminUser.superAdmin); se leen desde el
+    // endpoint público de settings porque cualquier sesión de admin las necesita
+    // para poder subir fotos. No son secretas (unsigned upload preset).
+
+    @Column(length = 200)
+    private String cloudinaryCloudName;
+
+    @Column(length = 200)
+    private String cloudinaryUploadPreset;
+
+    public String getCloudinaryCloudName() {
+        return cloudinaryCloudName;
+    }
+
+    public void setCloudinaryCloudName(String cloudinaryCloudName) {
+        this.cloudinaryCloudName = cloudinaryCloudName;
+    }
+
+    public String getCloudinaryUploadPreset() {
+        return cloudinaryUploadPreset;
+    }
+
+    public void setCloudinaryUploadPreset(String cloudinaryUploadPreset) {
+        this.cloudinaryUploadPreset = cloudinaryUploadPreset;
+    }
+
+    // --- SMTP (recuperación de cuenta por mail) ---
+    // Editable solo por superadmin. A diferencia de Cloudinary, `smtpPassword` es
+    // secreto de verdad (una API key de Brevo) — nunca se devuelve en ninguna
+    // respuesta, sólo se puede pisar (ver CloudinaryConfigResponse vs. MailConfigResponse).
+
+    @Column(length = 300)
+    private String smtpHost;
+
+    private Integer smtpPort;
+
+    @Column(length = 300)
+    private String smtpUsername;
+
+    @Column(length = 500)
+    private String smtpPassword;
+
+    @Column(length = 300)
+    private String smtpFromEmail;
+
+    @Column(length = 200)
+    private String smtpFromName;
+
+    public String getSmtpHost() {
+        return smtpHost;
+    }
+
+    public void setSmtpHost(String smtpHost) {
+        this.smtpHost = smtpHost;
+    }
+
+    public Integer getSmtpPort() {
+        return smtpPort;
+    }
+
+    public void setSmtpPort(Integer smtpPort) {
+        this.smtpPort = smtpPort;
+    }
+
+    public String getSmtpUsername() {
+        return smtpUsername;
+    }
+
+    public void setSmtpUsername(String smtpUsername) {
+        this.smtpUsername = smtpUsername;
+    }
+
+    public String getSmtpPassword() {
+        return smtpPassword;
+    }
+
+    public void setSmtpPassword(String smtpPassword) {
+        this.smtpPassword = smtpPassword;
+    }
+
+    public String getSmtpFromEmail() {
+        return smtpFromEmail;
+    }
+
+    public void setSmtpFromEmail(String smtpFromEmail) {
+        this.smtpFromEmail = smtpFromEmail;
+    }
+
+    public String getSmtpFromName() {
+        return smtpFromName;
+    }
+
+    public void setSmtpFromName(String smtpFromName) {
+        this.smtpFromName = smtpFromName;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getStoreName() {
+        return storeName;
+    }
+
+    public void setStoreName(String storeName) {
+        this.storeName = storeName;
+    }
+
+    public String getWhatsappNumber() {
+        return whatsappNumber;
+    }
+
+    public void setWhatsappNumber(String whatsappNumber) {
+        this.whatsappNumber = whatsappNumber;
+    }
+
+    public String getAboutText() {
+        return aboutText;
+    }
+
+    public void setAboutText(String aboutText) {
+        this.aboutText = aboutText;
+    }
+
+    public String getInstagram() {
+        return instagram;
+    }
+
+    public void setInstagram(String instagram) {
+        this.instagram = instagram;
+    }
+
+    public String getFacebookUrl() {
+        return facebookUrl;
+    }
+
+    public void setFacebookUrl(String facebookUrl) {
+        this.facebookUrl = facebookUrl;
+    }
+
+    public String getLogoUrl() {
+        return logoUrl;
+    }
+
+    public void setLogoUrl(String logoUrl) {
+        this.logoUrl = logoUrl;
+    }
+
+    public String getWhatsappIntro() {
+        return whatsappIntro;
+    }
+
+    public void setWhatsappIntro(String whatsappIntro) {
+        this.whatsappIntro = whatsappIntro;
+    }
+
+    public String getWhatsappClosing() {
+        return whatsappClosing;
+    }
+
+    public void setWhatsappClosing(String whatsappClosing) {
+        this.whatsappClosing = whatsappClosing;
+    }
+
+    public String getStoreAddress() {
+        return storeAddress;
+    }
+
+    public void setStoreAddress(String storeAddress) {
+        this.storeAddress = storeAddress;
+    }
+
+    public String getHelpText() {
+        return helpText;
+    }
+
+    public void setHelpText(String helpText) {
+        this.helpText = helpText;
+    }
+
+    public String getFaqText() {
+        return faqText;
+    }
+
+    public void setFaqText(String faqText) {
+        this.faqText = faqText;
+    }
+
+    public boolean isPaymentTransferEnabled() {
+        return paymentTransferEnabled;
+    }
+
+    public void setPaymentTransferEnabled(boolean paymentTransferEnabled) {
+        this.paymentTransferEnabled = paymentTransferEnabled;
+    }
+
+    public String getPaymentTransferAlias() {
+        return paymentTransferAlias;
+    }
+
+    public void setPaymentTransferAlias(String paymentTransferAlias) {
+        this.paymentTransferAlias = paymentTransferAlias;
+    }
+
+    public boolean isPaymentQrTransferEnabled() {
+        return paymentQrTransferEnabled;
+    }
+
+    public void setPaymentQrTransferEnabled(boolean paymentQrTransferEnabled) {
+        this.paymentQrTransferEnabled = paymentQrTransferEnabled;
+    }
+
+    public String getPaymentQrTransferImage() {
+        return paymentQrTransferImage;
+    }
+
+    public void setPaymentQrTransferImage(String paymentQrTransferImage) {
+        this.paymentQrTransferImage = paymentQrTransferImage;
+    }
+
+    public boolean isPaymentQrCardEnabled() {
+        return paymentQrCardEnabled;
+    }
+
+    public void setPaymentQrCardEnabled(boolean paymentQrCardEnabled) {
+        this.paymentQrCardEnabled = paymentQrCardEnabled;
+    }
+
+    public String getPaymentQrCardImage() {
+        return paymentQrCardImage;
+    }
+
+    public void setPaymentQrCardImage(String paymentQrCardImage) {
+        this.paymentQrCardImage = paymentQrCardImage;
+    }
+
+    public String getPaymentCardLink() {
+        return paymentCardLink;
+    }
+
+    public void setPaymentCardLink(String paymentCardLink) {
+        this.paymentCardLink = paymentCardLink;
+    }
+
+    public boolean isPaymentCashEnabled() {
+        return paymentCashEnabled;
+    }
+
+    public void setPaymentCashEnabled(boolean paymentCashEnabled) {
+        this.paymentCashEnabled = paymentCashEnabled;
+    }
 }

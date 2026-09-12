@@ -47,7 +47,7 @@ El 2026-09-08 se hizo este backend (v1) y se conectó el frontend Angular
 | Contraseñas | **BCrypt** (tabla `admin_user`) | nunca texto plano. Recuperación: mail con contraseña nueva (no hay "frase de recuperación", se sacó) |
 | Mail (SMTP) | credenciales en DB (`platform_mail_settings`, singleton) | hoy: Brevo. Editable sólo por superadmin desde `/admin/config/servicios`, sin redeploy |
 | Docs de API | **springdoc-openapi** → Swagger UI en `/swagger-ui.html` | |
-| Boilerplate | Lombok | |
+| Boilerplate | getters/setters/constructores a mano (sin Lombok) | evita el problema de Lombok + annotation processing en cada IDE |
 | Organización | **package-by-layer** (`model/`, `repository/`, `service/`, `controller/`, `dto/`) | pedido del cliente (estilo MVC clásico) |
 
 Paquete base: `com.estilospequenos`. Puerto: `8080`.
@@ -673,3 +673,37 @@ hace falta el mismo paso.
       falta de una segunda cuenta a mano) → caja del turno reflejó el total →
       turno cerrado. QR de un producto impreso. Todo revertido/limpiado de la
       base real después (pedido, línea, turno borrados; stock restaurado).
+26. **Merge de las ramas `develop` (local) y `origin/develop` (2026-09-12):**
+    `origin/develop` traía trabajo en paralelo (2026-09-10/11) que esta rama
+    nunca había bajado: Cloudinary editable desde el panel (`site_settings`
+    sumó `cloudinaryCloudName`/`cloudinaryUploadPreset`, endpoints
+    `GET`/`PUT /api/admin/settings/cloudinary`), un flag `AdminUser.superAdmin`
+    (boolean) separado del sistema de roles (con authority `SUPERADMIN` en el
+    JWT vía `JwtAuthFilter`), y un scaffolding de SMTP en `site_settings`
+    (`smtp*`) con pantalla `/admin/superadmin/mail`. Se sacó Lombok del
+    proyecto (`pom.xml` ya no lo tiene como dependencia) y se pasó a getters/
+    setters a mano.
+    - **Se quedaron los dos ejes de "superadmin":** el rol de sistema
+      ("Superadmin", ver #22) sigue siendo el único que tiene todos los
+      `Permission`; se sumó `AdminUser.superAdmin` como eje aparte, ungrantable
+      desde `/admin/usuarios` (a diferencia de un `Permission`, no hay forma de
+      dárselo a un rol normal por la UI) — sirve específicamente para
+      Cloudinary y el mail SMTP, que son secretos de infraestructura, no
+      config de negocio. `AuthService.ensureInitialSuperadmin()` (siembra por
+      `app.superadmin.*`, ver #22) ahora setea los dos ejes en la misma cuenta.
+    - **4 modelos usaban Lombok** (`MarketingConfig`, `MarketingSend`,
+      `PlatformMailSettings`, `Shift`, todos de #23-25) y quedaron rotos al
+      sacar la dependencia — se les escribieron los getters/setters a mano.
+    - **Pendiente de decidir (no se tocó en este merge):** quedaron **dos
+      configuraciones de SMTP independientes** — `PlatformMailSettings` (la
+      que de verdad usan `AccountMailService`/`MarketingMailService` para
+      mandar mail, ver #24, editable en `/admin/config/servicios`) y los
+      campos `smtp*` de `SiteSettings` (editables en `/admin/superadmin/mail`,
+      gateados por `SUPERADMIN`, pero sin conectar a ningún envío real). Falta
+      decidir si se unifican (lo más simple: apuntar `/admin/superadmin/mail`
+      a `PlatformMailSettings` y borrar los campos `smtp*` de `SiteSettings`)
+      o si se les da un propósito distinto a cada una.
+    - `database/schema.sql`: se agregó la columna `super_admin` a `admin_user`
+      (faltaba). Los campos `cloudinary*`/`smtp*` de `site_settings` siguen
+      sin reflejarse en `schema.sql` (existían así desde antes del merge, se
+      crean solos con `ddl-auto=update`).

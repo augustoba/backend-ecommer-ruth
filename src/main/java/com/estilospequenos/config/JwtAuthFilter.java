@@ -52,6 +52,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     for (Permission p : user.permissions()) {
                         authorities.add(new SimpleGrantedAuthority(p.name()));
                     }
+                    if (user.isSuperAdmin()) {
+                        authorities.add(new SimpleGrantedAuthority("SUPERADMIN"));
+                    }
                     var auth = new UsernamePasswordAuthenticationToken(dni, null, authorities);
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(auth);

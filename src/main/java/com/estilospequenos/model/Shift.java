@@ -1,9 +1,6 @@
 package com.estilospequenos.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 
@@ -16,9 +13,6 @@ import java.time.Instant;
  */
 @Entity
 @Table(name = "shift")
-@Getter
-@Setter
-@NoArgsConstructor
 public class Shift {
 
     @Id
@@ -36,4 +30,44 @@ public class Shift {
 
     /** null = turno abierto. */
     private Instant closedAt;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getUserDni() {
+        return userDni;
+    }
+
+    public void setUserDni(String userDni) {
+        this.userDni = userDni;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    public Instant getOpenedAt() {
+        return openedAt;
+    }
+
+    public void setOpenedAt(Instant openedAt) {
+        this.openedAt = openedAt;
+    }
+
+    public Instant getClosedAt() {
+        return closedAt;
+    }
+
+    public void setClosedAt(Instant closedAt) {
+        this.closedAt = closedAt;
+    }
 }
