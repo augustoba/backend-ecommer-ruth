@@ -328,12 +328,81 @@ de la propuesta original eran "solo un ejemplo").
 
 ### Fase 8 — Dominios propios, SSL, deployment con Docker + reverse proxy ⏸️
 
-### Fase 9 — Agregar el segundo rubro (ej. ferretería) reutilizando la plataforma ⏸️
+### Fase 9 — Agregar un segundo rubro reutilizando la plataforma 🔜 (plantillas preparadas, sin cargar)
+
+Rubros concretos definidos con el usuario: **ferretería** y **venta de
+repuestos de vehículos** (2026-09-15).
+
+**Hallazgo clave:** el usuario confirmó que estos rubros NO necesitan stock
+desglosado por variante (a diferencia de talle en ropa — una remera tiene
+stock distinto por talle; un tornillo o un filtro de aceite tiene un único
+número de stock). Esto cambia radicalmente el alcance de la fase:
+
+- **NO hace falta generalizar `SizeScale`/`SizeStock`** ni tocar `Product`,
+  `OrderLine`, checkout, métricas, caja o exports — el acoplamiento a
+  talle documentado en la sección 3 #1 **no bloquea** estos dos rubros.
+- **Los atributos de ambos rubros encajan directo en `ParamGroup`/
+  `ParamOption`**, que ya es 100% genérico (lo mismo que usa hoy "Tipo de
+  prenda" o "Estación" para ropa). Agregar el rubro es prácticamente
+  **cargar datos**, no escribir código.
+
+**Bloqueador real:** hoy existe un solo tenant (la tienda de ropa real).
+No tiene sentido cargar categorías de ferretería/repuestos en su catálogo.
+Por eso se preparan las plantillas como referencia, listas para sembrar el
+día que exista un segundo tenant — **no se cargan en ningún tenant ahora**.
+
+#### Plantilla — Ferretería
+
+| Grupo (`ParamGroup`) | `multiple` | Opciones de ejemplo |
+|---|---|---|
+| Marca | no | (abierto — alta libre por el dueño, no una lista fija) |
+| Medida | no | según el producto (ej: 3mm, 4mm, 5mm, 1/2", 3/4"...) |
+| Material | no | Acero, Acero inoxidable, Bronce, Plástico, Aluminio |
+| Unidad de venta | no | Unidad, Metro, Kilogramo, Caja, Par |
+| Características técnicas | sí (`multiple=true`) | Resistente a la corrosión, Uso exterior, Uso industrial... |
+
+#### Plantilla — Repuestos de vehículos
+
+| Grupo (`ParamGroup`) | `multiple` | Opciones de ejemplo |
+|---|---|---|
+| Marca del vehículo | no | Toyota, Ford, Volkswagen, Chevrolet, Fiat, Renault... |
+| Modelo | no | (depende de la marca elegida — considerar UI dependiente cuando se implemente) |
+| Año | sí (`multiple=true`, es un rango) | 2010, 2011, 2012... (o un rango desde/hasta si se prefiere modelar distinto) |
+| Cilindrada | no | 1.4, 1.6, 1.8, 2.0, 2.4... |
+| Compatibilidad | sí (`multiple=true`) | permite marcar que una pieza sirve para varios modelos/años a la vez |
+| Código OEM | — | esto es un dato de texto libre por producto, no una parametría — candidato a campo directo en `Product` (o un `ProductParam` de texto libre si se prefiere no tocar el modelo) cuando se implemente de verdad |
+
+**Nota de diseño para cuando se implemente:** "Compatibilidad" en repuestos
+es conceptualmente distinto a "Marca" — un filtro de aceite puede servir
+para 5 modelos/años distintos a la vez. El `ParamGroup.multiple=true` ya
+soporta esto (un producto puede tener varias opciones del mismo grupo), así
+que no hace falta modelo nuevo — mismo mecanismo que "Estación" en ropa,
+donde un producto puede ser de varias estaciones a la vez.
+
+**Qué falta para poder cargar esto de verdad (no ahora, cuando haya tenant real):**
+1. Mecanismo para crear un segundo tenant (hoy no existe — es la Fase 8,
+   deliberadamente diferida "hasta que despleguemos").
+2. Decidir si el segundo tenant es un módulo *nuevo* dentro de la misma
+   plataforma (share de `AdminUser`/`Role`/etc. patterns ya existen) o si
+   arranca de cero — con la arquitectura actual (todo tenant-scoped desde
+   la Fase 4), es simplemente: crear la fila `Tenant`, crear su `AdminUser`
+   inicial, y sembrar estas `ParamGroup` en vez de las de ropa.
 
 ---
 
 ## 5. Historial
 
+- **2026-09-15**: definidos los rubros concretos de la Fase 9 (ferretería y
+  repuestos de vehículos) y confirmado con el usuario que no necesitan
+  stock por variante — esto evita tener que generalizar `SizeScale`/
+  `SizeStock`. Documentadas las plantillas de `ParamGroup` para ambos
+  rubros (sección Fase 9), sin cargarlas en ningún tenant (no existe
+  todavía un segundo tenant real). También se relevó el proyecto frontend
+  Angular (`frontend-ecommerce---ruth`) para preparar las Fases 6/7 — tiene
+  su propio `CLAUDE.md` que pide cambios chicos e iterativos, así que esas
+  fases se van a encarar de a un paso, empezando por el backend de
+  `PAGE_BLOCK` + el bloque "hero" en el frontend (Fase 7), no las dos
+  fases completas de una.
 - **2026-09-15**: creado el documento. Análisis inicial del modelo hecho.
   Decisión: la tienda actual es una prueba real de uso único; multi-tenancy
   y todo lo relacionado queda diferido hasta validarla.
