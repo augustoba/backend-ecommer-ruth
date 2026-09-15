@@ -810,3 +810,16 @@ hace falta el mismo paso.
     navegador (mostrar/ocultar/mostrar) con ambos servidores contra MySQL
     real, no sólo con tests. Sin pantalla de admin, sin más tipos de
     bloque, sin reordenamiento — deliberadamente mínimo.
+31. **Base del sistema de themes** (2026-09-15, Fase 6 de `PLAN_SAAS.md`,
+    mecanismo probado, sin inventar un segundo theme todavía):
+    `SiteSettings.theme` (`String`, nullable → `"default"`), expuesto en
+    `GET /api/settings`. El frontend aplica `data-theme` en `<html>` (ver
+    su `PROYECTO.md` §11 #53). **Verificado en el navegador** (no sólo
+    asumido de la documentación de Tailwind): sobreescribir la variable CSS
+    `--color-brand-500` en runtime cambia el color de los elementos que
+    usan `bg-brand-500` al instante — confirma que Tailwind v4 genera las
+    utilities referenciando la variable (no un valor fijo), así que una
+    regla `[data-theme="x"] { --color-brand-500: ...; }` en `styles.css`
+    va a re-temear el sitio sin tocar ningún componente. No se creó ningún
+    theme nuevo (sería una decisión de diseño que nadie pidió) — sigue
+    habiendo un solo theme.

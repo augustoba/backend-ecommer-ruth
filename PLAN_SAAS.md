@@ -322,7 +322,38 @@ de la propuesta original eran "solo un ejemplo").
   campo existe en el backend pero mostrar/ocultar el "Powered by..." es
   trabajo de Angular, fuera de este repo.
 
-### Fase 6 — Themes en Angular ⏸️
+### Fase 6 — Themes en Angular 🔜 (mecanismo probado, un solo theme todavía)
+
+Hecho el 2026-09-15, mismo criterio de "un paso chico" que la Fase 7: se
+construyó y **verificó de verdad** el mecanismo de cambio de theme en
+runtime, sin inventar una segunda paleta especulativa (no hay pedido de
+diseño concreto para eso todavía).
+
+**Backend**: `SiteSettings.theme` (`String`, nullable — null se trata como
+`"default"`), expuesto en `GET /api/settings` (público). Sembrado
+`"default"` para la tienda actual. No editable por API todavía (no hay
+nada más entre qué elegir).
+
+**Frontend**: `SettingsService` aplica `document.documentElement.setAttribute
+('data-theme', theme)` al cargar/actualizar settings — mismo patrón que ya
+usaba `applyFavicon`.
+
+**Verificado en el navegador (no sólo leído en la doc de Tailwind):** con
+la app corriendo de verdad, se confirmó `data-theme="default"` en
+`<html>`, y se probó **en runtime** que sobreescribir la variable CSS
+`--color-brand-500` (`document.documentElement.style.setProperty(...)`)
+cambia instantáneamente el color de elementos que usan la utility
+`bg-brand-500` (Tailwind v4 genera las utilities referenciando la
+variable, no un valor fijo — confirmado, no asumido). Esto prueba que el
+mecanismo real para ofrecer temas (una regla `[data-theme="x"] { ... }`
+en `styles.css`) va a funcionar sin tocar ningún componente.
+
+**Lo que esto NO hizo (a propósito, sigue pendiente):**
+- No se creó ningún theme nuevo (serían decisiones de diseño — colores,
+  tipografías — que nadie pidió todavía).
+- Sin selector de theme en el admin (no hay entre qué elegir todavía).
+- `styles.css` no tiene ninguna regla `[data-theme="x"]` todavía — el
+  `@theme` actual sigue siendo el único/default, sin cambios visuales.
 
 ### Fase 7 — Personalizador visual (bloques de página) 🔜 (primer bloque hecho)
 
@@ -424,6 +455,13 @@ donde un producto puede ser de varias estaciones a la vez.
 
 ## 5. Historial
 
+- **2026-09-15**: hecha la base de la Fase 6 (themes): `SiteSettings.theme`
+  + `data-theme` aplicado en `<html>` desde el frontend. Verificado en el
+  navegador (no sólo asumido de la doc de Tailwind) que sobreescribir una
+  variable CSS de Tailwind v4 en runtime cambia el color de los elementos
+  al instante — confirma que el mecanismo para ofrecer temas reales
+  funciona. No se inventó ningún theme nuevo (sería una decisión de diseño
+  que nadie pidió) — sigue habiendo un solo theme, `"default"`.
 - **2026-09-15**: hecho el primer bloque de la Fase 7 (personalizador
   visual): entidad `PageBlock` + endpoints, bloque "HERO" mostrable/
   ocultable, y el frontend (`frontend-ecommerce---ruth`, repo separado)

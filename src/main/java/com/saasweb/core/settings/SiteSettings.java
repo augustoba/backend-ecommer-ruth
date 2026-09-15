@@ -36,6 +36,15 @@ public class SiteSettings {
     private String logoUrl;
 
     /**
+     * Theme visual del sitio (ver PLAN_SAAS.md Fase 6). Hoy sólo existe
+     * `"default"` — el campo es la base para poder ofrecer más de una
+     * apariencia sin redeploy el día que haya una segunda. Nullable a
+     * propósito (no todo tenant existente tiene por qué tener el valor
+     * seteado): null se trata como `"default"` en {@code SettingsResponse}.
+     */
+    private String theme;
+
+    /**
      * Texto de saludo del mensaje de pedido de WhatsApp (antes del detalle).
      * Admite los tokens {tienda} y {codigo}. null = usar el texto por defecto.
      */
@@ -246,6 +255,14 @@ public class SiteSettings {
 
     public void setLogoUrl(String logoUrl) {
         this.logoUrl = logoUrl;
+    }
+
+    public String getTheme() {
+        return theme;
+    }
+
+    public void setTheme(String theme) {
+        this.theme = theme;
     }
 
     public String getWhatsappIntro() {

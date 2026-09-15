@@ -64,6 +64,7 @@ public class SiteSettingsService {
 
     private static SiteSettings defaults() {
         SiteSettings s = new SiteSettings();
+        s.setTheme("default");
         s.setStoreName("Estilos Pequeños");
         s.setWhatsappNumber("5491122334455");
         s.setAboutText(

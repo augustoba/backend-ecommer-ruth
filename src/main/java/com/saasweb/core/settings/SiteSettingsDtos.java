@@ -46,6 +46,7 @@ public final class SiteSettingsDtos {
             String instagram,
             String facebookUrl,
             String logoUrl,
+            String theme,
             String whatsappIntro,
             String whatsappClosing,
             String storeAddress,
@@ -71,6 +72,7 @@ public final class SiteSettingsDtos {
             return new SettingsResponse(
                     s.getStoreName(), s.getWhatsappNumber(), s.getAboutText(),
                     s.getInstagram(), s.getFacebookUrl(), s.getLogoUrl(),
+                    s.getTheme() != null ? s.getTheme() : "default",
                     s.getWhatsappIntro(), s.getWhatsappClosing(), s.getStoreAddress(),
                     s.getHelpText(), s.getFaqText(),
                     s.isPaymentTransferEnabled(), s.getPaymentTransferAlias(),
