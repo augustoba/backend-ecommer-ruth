@@ -48,7 +48,7 @@ El 2026-09-08 se hizo este backend (v1) y se conectó el frontend Angular
 | Mail (SMTP) | credenciales en DB (`platform_mail_settings`, singleton) | hoy: Brevo. Editable sólo por superadmin desde `/admin/config/servicios`, sin redeploy |
 | Docs de API | **springdoc-openapi** → Swagger UI en `/swagger-ui.html` | |
 | Boilerplate | getters/setters/constructores a mano (sin Lombok) | evita el problema de Lombok + annotation processing en cada IDE |
-| Organización | **package-by-layer** (`model/`, `repository/`, `service/`, `controller/`, `dto/`) | pedido del cliente (estilo MVC clásico) |
+| Organización | **package-by-feature** (`core/<tema>/`, `modules/ropa/`, `platform/`) | cambiado el 2026-09-15 (Fase 2 de `PLAN_SAAS.md`) — antes era package-by-layer (`model/`, `repository/`, `service/`, `controller/`, `dto/`), pedido del cliente en su momento. Se pasó a organizar por tema de negocio para preparar la evolución a SaaS multi-tenant; decisión tomada explícitamente con el usuario, revirtiendo la anterior. |
 
 Paquete base: `com.saasweb`. Puerto: `8080`.
 
@@ -94,30 +94,49 @@ a `application-local.yml` (gitignored) y correr con
 
 ---
 
-## 4. Estructura del código (package-by-layer)
+## 4. Estructura del código (package-by-feature)
+
+Cambiado el 2026-09-15 (Fase 2 de `PLAN_SAAS.md`, ver también la tabla de
+la sección 2). Cada carpeta de negocio mezcla modelo + repository +
+service + controller + dtos de ese tema (antes estaba separado por capa).
+`config/` y `common/` siguen aparte porque son infraestructura transversal,
+no un tema de negocio.
 
 ```
 com.saasweb
-  BackendApplication            excluye UserDetailsServiceAutoConfiguration (auth es por JWT)
-  model/        entidades JPA
-                AdminUser, Product + SizeStock + ProductParam (embeddables),
-                ParamGroup + ParamOption, SizeScale, Supplier,
-                Discount, Order + OrderLine + OrderStatus/DeliveryMethod/PaymentMethod (enums),
-                HeroSlide
-  repository/   interfaces Spring Data (*Repository)
-  service/      lógica de negocio (*Service)
-                AuthService, ProductService, ParamService, SizeScaleService,
-                SupplierService, DiscountService, OrderService, HeroSlideService
-  controller/   endpoints REST (*Controller)
-                AuthController, AccountController, ProductController, ParamController,
-                SizeScaleController, SupplierController, DiscountController,
-                OrderController, HeroSlideController
-  dto/          records de request/response
-                LoginRequest, TokenResponse, AccountDtos, ProductDtos, ParamDtos,
-                SizeScaleDtos, SupplierDtos, DiscountDtos, OrderDtos, HeroSlideDtos
+  BackendApplication      excluye UserDetailsServiceAutoConfiguration (auth es por JWT)
+  core/
+    PageResponse.java     wrapper genérico de paginación, usado por varios temas
+    product/               Product (+SizeStock embebido de modules/ropa), ProductParam,
+                            ProductService, ProductController, ProductRepository, ProductDtos
+    order/                 Order, OrderLine, OrderStatus, DeliveryMethod, PaymentMethod,
+                            SaleChannel, OrderService, OrderController, OrderRepository, OrderDtos
+    discount/               Discount, DiscountService, DiscountController, DiscountRepository, DiscountDtos
+    coupon/                 Coupon, CouponService, CouponController, CouponRepository, CouponDtos
+    param/                  ParamGroup, ParamOption (parametría genérica), ParamService,
+                            ParamController, ParamRepository, ParamDtos
+    admin/                  AdminUser, Role, Permission, AdminUserService, RoleService,
+                            AdminUserController, RoleController, *Repository, *Dtos
+    hero/                   HeroSlide (carrusel home) + Service/Controller/Repository/Dtos
+    supplier/               Supplier + Service/Controller/Repository/Dtos
+    shift/                  Shift (turnos) + caja: CashRegisterService/Controller/Dtos
+    settings/               SiteSettings (config de la tienda, 1 fila por tenant) + Service/Controller/Repository/Dtos
+    marketing/              MarketingConfig, MarketingSend, MarketingCampaignService/Scheduler,
+                            MarketingMailService, MarketingController, *Repository, MarketingDtos
+    exchange/               Exchange, ExchangeLine + Service/Controller/Repository/Dtos
+    tenant/                 Tenant, TenantService, TenantRepository (ver PLAN_SAAS.md Fase 3/4)
+    auth/                   AuthService/Controller, AccountController, AccountMailService,
+                            LoginAttemptService, LoginRequest, TokenResponse, AccountDtos
+    dashboard/              DashboardService/Controller/Dtos, MetricsService/Controller/Dtos
+    export/                 CsvExportController (exports CSV de productos/pedidos/cambios/marketing)
+  modules/
+    ropa/                   SizeScale, SizeStock (específico de indumentaria) + Service/Controller/Repository/Dtos
+  platform/                 PlatformMailSettings (SMTP del operador de la plataforma, global —
+                            NO tenant-scoped) + Service/Controller/Repository/Dtos
   common/       ApiError (cuerpo de error uniforme), ResourceNotFoundException,
-                BadRequestException, Slugs (genera ids legibles)
-  config/       SecurityConfig, JwtService, JwtAuthFilter, OpenApiConfig,
+                BadRequestException, TooManyRequestsException, Csv, Slugs (genera ids legibles),
+                TenantContext (holder del tenant de la request actual)
+  config/       SecurityConfig, JwtService, JwtAuthFilter, TenantResolutionFilter, OpenApiConfig,
                 AppProperties (@ConfigurationProperties app.*), DataSeeder,
                 GlobalExceptionHandler (@RestControllerAdvice)
 ```
@@ -745,3 +764,16 @@ hace falta el mismo paso.
       Resolución de tenant por `Host`, JWT con claim de tenant, y
       generalizar talle→variante genérica quedan diferidos (ver
       `PLAN_SAAS.md`).
+28. **Repackage a package-by-feature** (2026-09-15, Fase 2 de
+    `PLAN_SAAS.md`): reorganizados los 112 archivos Java de package-by-layer
+    (`model/`, `repository/`, `service/`, `controller/`, `dto/`) a
+    package-by-feature (`core/<tema>/`, `modules/ropa/`, `platform/`) — ver
+    el árbol completo en §4. Decisión confirmada explícitamente con el
+    usuario antes de ejecutar, porque revertía la organización
+    package-by-layer que en su momento se había pedido así (§2). Sin
+    cambios de comportamiento ni de esquema — sólo mover clases y arreglar
+    imports (compila y los 28 tests pasan). `core/product/Product.java`
+    termina importando `modules/ropa/SizeStock.java` (un core dependiendo
+    de un módulo, al revés de lo ideal) — es el mismo acoplamiento ya
+    conocido de la sección 3 #1 de `PLAN_SAAS.md`, se resuelve recién con
+    la generalización de talle→variante.

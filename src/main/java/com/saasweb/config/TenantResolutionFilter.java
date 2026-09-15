@@ -1,7 +1,7 @@
 package com.saasweb.config;
 
 import com.saasweb.common.TenantContext;
-import com.saasweb.service.TenantService;
+import com.saasweb.core.tenant.TenantService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

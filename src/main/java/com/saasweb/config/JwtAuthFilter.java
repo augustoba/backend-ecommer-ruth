@@ -1,9 +1,9 @@
 package com.saasweb.config;
 
 import com.saasweb.common.TenantContext;
-import com.saasweb.model.AdminUser;
-import com.saasweb.model.Permission;
-import com.saasweb.repository.AdminUserRepository;
+import com.saasweb.core.admin.AdminUser;
+import com.saasweb.core.admin.Permission;
+import com.saasweb.core.admin.AdminUserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

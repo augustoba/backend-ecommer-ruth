@@ -1,0 +1,62 @@
+package com.saasweb.core.admin;
+
+import com.saasweb.core.admin.AdminUser;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+import java.time.Instant;
+
+public final class AdminUserDtos {
+
+    private AdminUserDtos() {}
+
+    /** `dni` es el identificador de login (reemplaza al username viejo, ver AdminUser). */
+    public record CreateUserRequest(
+            @NotBlank @Size(max = 100) String nombre,
+            @NotBlank @Size(max = 100) String apellido,
+            @NotBlank @Size(min = 6, max = 20) String dni,
+            @NotBlank @jakarta.validation.constraints.Email @Size(max = 200) String email,
+            @NotBlank @Size(min = 4, max = 100) String password,
+            @NotBlank String roleId,
+            Boolean enabled
+    ) {}
+
+    /** Edición: datos, rol, estado y (opcional) contraseña nueva. */
+    public record UpdateUserRequest(
+            @Size(max = 100) String nombre,
+            @Size(max = 100) String apellido,
+            @Size(min = 6, max = 20) String dni,
+            @jakarta.validation.constraints.Email @Size(max = 200) String email,
+            String roleId,
+            Boolean enabled,
+            @Size(min = 4, max = 100) String password
+    ) {}
+
+    public record UserResponse(
+            String id, String nombre, String apellido, String dni, String email,
+            String roleId, String roleName, boolean systemAdmin, boolean enabled, Instant createdAt
+    ) {
+        public static UserResponse from(AdminUser u) {
+            return new UserResponse(
+                    u.getId(), u.getNombre(), u.getApellido(), u.getDni(), u.getEmail(),
+                    u.getRole() != null ? u.getRole().getId() : null,
+                    u.getRole() != null ? u.getRole().getName() : null,
+                    u.isSystemAdmin(), u.isEnabled(), u.getCreatedAt());
+        }
+    }
+
+    /** Respuesta de `/api/auth/me`: quién soy y qué puedo hacer. */
+    public record MeResponse(
+            String id, String nombre, String apellido, String dni, String email,
+            String roleName, boolean systemAdmin, boolean superAdmin, java.util.List<String> permissions
+    ) {
+        public static MeResponse from(AdminUser u) {
+            return new MeResponse(
+                    u.getId(), u.getNombre(), u.getApellido(), u.getDni(), u.getEmail(),
+                    u.getRole() != null ? u.getRole().getName() : null,
+                    u.isSystemAdmin(),
+                    u.isSuperAdmin(),
+                    u.permissions().stream().map(Enum::name).sorted().toList());
+        }
+    }
+}

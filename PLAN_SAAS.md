@@ -115,17 +115,47 @@ ofrecerla a otros.
 - [x] Confirmar nombre (sección 2)
 - [x] Ejecutar rename de paquete/pom.xml/docs (DB queda como estaba, ver sección 2)
 
-### Fase 2 — Repackage por feature 🔜
-Reorganizar `com.<nombre>.{controller,service,model,repository}` (hoy
-package-by-layer) hacia algo tipo:
+### Fase 2 — Repackage por feature ✅
+
+Hecho el 2026-09-15. **Decisión explícita con el usuario:** esto revierte
+la organización package-by-layer (`model/`, `repository/`, `service/`,
+`controller/`, `dto/`) que estaba documentada en `PROYECTO.md` como
+"pedido del cliente" — se confirmó antes de ejecutar (ver AskUserQuestion
+de esta sesión) porque era un cambio de fondo, no cosmético.
+
+112 archivos movidos (con `git mv`, historial preservado) a package-by-feature:
+
 ```
-core/         -> Product (sin talle), Order, Discount, Coupon, AdminUser, Role, Permission...
-modules/ropa/ -> SizeScale, SizeStock, integración con Product
-platform/     -> PlatformMailSettings
+core/product/    core/order/     core/discount/  core/coupon/    core/param/
+core/admin/      core/hero/      core/supplier/  core/shift/     core/settings/
+core/marketing/  core/exchange/  core/tenant/    core/auth/      core/dashboard/
+core/export/     core/ (PageResponse, compartido)
+modules/ropa/    -> SizeScale, SizeStock, integración con Product
+platform/        -> PlatformMailSettings (config del operador, no de cada tienda)
 ```
-Sin cambios de comportamiento ni de DB — solo mover clases y dejar la
-frontera core/ropa visible. Bajo riesgo, tests en verde en cada paso.
-- [ ] Ejecutar repackage
+`config/` y `common/` quedaron como estaban (son infraestructura
+transversal, no un tema de negocio).
+
+- [x] Mapeo completo de las 112 clases a su paquete nuevo
+- [x] Move + fix de `package` declarations (script)
+- [x] Fix de imports (3 pasadas: imports directos, imports de miembros
+      anidados tipo `X.Dtos.Nested`, y referencias completamente
+      calificadas inline en el código — las tres formas que usa este
+      codebase para referenciar clases de otro paquete)
+- [x] Fix manual de ~10 imports que quedaron implícitos (dos clases que
+      antes compartían paquete por capa — ej. `Product`/`SizeStock` — y al
+      separarse por feature necesitaban un import explícito que antes no
+      hacía falta)
+- [x] Carpetas viejas vacías (`model/`, `controller/`, `service/`,
+      `repository/`, `dto/`) eliminadas
+- [x] `PROYECTO.md` y `README.md` actualizados con la estructura nueva
+- [x] Verificado: compila, compilan los tests, y los 28 tests pasan
+
+**Nota técnica:** `core/product/Product.java` importa
+`modules/ropa/SizeStock.java` — un core dependiendo de un módulo es lo
+inverso de lo ideal (debería ser al revés), pero es el mismo acoplamiento
+ya documentado en la sección 3 (#1) que se resuelve recién en la
+generalización de talle→variante, no en este repackage.
 
 ### Fase 3 — Infraestructura de tenant (base, sin activar todavía) ✅
 Hecho el 2026-09-15. Se agregó el mecanismo de tenant sin tocar ninguna
@@ -288,3 +318,10 @@ Ver `propuesta_ecommerce_saas.txt` secciones 2-4 y 15-16 para más detalle.
   (sólo el nombre de la base) — pendiente. Próximo paso: retomar Fase 2
   (repackage por feature) o seguir con las fases de negocio (5+) cuando
   corresponda.
+- **2026-09-15**: ejecutada la Fase 2 (repackage a package-by-feature),
+  confirmando antes con el usuario que revertía la organización
+  package-by-layer documentada como "pedido del cliente". 112 archivos
+  movidos, imports arreglados en varias pasadas (directos, miembros
+  anidados, referencias calificadas inline, y ~10 imports que quedaron
+  implícitos por compartir paquete-por-capa antes). Compila y los 28 tests
+  pasan. `PROYECTO.md`/`README.md` actualizados.

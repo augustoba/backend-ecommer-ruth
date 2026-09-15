@@ -100,18 +100,21 @@ curl -i -X POST http://localhost:8080/api/admin/products
 ```
 Los tests usan **H2 en memoria** (no tocan MySQL).
 
-## Estructura (package-by-layer)
+## Estructura (package-by-feature)
+
+Detalle completo en `PROYECTO.md` §4.
 
 ```
 com.saasweb
   BackendApplication
-  model/        entidades JPA (Product, Order, ParamGroup, SizeScale, Supplier, Discount…)
-  repository/   interfaces Spring Data (*Repository)
-  service/      lógica de negocio (*Service)
-  controller/   endpoints REST (*Controller, incl. AuthController)
-  dto/          records de request/response (*Dtos, LoginRequest, TokenResponse)
-  common/       ApiError, excepciones, utils (Slugs)
-  config/       seguridad/JWT, CORS, OpenAPI, DataSeeder, manejo de errores
+  core/         un subpaquete por tema de negocio (product/, order/, discount/,
+                coupon/, param/, admin/, hero/, supplier/, shift/, settings/,
+                marketing/, exchange/, tenant/, auth/, dashboard/, export/) —
+                cada uno mezcla modelo + repository + service + controller + dtos
+  modules/ropa/ lo específico de indumentaria (SizeScale, SizeStock)
+  platform/     config del operador de la plataforma (PlatformMailSettings), no de cada tienda
+  common/       ApiError, excepciones, utils (Slugs), TenantContext
+  config/       seguridad/JWT, CORS, OpenAPI, DataSeeder, resolución de tenant, manejo de errores
 ```
 
 ## Endpoints
