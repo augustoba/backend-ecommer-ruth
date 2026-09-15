@@ -125,6 +125,7 @@ com.saasweb
                             MarketingMailService, MarketingController, *Repository, MarketingDtos
     exchange/               Exchange, ExchangeLine + Service/Controller/Repository/Dtos
     tenant/                 Tenant, TenantService, TenantRepository (ver PLAN_SAAS.md Fase 3/4)
+    plan/                   Plan (límites/módulos por plan), PlanService, PlanRepository (Fase 5)
     auth/                   AuthService/Controller, AccountController, AccountMailService,
                             LoginAttemptService, LoginRequest, TokenResponse, AccountDtos
     dashboard/              DashboardService/Controller/Dtos, MetricsService/Controller/Dtos
@@ -777,3 +778,17 @@ hace falta el mismo paso.
     de un módulo, al revés de lo ideal) — es el mismo acoplamiento ya
     conocido de la sección 3 #1 de `PLAN_SAAS.md`, se resuelve recién con
     la generalización de talle→variante.
+29. **Infraestructura de planes/límites** (2026-09-15, Fase 5 de
+    `PLAN_SAAS.md`, solo mecanismo — sin precios/planes/límites reales
+    definidos, confirmado con el usuario): entidad `Plan` (`core/plan/`) —
+    `maxProducts`/`maxAdminUsers` (`Integer`, null = sin límite),
+    `enabledModules` (`Set<String>`), `showPlatformBranding`. `Tenant.planId`
+    (NOT NULL) asignado en la misma operación que crea el tenant
+    (`TenantService.ensureDefault()` ahora depende de `PlanService`).
+    `ProductService.create()`/`duplicate()` y `AdminUserService.create()`
+    validan el límite del plan antes de crear (400 si se pasaría). Plan por
+    defecto sembrado sin límites (cero impacto en la tienda actual).
+    `enabledModules` existe pero no gatea nada todavía (no hay segundo
+    módulo que desactivar). Sin `PlanController` (no hay catálogo de planes
+    que gestionar desde el panel todavía). Sin test automatizado de la
+    validación de límites. Compila y los 28 tests pasan.

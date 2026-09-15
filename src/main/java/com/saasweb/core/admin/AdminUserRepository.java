@@ -30,6 +30,8 @@ public interface AdminUserRepository extends JpaRepository<AdminUser, String> {
 
     List<AdminUser> findByTenantIdOrderByCreatedAtAsc(String tenantId);
 
+    long countByTenantId(String tenantId);
+
     /** El roleId ya determina el tenant (cada rol pertenece a uno solo, o es el rol de sistema). */
     long countByRoleId(String roleId);
 

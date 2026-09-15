@@ -277,7 +277,50 @@ cuenta). Recomendación: explícito.
 
 Ver `propuesta_ecommerce_saas.txt` secciones 2-4 y 15-16 para más detalle.
 
-### Fase 5 — Planes, límites y módulos activables por tenant ⏸️
+### Fase 5 — Planes, límites y módulos activables por tenant ✅ (solo infraestructura)
+
+Hecho el 2026-09-15. **Alcance confirmado con el usuario:** solo el
+mecanismo, sin definir precios/planes/límites reales todavía (los números
+de la propuesta original eran "solo un ejemplo").
+
+- [x] Entidad `Plan` (`core/plan/`): `slug`, `name`, `maxProducts`
+      (`Integer`, null = sin límite), `maxAdminUsers` (ídem),
+      `enabledModules` (`Set<String>`, ej: `"ropa"`), `showPlatformBranding`
+      — catálogo compartido (varios tenants podrían apuntar al mismo plan),
+      no una fila por tenant
+- [x] `Tenant.planId` (NOT NULL) — todo tenant tiene un plan asignado desde
+      que se crea; `TenantService.ensureDefault()` crea el plan por defecto
+      en la misma operación que crea el tenant (evita el problema de
+      columna NOT NULL en una fila a medio crear)
+- [x] `PlanService.ensureDefault()`: siembra UN plan permisivo (`maxProducts
+      = null`, `maxAdminUsers = null`, `enabledModules = {"ropa"}`,
+      `showPlatformBranding = false`) — cero impacto en la tienda actual
+- [x] **Límites realmente enforced** (no solo el dato, la validación):
+      `ProductService.create()`/`duplicate()` y `AdminUserService.create()`
+      chequean el límite del plan del tenant antes de crear, tiran 400 con
+      mensaje claro si se pasaría del límite
+- [x] Verificado: compila y los 28 tests pasan (el plan por defecto sin
+      límites no bloquea nada de lo que ya hacían los tests)
+
+**Lo que esto NO hizo (a propósito):**
+- **`enabledModules` no está gateado en ningún lado todavía.** El campo
+  existe (el plan por defecto ya trae `"ropa"` habilitado) pero no hay
+  ningún endpoint/funcionalidad que lo consulte para activar/desactivar
+  algo — no tiene sentido gatear el único módulo que existe hoy y que es
+  obligatorio para la tienda actual. Se activa el día que haya un segundo
+  módulo real que se pueda deshabilitar.
+- **Sin `PlanController`/endpoints de gestión de planes** — no hay todavía
+  un catálogo de planes que administrar desde el panel; cargar planes
+  reales (Básico/Profesional/etc.) el día que se definan es un INSERT/UPDATE
+  directo en la tabla `plan`, no requiere código nuevo.
+- **Sin test automatizado de la validación de límites** — la lógica se
+  revisó a mano y no rompe nada existente (el plan sembrado no tiene
+  límites), pero no hay un test de integración que fuerce el límite y
+  verifique el 400. Pendiente si se quiere blindar antes de cargar límites
+  reales.
+- **`showPlatformBranding` no está conectado a nada del frontend** — el
+  campo existe en el backend pero mostrar/ocultar el "Powered by..." es
+  trabajo de Angular, fuera de este repo.
 
 ### Fase 6 — Themes en Angular ⏸️
 
@@ -325,3 +368,13 @@ Ver `propuesta_ecommerce_saas.txt` secciones 2-4 y 15-16 para más detalle.
   anidados, referencias calificadas inline, y ~10 imports que quedaron
   implícitos por compartir paquete-por-capa antes). Compila y los 28 tests
   pasan. `PROYECTO.md`/`README.md` actualizados.
+- **2026-09-15**: ejecutada la Fase 5 (solo infraestructura, confirmado con
+  el usuario). Entidad `Plan` + `Tenant.planId` (NOT NULL) + límites de
+  productos/usuarios realmente enforced en `ProductService`/
+  `AdminUserService`. Plan por defecto sembrado sin límites reales.
+  `enabledModules` existe pero no está gateado todavía (no hay un segundo
+  módulo que activar/desactivar). Compila y los 28 tests pasan. **Nota:**
+  como `Tenant` ya tiene una fila en la MySQL local (de la Fase 4), agregar
+  `plan_id` NOT NULL va a repetir el mismo problema de arranque que ya
+  vimos — mismo criterio: reset de la base local (`saasweb`), no hay datos
+  importantes cargados.

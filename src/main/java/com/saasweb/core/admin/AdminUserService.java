@@ -9,6 +9,8 @@ import com.saasweb.core.admin.AdminUser;
 import com.saasweb.core.admin.Role;
 import com.saasweb.core.admin.AdminUserRepository;
 import com.saasweb.core.admin.RoleRepository;
+import com.saasweb.core.plan.Plan;
+import com.saasweb.core.plan.PlanService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,11 +26,14 @@ public class AdminUserService {
     private final AdminUserRepository users;
     private final RoleRepository roles;
     private final PasswordEncoder passwordEncoder;
+    private final PlanService planService;
 
-    public AdminUserService(AdminUserRepository users, RoleRepository roles, PasswordEncoder passwordEncoder) {
+    public AdminUserService(AdminUserRepository users, RoleRepository roles, PasswordEncoder passwordEncoder,
+                            PlanService planService) {
         this.users = users;
         this.roles = roles;
         this.passwordEncoder = passwordEncoder;
+        this.planService = planService;
     }
 
     @Transactional(readOnly = true)
@@ -44,6 +49,7 @@ public class AdminUserService {
 
     public AdminUser create(CreateUserRequest req, String actingDni) {
         String tenantId = TenantContext.getTenantId();
+        assertUnderUserLimit(tenantId);
         String dni = req.dni().trim();
         if (users.existsByTenantIdAndDniIgnoreCase(tenantId, dni)) {
             throw new BadRequestException("Ya existe un usuario con ese DNI.");
@@ -120,6 +126,17 @@ public class AdminUserService {
 
     private long countSystemAdmins() {
         return users.countByRoleSystemTrue();
+    }
+
+    /** Límite de usuarios del panel del plan (ver PlanService) — null = sin límite. */
+    private void assertUnderUserLimit(String tenantId) {
+        Plan plan = planService.getForTenant(tenantId);
+        Integer max = plan != null ? plan.getMaxAdminUsers() : null;
+        if (max != null && users.countByTenantId(tenantId) >= max) {
+            throw new BadRequestException(
+                    "Llegaste al límite de " + max + " usuarios de tu plan. "
+                            + "Contactanos para ampliarlo.");
+        }
     }
 
     /**

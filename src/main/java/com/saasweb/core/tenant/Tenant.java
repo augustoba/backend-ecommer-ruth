@@ -9,8 +9,8 @@ import java.time.Instant;
  * única fila — la app entera resuelve siempre contra ese tenant (ver
  * {@code TenantResolutionFilter}), sembrada por {@code TenantService} a
  * partir de {@code app.tenant.*}. El día que haya resolución por dominio,
- * esta entidad suma `domain`/`subdomain`/`plan`/`theme`; por ahora tiene
- * sólo lo mínimo para no construir sobre requisitos que todavía no existen.
+ * esta entidad suma `domain`/`subdomain`/`theme`; por ahora tiene sólo lo
+ * mínimo para no construir sobre requisitos que todavía no existen.
  */
 @Entity
 @Table(name = "tenant")
@@ -24,6 +24,10 @@ public class Tenant {
 
     @Column(nullable = false)
     private String name;
+
+    /** Plan asignado (ver {@code core.plan.Plan}). Nunca null tras el seed. */
+    @Column(name = "plan_id", nullable = false)
+    private String planId;
 
     @Column(nullable = false)
     private boolean active = true;
@@ -53,6 +57,14 @@ public class Tenant {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getPlanId() {
+        return planId;
+    }
+
+    public void setPlanId(String planId) {
+        this.planId = planId;
     }
 
     public boolean isActive() {

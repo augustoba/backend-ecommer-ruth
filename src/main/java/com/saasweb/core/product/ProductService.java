@@ -1,7 +1,10 @@
 package com.saasweb.core.product;
 
+import com.saasweb.common.BadRequestException;
 import com.saasweb.common.ResourceNotFoundException;
 import com.saasweb.common.TenantContext;
+import com.saasweb.core.plan.Plan;
+import com.saasweb.core.plan.PlanService;
 import com.saasweb.core.product.ProductDtos.ProductRequest;
 import com.saasweb.core.product.ProductDtos.SizeStockDto;
 import com.saasweb.core.product.Product;
@@ -30,10 +33,12 @@ public class ProductService {
 
     private final ProductRepository repo;
     private final OrderRepository orderRepo;
+    private final PlanService planService;
 
-    public ProductService(ProductRepository repo, OrderRepository orderRepo) {
+    public ProductService(ProductRepository repo, OrderRepository orderRepo, PlanService planService) {
         this.repo = repo;
         this.orderRepo = orderRepo;
+        this.planService = planService;
     }
 
     /**
@@ -96,12 +101,25 @@ public class ProductService {
     }
 
     public Product create(ProductRequest req) {
+        String tenantId = TenantContext.getTenantId();
+        assertUnderProductLimit(tenantId);
         Product p = new Product();
         p.setId(UUID.randomUUID().toString());
-        p.setTenantId(TenantContext.getTenantId());
+        p.setTenantId(tenantId);
         p.setCreatedAt(Instant.now());
         apply(p, req);
         return repo.save(p);
+    }
+
+    /** Límite de productos del plan (ver PlanService) — null = sin límite. */
+    private void assertUnderProductLimit(String tenantId) {
+        Plan plan = planService.getForTenant(tenantId);
+        Integer max = plan != null ? plan.getMaxProducts() : null;
+        if (max != null && repo.countByTenantIdAndDeletedFalse(tenantId) >= max) {
+            throw new BadRequestException(
+                    "Llegaste al límite de " + max + " productos de tu plan. "
+                            + "Archivá alguno o contactanos para ampliarlo.");
+        }
     }
 
     public Product update(String id, ProductRequest req) {
@@ -117,6 +135,7 @@ public class ProductService {
      */
     public Product duplicate(String id) {
         Product src = get(id);
+        assertUnderProductLimit(src.getTenantId());
         Product copy = new Product();
         copy.setId(UUID.randomUUID().toString());
         copy.setTenantId(src.getTenantId());

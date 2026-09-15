@@ -1,8 +1,7 @@
 package com.saasweb.core.tenant;
 
 import com.saasweb.config.AppProperties;
-import com.saasweb.core.tenant.Tenant;
-import com.saasweb.core.tenant.TenantRepository;
+import com.saasweb.core.plan.PlanService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,13 +20,20 @@ public class TenantService {
 
     private final TenantRepository repo;
     private final AppProperties props;
+    private final PlanService planService;
 
-    public TenantService(TenantRepository repo, AppProperties props) {
+    public TenantService(TenantRepository repo, AppProperties props, PlanService planService) {
         this.repo = repo;
         this.props = props;
+        this.planService = planService;
     }
 
-    /** Crea el tenant único de este deploy si todavía no existe. Idempotente. */
+    /**
+     * Crea el tenant único de este deploy si todavía no existe, con el plan
+     * por defecto ya asignado (ver PlanService.ensureDefault) — Tenant.planId
+     * es NOT NULL, así que el plan se resuelve/crea en la misma operación,
+     * nunca queda una fila de tenant sin plan. Idempotente.
+     */
     public Tenant ensureDefault() {
         String slug = props.getTenant().getSlug();
         return repo.findBySlug(slug).orElseGet(() -> {
@@ -35,6 +41,7 @@ public class TenantService {
             t.setId(UUID.randomUUID().toString());
             t.setSlug(slug);
             t.setName(props.getTenant().getName());
+            t.setPlanId(planService.ensureDefault().getId());
             return repo.save(t);
         });
     }
