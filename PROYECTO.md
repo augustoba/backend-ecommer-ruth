@@ -836,3 +836,13 @@ hace falta el mismo paso.
     desde la pantalla nueva, confirmar que desaparece de la home pública,
     volver a mostrarlo. Sin reordenamiento en la UI todavía (con 2 bloques
     fijos no hay drag&drop real que probar), sin más tipos de bloque.
+33. **Modo oscuro (2026-09-15, Fase 6 ampliada, a pedido del usuario):**
+    puramente frontend (ver `../frontend-ecommerce---ruth/PROYECTO.md`
+    §11 #55) — no tocó este repo. Es un eje aparte del `SiteSettings.theme`
+    de marca del #31: preferencia de quien visita, guardada en
+    `localStorage`, no en el backend. `ThemeModeService` setea
+    `data-mode="dark"|"light"` en `<html>`, `@custom-variant dark` en
+    `styles.css` activa las clases `dark:` de Tailwind v4 contra ese
+    atributo. Alcance acotado a header + home (logo/intro + heading de "Lo
+    más vendido") — el resto del sitio no reacciona todavía. Probado en el
+    navegador en los dos sentidos del toggle.

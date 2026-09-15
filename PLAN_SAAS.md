@@ -322,7 +322,7 @@ de la propuesta original eran "solo un ejemplo").
   campo existe en el backend pero mostrar/ocultar el "Powered by..." es
   trabajo de Angular, fuera de este repo.
 
-### Fase 6 — Themes en Angular 🔜 (mecanismo probado, un solo theme todavía)
+### Fase 6 — Themes en Angular 🔜 (mecanismo de marca probado + modo oscuro parcial)
 
 Hecho el 2026-09-15, mismo criterio de "un paso chico" que la Fase 7: se
 construyó y **verificó de verdad** el mecanismo de cambio de theme en
@@ -349,11 +349,36 @@ mecanismo real para ofrecer temas (una regla `[data-theme="x"] { ... }`
 en `styles.css`) va a funcionar sin tocar ningún componente.
 
 **Lo que esto NO hizo (a propósito, sigue pendiente):**
-- No se creó ningún theme nuevo (serían decisiones de diseño — colores,
-  tipografías — que nadie pidió todavía).
-- Sin selector de theme en el admin (no hay entre qué elegir todavía).
+- No se creó ningún theme de MARCA nuevo (serían decisiones de diseño —
+  colores, tipografías — que nadie pidió todavía).
+- Sin selector de theme de marca en el admin (no hay entre qué elegir
+  todavía). El modo oscuro (ver abajo) es otro eje, no esto.
 - `styles.css` no tiene ninguna regla `[data-theme="x"]` todavía — el
-  `@theme` actual sigue siendo el único/default, sin cambios visuales.
+  `@theme` actual sigue siendo el único/default de marca, sin cambios
+  visuales por ese lado.
+
+**Modo oscuro — segundo paso, alcance acotado (2026-09-15):** a pedido
+del usuario, se implementó un modo oscuro real, pero **como eje aparte del
+theme de marca**: es una preferencia de quien visita (se guarda en
+`localStorage` del navegador, no en el backend), no una decisión del
+tenant. Mecanismo: `ThemeModeService` (frontend) setea
+`data-mode="dark"|"light"` en `<html>` — inicial: `localStorage` si ya
+eligió antes, si no `prefers-color-scheme` del sistema. `styles.css` define
+`@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *))`
+para que las clases `dark:` de Tailwind v4 reaccionen a ese atributo (en
+vez de sólo seguir el SO). Botón toggle (☀️/🌙) en el header.
+
+**Alcance deliberadamente chico:** sólo el header y la sección de
+logo/intro + el título de "Lo más vendido" de la home tienen clases
+`dark:`. El resto del sitio (grilla de productos, catálogo con filtros,
+ficha de producto, checkout, todo el panel de admin) **todavía no
+reacciona al modo oscuro** — se ve igual en los dos modos. Sumar más
+páginas es trabajo iterativo futuro, página por página.
+
+**Verificado en el navegador:** con la app corriendo de verdad, se probó
+el toggle en los dos sentidos (claro→oscuro→claro), se confirmó que
+recolorea header + hero + título correctamente, y que `localStorage`
+guarda la elección.
 
 ### Fase 7 — Personalizador visual (bloques de página) 🔜 (2 bloques + pantalla de admin)
 
@@ -464,6 +489,12 @@ donde un producto puede ser de varias estaciones a la vez.
 
 ## 5. Historial
 
+- **2026-09-15**: agregado modo oscuro real (Fase 6, segundo paso), a
+  pedido del usuario, como eje aparte del theme de marca (preferencia del
+  visitante en `localStorage`, no del tenant). Alcance acotado a
+  header + home (logo/intro + heading de "Lo más vendido") — el resto del
+  sitio no reacciona todavía. Verificado en el navegador en los dos
+  sentidos del toggle.
 - **2026-09-15**: ampliada la Fase 7 — segundo bloque (`FEATURED_PRODUCTS`,
   envuelve "Lo más vendido") y pantalla de admin nueva (`/admin/inicio`)
   para mostrar/ocultar bloques sin llamar la API a mano. Verificado de
