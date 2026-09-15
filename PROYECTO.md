@@ -823,3 +823,16 @@ hace falta el mismo paso.
     va a re-temear el sitio sin tocar ningún componente. No se creó ningún
     theme nuevo (sería una decisión de diseño que nadie pidió) — sigue
     habiendo un solo theme.
+32. **Fase 7 ampliada: segundo bloque + pantalla de admin** (2026-09-15):
+    `PageBlockService.ensureDefaultHomeBlocks()` (renombrado desde
+    `ensureHeroBlock`) siembra ahora dos bloques por tenant: `HERO`
+    (posición 0) y `FEATURED_PRODUCTS` (posición 1, envuelve la sección
+    "Lo más vendido" de la home que ya existía). El frontend sumó
+    `AdminPageBlocksComponent` (`/admin/inicio`, gateado por
+    `CAROUSEL_MANAGE`): lista los bloques con un botón Mostrar/Ocultar,
+    reemplaza tener que llamar la API a mano — ver
+    `../frontend-ecommerce---ruth/PROYECTO.md` §11 #54. Probado de punta a
+    punta en el navegador: login como superadmin, ocultar "Lo más vendido"
+    desde la pantalla nueva, confirmar que desaparece de la home pública,
+    volver a mostrarlo. Sin reordenamiento en la UI todavía (con 2 bloques
+    fijos no hay drag&drop real que probar), sin más tipos de bloque.

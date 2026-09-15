@@ -13,6 +13,7 @@ public class PageBlockService {
 
     public static final String HOME = "HOME";
     public static final String HERO = "HERO";
+    public static final String FEATURED_PRODUCTS = "FEATURED_PRODUCTS";
 
     private final PageBlockRepository repo;
 
@@ -43,16 +44,21 @@ public class PageBlockService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Bloque", id));
     }
 
-    /** Crea el bloque HERO de la home si todavía no existe. Se llama desde el DataSeeder. */
-    public void ensureHeroBlock(String tenantId) {
+    /** Crea los bloques por defecto de la home si todavía no existe ninguno. Se llama desde el DataSeeder. */
+    public void ensureDefaultHomeBlocks(String tenantId) {
         if (!repo.findByTenantIdAndPageTypeOrderByPositionAsc(tenantId, HOME).isEmpty()) return;
-        PageBlock hero = new PageBlock();
-        hero.setId(java.util.UUID.randomUUID().toString());
-        hero.setTenantId(tenantId);
-        hero.setPageType(HOME);
-        hero.setBlockType(HERO);
-        hero.setPosition(0);
-        hero.setVisible(true);
-        repo.save(hero);
+        repo.save(block(tenantId, HERO, 0));
+        repo.save(block(tenantId, FEATURED_PRODUCTS, 1));
+    }
+
+    private PageBlock block(String tenantId, String blockType, int position) {
+        PageBlock b = new PageBlock();
+        b.setId(java.util.UUID.randomUUID().toString());
+        b.setTenantId(tenantId);
+        b.setPageType(HOME);
+        b.setBlockType(blockType);
+        b.setPosition(position);
+        b.setVisible(true);
+        return b;
     }
 }

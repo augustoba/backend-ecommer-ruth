@@ -94,7 +94,7 @@ public class DataSeeder implements CommandLineRunner {
         TenantContext.set(tenantId);
         try {
             siteSettingsService.get();
-            pageBlockService.ensureHeroBlock(tenantId);
+            pageBlockService.ensureDefaultHomeBlocks(tenantId);
 
             if (!props.getSeed().isEnabled()) return;
             seedParamGroups(tenantId);

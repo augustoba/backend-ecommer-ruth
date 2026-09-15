@@ -355,7 +355,7 @@ en `styles.css`) va a funcionar sin tocar ningún componente.
 - `styles.css` no tiene ninguna regla `[data-theme="x"]` todavía — el
   `@theme` actual sigue siendo el único/default, sin cambios visuales.
 
-### Fase 7 — Personalizador visual (bloques de página) 🔜 (primer bloque hecho)
+### Fase 7 — Personalizador visual (bloques de página) 🔜 (2 bloques + pantalla de admin)
 
 Hecho el 2026-09-15, **un bloque a la vez** (el proyecto frontend tiene su
 propio `CLAUDE.md` que pide cambios chicos e iterativos, no specs grandes
@@ -363,30 +363,39 @@ de una — se respetó eso en vez de implementar todo el personalizador de
 una sola tanda).
 
 **Backend** (`core/page/`): entidad `PageBlock` (`tenantId`, `pageType`
-—hoy sólo `"HOME"`—, `blockType` —hoy sólo `"HERO"`—, `position`,
-`visible`). Sin campo `configuration` todavía (se agrega el día que un
-bloque realmente necesite datos propios — el HERO no necesita nada, ya
-usa `core.hero.HeroSlide` para las imágenes). `GET /api/page-blocks`
-público (sólo visibles, en orden), `GET/PUT /api/admin/page-blocks/**`
-gateados por `CAROUSEL_MANAGE` (mismo permiso que ya gatea el resto del
-carrusel — reservado a superadmin, no a "Administrador", igual que hoy).
-Sembrado un bloque HERO visible por tenant.
+—hoy sólo `"HOME"`—, `blockType`, `position`, `visible`). Sin campo
+`configuration` todavía (se agrega el día que un bloque realmente
+necesite datos propios). `GET /api/page-blocks` público (sólo visibles,
+en orden), `GET/PUT /api/admin/page-blocks/**` gateados por
+`CAROUSEL_MANAGE` (mismo permiso que ya gatea el resto del carrusel —
+reservado a superadmin, no a "Administrador", igual que hoy).
+`PageBlockService.ensureDefaultHomeBlocks()` siembra dos bloques por
+tenant: `HERO` (posición 0) y `FEATURED_PRODUCTS` (posición 1, envuelve la
+sección "Lo más vendido" que ya existía).
 
 **Frontend** (`frontend-ecommerce---ruth`, repo separado — ver su propio
-`PROYECTO.md` §7 y §11 #52): `PageBlocksService` lee el endpoint público;
-`CatalogPageComponent` envuelve la sección del carrusel en
-`@if (heroBlockVisible())`.
+`PROYECTO.md` §7 y §11 #52-54): `PageBlocksService` lee el endpoint
+público (`isVisible(blockType)`) y el endpoint de admin
+(`adminBlocks`/`setVisible`). `CatalogPageComponent` envuelve el hero y
+"Lo más vendido" en sus respectivos `@if`. **Pantalla de admin nueva**
+(`/admin/inicio`, componente `AdminPageBlocksComponent`, gateada por
+`CAROUSEL_MANAGE`): lista los bloques de la home con un botón
+Mostrar/Ocultar por bloque — reemplaza tener que llamar la API a mano.
 
 **Verificado de punta a punta en el navegador** (no sólo tests): con
-ambos servidores corriendo contra MySQL real, se probó mostrar → ocultar
-→ mostrar el bloque desde la API y se confirmó visualmente/vía DOM que la
-sección aparece y desaparece. Backend: compila y los 28 tests pasan.
+ambos servidores corriendo contra MySQL real — reseteada para que se
+sembraran los dos bloques —, se entró como superadmin a `/admin/inicio`,
+se ocultó "Lo más vendido" desde la pantalla nueva, se confirmó que
+desaparecía de la home pública, y se volvió a mostrar. Backend: compila y
+los 28 tests pasan.
 
 **Lo que esto NO hizo (a propósito, sigue pendiente):**
-- Sin pantalla de admin para togglear/reordenar (se hace por API).
-- Sin más tipos de bloque, sin `configuration`, sin reordenamiento real
-  (el campo `position` existe pero con un solo bloque no hay nada que
-  reordenar todavía).
+- Sin reordenamiento real en la UI (el campo `position` existe, pero con
+  2 bloques fijos no hay drag&drop todavía).
+- Sin `configuration` por bloque (ningún bloque actual necesita datos
+  propios).
+- Sin más tipos de bloque (banner de texto, categorías, etc.) — se suman
+  cuando haya un pedido concreto de cuál.
 - Sin theming (eso es la Fase 6, todavía no arrancada).
 
 ### Fase 8 — Dominios propios, SSL, deployment con Docker + reverse proxy ⏸️
@@ -455,6 +464,11 @@ donde un producto puede ser de varias estaciones a la vez.
 
 ## 5. Historial
 
+- **2026-09-15**: ampliada la Fase 7 — segundo bloque (`FEATURED_PRODUCTS`,
+  envuelve "Lo más vendido") y pantalla de admin nueva (`/admin/inicio`)
+  para mostrar/ocultar bloques sin llamar la API a mano. Verificado de
+  punta a punta en el navegador con ambos servidores contra MySQL real
+  (reseteada para sembrar los bloques nuevos).
 - **2026-09-15**: hecha la base de la Fase 6 (themes): `SiteSettings.theme`
   + `data-theme` aplicado en `<html>` desde el frontend. Verificado en el
   navegador (no sólo asumido de la doc de Tailwind) que sobreescribir una
