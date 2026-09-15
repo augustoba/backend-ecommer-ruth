@@ -103,7 +103,7 @@ Los tests usan **H2 en memoria** (no tocan MySQL).
 ## Estructura (package-by-layer)
 
 ```
-com.estilospequenos
+com.saasweb
   BackendApplication
   model/        entidades JPA (Product, Order, ParamGroup, SizeScale, Supplier, Discount…)
   repository/   interfaces Spring Data (*Repository)

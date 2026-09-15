@@ -50,7 +50,7 @@ El 2026-09-08 se hizo este backend (v1) y se conectó el frontend Angular
 | Boilerplate | getters/setters/constructores a mano (sin Lombok) | evita el problema de Lombok + annotation processing en cada IDE |
 | Organización | **package-by-layer** (`model/`, `repository/`, `service/`, `controller/`, `dto/`) | pedido del cliente (estilo MVC clásico) |
 
-Paquete base: `com.estilospequenos`. Puerto: `8080`.
+Paquete base: `com.saasweb`. Puerto: `8080`.
 
 ---
 
@@ -97,7 +97,7 @@ a `application-local.yml` (gitignored) y correr con
 ## 4. Estructura del código (package-by-layer)
 
 ```
-com.estilospequenos
+com.saasweb
   BackendApplication            excluye UserDetailsServiceAutoConfiguration (auth es por JWT)
   model/        entidades JPA
                 AdminUser, Product + SizeStock + ProductParam (embeddables),

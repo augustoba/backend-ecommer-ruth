@@ -11,11 +11,11 @@
     <relativePath/>
   </parent>
 
-  <groupId>com.estilospequenos</groupId>
+  <groupId>com.saasweb</groupId>
   <artifactId>backend</artifactId>
   <version>0.1.0</version>
-  <name>Estilos Pequenos - Backend</name>
-  <description>API del panel de administracion y catalogo de Estilos Pequenos</description>
+  <name>SaasWeb - Backend</name>
+  <description>API del panel de administracion y catalogo (deploy actual: Estilos Pequenos)</description>
 
   <properties>
     <java.version>21</java.version>
