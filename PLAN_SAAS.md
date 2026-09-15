@@ -324,7 +324,39 @@ de la propuesta original eran "solo un ejemplo").
 
 ### Fase 6 — Themes en Angular ⏸️
 
-### Fase 7 — Personalizador visual (bloques de página) ⏸️
+### Fase 7 — Personalizador visual (bloques de página) 🔜 (primer bloque hecho)
+
+Hecho el 2026-09-15, **un bloque a la vez** (el proyecto frontend tiene su
+propio `CLAUDE.md` que pide cambios chicos e iterativos, no specs grandes
+de una — se respetó eso en vez de implementar todo el personalizador de
+una sola tanda).
+
+**Backend** (`core/page/`): entidad `PageBlock` (`tenantId`, `pageType`
+—hoy sólo `"HOME"`—, `blockType` —hoy sólo `"HERO"`—, `position`,
+`visible`). Sin campo `configuration` todavía (se agrega el día que un
+bloque realmente necesite datos propios — el HERO no necesita nada, ya
+usa `core.hero.HeroSlide` para las imágenes). `GET /api/page-blocks`
+público (sólo visibles, en orden), `GET/PUT /api/admin/page-blocks/**`
+gateados por `CAROUSEL_MANAGE` (mismo permiso que ya gatea el resto del
+carrusel — reservado a superadmin, no a "Administrador", igual que hoy).
+Sembrado un bloque HERO visible por tenant.
+
+**Frontend** (`frontend-ecommerce---ruth`, repo separado — ver su propio
+`PROYECTO.md` §7 y §11 #52): `PageBlocksService` lee el endpoint público;
+`CatalogPageComponent` envuelve la sección del carrusel en
+`@if (heroBlockVisible())`.
+
+**Verificado de punta a punta en el navegador** (no sólo tests): con
+ambos servidores corriendo contra MySQL real, se probó mostrar → ocultar
+→ mostrar el bloque desde la API y se confirmó visualmente/vía DOM que la
+sección aparece y desaparece. Backend: compila y los 28 tests pasan.
+
+**Lo que esto NO hizo (a propósito, sigue pendiente):**
+- Sin pantalla de admin para togglear/reordenar (se hace por API).
+- Sin más tipos de bloque, sin `configuration`, sin reordenamiento real
+  (el campo `position` existe pero con un solo bloque no hay nada que
+  reordenar todavía).
+- Sin theming (eso es la Fase 6, todavía no arrancada).
 
 ### Fase 8 — Dominios propios, SSL, deployment con Docker + reverse proxy ⏸️
 
@@ -392,6 +424,13 @@ donde un producto puede ser de varias estaciones a la vez.
 
 ## 5. Historial
 
+- **2026-09-15**: hecho el primer bloque de la Fase 7 (personalizador
+  visual): entidad `PageBlock` + endpoints, bloque "HERO" mostrable/
+  ocultable, y el frontend (`frontend-ecommerce---ruth`, repo separado)
+  consumiéndolo — probado de punta a punta en el navegador con ambos
+  servidores contra MySQL real. Se respetó el `CLAUDE.md` del frontend
+  (cambios chicos e iterativos): sólo un bloque, sin pantalla de admin ni
+  reordenamiento todavía. Fase 6 (themes) sigue sin arrancar.
 - **2026-09-15**: definidos los rubros concretos de la Fase 9 (ferretería y
   repuestos de vehículos) y confirmado con el usuario que no necesitan
   stock por variante — esto evita tener que generalizar `SizeScale`/

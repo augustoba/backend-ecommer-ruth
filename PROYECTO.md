@@ -126,6 +126,7 @@ com.saasweb
     exchange/               Exchange, ExchangeLine + Service/Controller/Repository/Dtos
     tenant/                 Tenant, TenantService, TenantRepository (ver PLAN_SAAS.md Fase 3/4)
     plan/                   Plan (límites/módulos por plan), PlanService, PlanRepository (Fase 5)
+    page/                   PageBlock (bloques de la home, hoy sólo "HERO"), PageBlockService/Controller/Repository/Dtos (Fase 7)
     auth/                   AuthService/Controller, AccountController, AccountMailService,
                             LoginAttemptService, LoginRequest, TokenResponse, AccountDtos
     dashboard/              DashboardService/Controller/Dtos, MetricsService/Controller/Dtos
@@ -792,3 +793,20 @@ hace falta el mismo paso.
     módulo que desactivar). Sin `PlanController` (no hay catálogo de planes
     que gestionar desde el panel todavía). Sin test automatizado de la
     validación de límites. Compila y los 28 tests pasan.
+30. **Primer bloque del personalizador visual: bloque "HERO"** (2026-09-15,
+    Fase 7 de `PLAN_SAAS.md`, un bloque a la vez — el frontend tiene su
+    propio `CLAUDE.md` que pide cambios chicos e iterativos): entidad
+    `PageBlock` (`core/page/`) — `tenantId`, `pageType` (hoy sólo `"HOME"`),
+    `blockType` (hoy sólo `"HERO"`), `position`, `visible`. Sin
+    `configuration` todavía (el HERO no necesita datos propios, reusa
+    `core.hero.HeroSlide` para las imágenes). `GET /api/page-blocks`
+    público (sólo bloques visibles, en orden). `GET`/`PUT
+    /api/admin/page-blocks/**` gateados por `CAROUSEL_MANAGE` (mismo
+    permiso que ya gatea el carrusel — reservado a superadmin). Sembrado un
+    bloque HERO visible por tenant en el `DataSeeder`. El frontend
+    (`../frontend-ecommerce---ruth/`, repo separado, ver su `PROYECTO.md`
+    §7 y §11 #52) consume el endpoint público y oculta la sección del
+    carrusel si el bloque no viene. Probado de punta a punta en el
+    navegador (mostrar/ocultar/mostrar) con ambos servidores contra MySQL
+    real, no sólo con tests. Sin pantalla de admin, sin más tipos de
+    bloque, sin reordenamiento — deliberadamente mínimo.

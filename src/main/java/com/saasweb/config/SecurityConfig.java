@@ -49,6 +49,7 @@ public class SecurityConfig {
                                 "/api/param-groups/**",
                                 "/api/size-scales/**",
                                 "/api/hero-slides/**",
+                                "/api/page-blocks/**",
                                 "/api/discounts",
                                 "/api/coupons/**",
                                 "/api/settings",

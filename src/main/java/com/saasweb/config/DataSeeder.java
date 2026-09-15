@@ -15,6 +15,7 @@ import com.saasweb.modules.ropa.SizeScaleRepository;
 import com.saasweb.core.admin.Permission;
 import com.saasweb.core.auth.AuthService;
 import com.saasweb.core.admin.RoleService;
+import com.saasweb.core.page.PageBlockService;
 import com.saasweb.core.settings.SiteSettingsService;
 import com.saasweb.core.tenant.TenantService;
 import org.slf4j.Logger;
@@ -40,6 +41,7 @@ public class DataSeeder implements CommandLineRunner {
     private final RoleService roleService;
     private final SiteSettingsService siteSettingsService;
     private final TenantService tenantService;
+    private final PageBlockService pageBlockService;
     private final ParamRepository paramRepo;
     private final SizeScaleRepository sizeScaleRepo;
     private final DiscountRepository discountRepo;
@@ -50,6 +52,7 @@ public class DataSeeder implements CommandLineRunner {
                       RoleService roleService,
                       SiteSettingsService siteSettingsService,
                       TenantService tenantService,
+                      PageBlockService pageBlockService,
                       ParamRepository paramRepo,
                       SizeScaleRepository sizeScaleRepo,
                       DiscountRepository discountRepo,
@@ -59,6 +62,7 @@ public class DataSeeder implements CommandLineRunner {
         this.roleService = roleService;
         this.siteSettingsService = siteSettingsService;
         this.tenantService = tenantService;
+        this.pageBlockService = pageBlockService;
         this.paramRepo = paramRepo;
         this.sizeScaleRepo = sizeScaleRepo;
         this.discountRepo = discountRepo;
@@ -90,6 +94,7 @@ public class DataSeeder implements CommandLineRunner {
         TenantContext.set(tenantId);
         try {
             siteSettingsService.get();
+            pageBlockService.ensureHeroBlock(tenantId);
 
             if (!props.getSeed().isEnabled()) return;
             seedParamGroups(tenantId);
