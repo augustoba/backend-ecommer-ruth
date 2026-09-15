@@ -6,9 +6,9 @@
 --
 --    mysql -u root -p < database/reset.sql
 --    mysql -u root -p < database/schema.sql
---    mysql -u root -p estilos_pequenos < database/seed.sql
+--    mysql -u root -p saasweb < database/seed.sql
 -- =============================================================================
 
-DROP DATABASE IF EXISTS estilos_pequenos;
-CREATE DATABASE estilos_pequenos
+DROP DATABASE IF EXISTS saasweb;
+CREATE DATABASE saasweb
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

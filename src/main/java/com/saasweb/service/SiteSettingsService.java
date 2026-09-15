@@ -1,5 +1,6 @@
 package com.saasweb.service;
 
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.SiteSettingsDtos.PaymentsSettingsRequest;
 import com.saasweb.dto.SiteSettingsDtos.PlatformSettingsRequest;
 import com.saasweb.model.SiteSettings;
@@ -17,9 +18,14 @@ public class SiteSettingsService {
         this.repo = repo;
     }
 
-    /** Devuelve la fila de settings; si no existe, la crea con los valores por defecto. */
+    /** Devuelve la fila de settings del tenant actual; si no existe, la crea con los valores por defecto. */
     public SiteSettings get() {
-        return repo.findById(SiteSettings.SINGLETON_ID).orElseGet(() -> repo.save(defaults()));
+        String tenantId = TenantContext.getTenantId();
+        return repo.findById(tenantId).orElseGet(() -> {
+            SiteSettings s = defaults();
+            s.setId(tenantId);
+            return repo.save(s);
+        });
     }
 
     /** Textos por defecto del mensaje de pedido de WhatsApp (si no se personalizan). */

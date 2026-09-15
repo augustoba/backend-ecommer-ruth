@@ -4,17 +4,17 @@ import jakarta.persistence.*;
 
 /**
  * Datos del local editables desde el panel (nombre, WhatsApp, "sobre nosotros",
- * redes). Una sola fila (id fijo). Así el dueño/a puede cambiar el número de
- * WhatsApp o las redes sin redesplegar nada.
+ * redes). Una fila por tenant — el id de la fila ES el id del tenant (relación
+ * 1:1), así el dueño/a puede cambiar el número de WhatsApp o las redes sin
+ * redesplegar nada.
  */
 @Entity
 @Table(name = "site_settings")
 public class SiteSettings {
 
-    public static final String SINGLETON_ID = "config";
-
+    /** Id del tenant dueño de esta config (ver TenantService/SiteSettingsService.get()). */
     @Id
-    private String id = SINGLETON_ID;
+    private String id;
 
     @Column(nullable = false)
     private String storeName;

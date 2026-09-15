@@ -14,6 +14,9 @@ public class ParamGroup {
     @Id
     private String id;
 
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     @Column(nullable = false)
     private String name;
 
@@ -48,6 +51,14 @@ public class ParamGroup {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getName() {

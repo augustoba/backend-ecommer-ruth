@@ -19,9 +19,9 @@
 --  chequea que el esquema coincida con las entidades al arrancar.
 -- =============================================================================
 
-CREATE DATABASE IF NOT EXISTS estilos_pequenos
+CREATE DATABASE IF NOT EXISTS saasweb
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE estilos_pequenos;
+USE saasweb;
 
 SET FOREIGN_KEY_CHECKS = 0;
 

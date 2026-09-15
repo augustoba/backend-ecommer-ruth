@@ -1,5 +1,6 @@
 package com.saasweb.service;
 
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.MetricsDtos.ComparisonResponse;
 import com.saasweb.dto.MetricsDtos.GroupBreakdown;
 import com.saasweb.dto.MetricsDtos.GroupRow;
@@ -73,7 +74,8 @@ public class MetricsService {
         Instant fromI = from.atStartOfDay(zone).toInstant();
         Instant toI = to.plusDays(1).atStartOfDay(zone).toInstant();
         List<Order> orders = orderRepo
-                .findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(OrderStatus.PROCESADO, fromI, toI);
+                .findByTenantIdAndStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
+                        TenantContext.getTenantId(), OrderStatus.PROCESADO, fromI, toI);
         BigDecimal revenue = BigDecimal.ZERO;
         long units = 0;
         for (Order o : orders) {
@@ -88,17 +90,19 @@ public class MetricsService {
 
     @Transactional(readOnly = true)
     public MetricsResponse compute(LocalDate from, LocalDate to, String groupBy) {
+        String tenantId = TenantContext.getTenantId();
         Instant fromI = from.atStartOfDay(zone).toInstant();
         Instant toI = to.plusDays(1).atStartOfDay(zone).toInstant();
 
         List<Order> orders = orderRepo
-                .findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(OrderStatus.PROCESADO, fromI, toI);
+                .findByTenantIdAndStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
+                        tenantId, OrderStatus.PROCESADO, fromI, toI);
 
         Map<String, Product> productsById = new LinkedHashMap<>();
-        for (Product p : productRepo.findAll()) productsById.put(p.getId(), p);
+        for (Product p : productRepo.findByTenantId(tenantId)) productsById.put(p.getId(), p);
 
         String groupId = (groupBy == null || groupBy.isBlank()) ? DEFAULT_GROUP : groupBy.trim();
-        ParamGroup group = paramRepo.findById(groupId).orElse(null);
+        ParamGroup group = paramRepo.findByIdAndTenantId(groupId, tenantId).orElse(null);
 
         // --- acumuladores ---
         BigDecimal totalRevenue = BigDecimal.ZERO;
@@ -160,7 +164,7 @@ public class MetricsService {
         }
 
         // --- Cambios: la diferencia cobrada cuenta como facturación (local). No suma unidades ni pedidos. ---
-        for (Exchange e : exchangeRepo.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(fromI, toI)) {
+        for (Exchange e : exchangeRepo.findByTenantIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(tenantId, fromI, toI)) {
             if (e.getDifference().signum() <= 0) continue;
             BigDecimal diff = e.getDifference();
             totalRevenue = totalRevenue.add(diff);
@@ -199,7 +203,7 @@ public class MetricsService {
 
     private List<com.saasweb.dto.MetricsDtos.GroupRow> supplierRows(Map<String, Acc> bySupplier) {
         Map<String, String> names = new LinkedHashMap<>();
-        for (Supplier s : supplierRepo.findAll()) names.put(s.getId(), s.getName());
+        for (Supplier s : supplierRepo.findByTenantId(TenantContext.getTenantId())) names.put(s.getId(), s.getName());
         return bySupplier.entrySet().stream()
                 .filter(en -> en.getValue().units > 0)
                 .sorted(java.util.Comparator.comparingLong((Map.Entry<String, Acc> en) -> en.getValue().units).reversed())
@@ -230,7 +234,8 @@ public class MetricsService {
         Instant yearStart = LocalDate.of(year, 1, 1).atStartOfDay(zone).toInstant();
         Instant yearEnd = LocalDate.of(year, 1, 1).plusYears(1).atStartOfDay(zone).toInstant();
         List<Order> orders = orderRepo
-                .findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(OrderStatus.PROCESADO, yearStart, yearEnd);
+                .findByTenantIdAndStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
+                        TenantContext.getTenantId(), OrderStatus.PROCESADO, yearStart, yearEnd);
 
         Map<Integer, Acc> monthly = new LinkedHashMap<>();
         Map<Integer, Acc> weekly = new LinkedHashMap<>();

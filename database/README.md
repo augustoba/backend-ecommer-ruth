@@ -1,6 +1,6 @@
 # Scripts de base de datos
 
-Scripts SQL para crear y poblar la base **`estilos_pequenos`** (MySQL 8).
+Scripts SQL para crear y poblar la base **`saasweb`** (MySQL 8).
 
 | Archivo | Qué hace |
 |---|---|
@@ -21,7 +21,7 @@ MYSQL="/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe"   # o solo `mysql`
 
 # --- o por partes ---
 "$MYSQL" -u root -p < database/schema.sql                    # tablas
-"$MYSQL" -u root -p estilos_pequenos < database/seed.sql     # config
+"$MYSQL" -u root -p saasweb < database/seed.sql     # config
 
 # reset total
 "$MYSQL" -u root -p < database/reset.sql

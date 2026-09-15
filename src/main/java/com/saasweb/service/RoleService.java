@@ -2,6 +2,7 @@ package com.saasweb.service;
 
 import com.saasweb.common.BadRequestException;
 import com.saasweb.common.ResourceNotFoundException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.RoleDtos.RoleRequest;
 import com.saasweb.model.Permission;
 import com.saasweb.model.Role;
@@ -28,12 +29,13 @@ public class RoleService {
 
     @Transactional(readOnly = true)
     public List<Role> findAll() {
-        return repo.findAllByOrderBySystemDescNameAsc();
+        return repo.findAllForTenant(TenantContext.getTenantId());
     }
 
     @Transactional(readOnly = true)
     public Role get(String id) {
-        return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Rol", id));
+        return repo.findByIdForTenant(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Rol", id));
     }
 
     public long userCount(String roleId) {
@@ -41,12 +43,14 @@ public class RoleService {
     }
 
     public Role create(RoleRequest req) {
+        String tenantId = TenantContext.getTenantId();
         String name = req.name().trim();
-        if (repo.existsByNameIgnoreCase(name)) {
+        if (repo.existsByTenantIdAndNameIgnoreCase(tenantId, name)) {
             throw new BadRequestException("Ya existe un rol con ese nombre.");
         }
         Role r = new Role();
         r.setId(UUID.randomUUID().toString());
+        r.setTenantId(tenantId);
         r.setName(name);
         r.setSystem(false);
         r.setPermissions(cleanPermissions(req));
@@ -59,7 +63,7 @@ public class RoleService {
             throw new BadRequestException("El rol Superadmin no se puede editar (tiene todos los permisos).");
         }
         String name = req.name().trim();
-        if (!name.equalsIgnoreCase(r.getName()) && repo.existsByNameIgnoreCase(name)) {
+        if (!name.equalsIgnoreCase(r.getName()) && repo.existsByTenantIdAndNameIgnoreCase(r.getTenantId(), name)) {
             throw new BadRequestException("Ya existe un rol con ese nombre.");
         }
         r.setName(name);
@@ -95,10 +99,11 @@ public class RoleService {
         });
     }
 
-    public void ensureRole(String name, Permission... perms) {
-        if (repo.findByNameIgnoreCase(name).isEmpty()) {
+    public void ensureRole(String tenantId, String name, Permission... perms) {
+        if (repo.findByTenantIdAndNameIgnoreCase(tenantId, name).isEmpty()) {
             Role r = new Role();
             r.setId(UUID.randomUUID().toString());
+            r.setTenantId(tenantId);
             r.setName(name);
             r.setSystem(false);
             r.setPermissions(perms.length == 0

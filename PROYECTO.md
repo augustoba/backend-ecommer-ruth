@@ -4,7 +4,7 @@
 > está en `../frontend-ecommerce---ruth/PROYECTO.md`. Este archivo entra en el
 > detalle de la API.
 
-Última actualización: 2026-09-11.
+Última actualización: 2026-09-15.
 
 > **Nota de mantenimiento:** las tablas de las secciones 2-6 se actualizan
 > cuando el cambio es grande (como hoy); para el detalle día a día, la
@@ -41,7 +41,7 @@ El 2026-09-08 se hizo este backend (v1) y se conectó el frontend Angular
 | Lenguaje / runtime | **Java 21** | pedido del cliente |
 | Framework | **Spring Boot 3.3.5** | estándar para REST + Security + JPA |
 | Build | **Maven** con wrapper (`./mvnw`) | no depende de Maven global; sin Gradle |
-| Base de datos | **MySQL 8** | pedido del cliente. Local: `root`/`root`, DB `estilos_pequenos` (se crea sola) |
+| Base de datos | **MySQL 8** | pedido del cliente. Local: `root`/`root`, DB `saasweb` (se crea sola) |
 | ORM / esquema | Spring Data JPA + Hibernate, `ddl-auto=update` | Flyway queda pendiente. Hay scripts SQL en `database/` para el modo controlado |
 | Auth | **JWT stateless** (HS256, `io.jsonwebtoken` 0.12.6) | multi-usuario, login por **DNI** (no username) + roles (RBAC) |
 | Contraseñas | **BCrypt** (tabla `admin_user`) | nunca texto plano. Recuperación: mail con contraseña nueva (no hay "frase de recuperación", se sacó) |
@@ -58,7 +58,7 @@ Paquete base: `com.saasweb`. Puerto: `8080`.
 
 ### Requisitos
 - JDK 21 (`java -version` → 21.x).
-- MySQL 8 corriendo en `localhost:3306`. La base `estilos_pequenos` se crea sola
+- MySQL 8 corriendo en `localhost:3306`. La base `saasweb` se crea sola
   (`createDatabaseIfNotExist=true`). En esta PC: servicio `MySQL80`, usuario/clave
   `root` / `root` (ya es el default del `application.yml`).
 
@@ -707,3 +707,41 @@ hace falta el mismo paso.
       (faltaba). Los campos `cloudinary*`/`smtp*` de `site_settings` siguen
       sin reflejarse en `schema.sql` (existían así desde antes del merge, se
       crean solos con `ddl-auto=update`).
+27. **Primer paso de evolución a SaaS multi-tenant** (2026-09-15, detalle
+    completo en `PLAN_SAAS.md` — este proyecto se piensa evolucionar
+    progresivamente a plataforma multi-tienda, manteniendo esta tienda como
+    single-tenant real mientras tanto):
+    - **Rename de plataforma**: paquete Java `com.estilospequenos` →
+      `com.saasweb`, `pom.xml`, nombre de la base MySQL `estilos_pequenos` →
+      `saasweb` (la base vieja queda huérfana, no se borró). La marca de la
+      tienda ("Estilos Pequeños", Instagram, Cloudinary, dominio de mail)
+      no cambió — es identidad de negocio, no de código.
+    - **Infraestructura de tenant**: entidad `Tenant` (`id`, `slug`, `name`,
+      `active`, `createdAt`), `TenantService.ensureDefault()` (siembra la
+      única fila desde `app.tenant.*`), `TenantContext` (holder por
+      request) y `TenantResolutionFilter` (resuelve el tenant de cada
+      request — hoy siempre "el único activo", no lee `Host` todavía; es el
+      único punto que va a cambiar cuando haya resolución real por
+      dominio).
+    - **`tenant_id` en 13 entidades** (Product, Order, Exchange, Discount,
+      Coupon, ParamGroup, SizeScale, HeroSlide, Supplier, Shift,
+      MarketingSend, AdminUser, Role), con filtrado explícito en cada
+      repository/service (`findByIdAndTenantId`, etc. — se prefirió a un
+      filtro automático de Hibernate por auditabilidad). `SiteSettings` y
+      `MarketingConfig` dejaron de ser singleton (`id='config'`) y pasaron a
+      "una fila por tenant" (el id de la fila es el id del tenant).
+      `PlatformMailSettings` sigue global (es del operador de la
+      plataforma, no de cada tienda).
+    - **`AdminUser`/`Role`**: un admin de tienda pertenece a un único
+      tenant; el superadmin (operador de la plataforma) tiene
+      `tenantId = null`, no pertenece a ningún tenant.
+      `AdminUserRepository.findByDniForTenant` resuelve login/JWT contra el
+      tenant actual o el superadmin.
+    - **Uniques que pasaron de globales a compuestos** (`tenant_id` + X):
+      `Coupon.code`, `Order.number`, `Exchange.number`, `AdminUser.dni`,
+      `AdminUser.email`, `Role.name`.
+    - **Pendiente**: `database/*.sql` (curados) no reflejan todavía el
+      esquema con `tenant_id` — sólo se les cambió el nombre de la base.
+      Resolución de tenant por `Host`, JWT con claim de tenant, y
+      generalizar talle→variante genérica quedan diferidos (ver
+      `PLAN_SAAS.md`).

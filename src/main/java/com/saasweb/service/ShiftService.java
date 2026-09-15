@@ -2,6 +2,7 @@ package com.saasweb.service;
 
 import com.saasweb.common.BadRequestException;
 import com.saasweb.common.ResourceNotFoundException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.model.AdminUser;
 import com.saasweb.model.Permission;
 import com.saasweb.model.Shift;
@@ -30,29 +31,33 @@ public class ShiftService {
 
     @Transactional(readOnly = true)
     public Shift get(String id) {
-        return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Turno", id));
+        return repo.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Turno", id));
     }
 
     @Transactional(readOnly = true)
     public Optional<Shift> currentOpen(String userDni) {
-        return repo.findByUserDniAndClosedAtIsNull(userDni);
+        return repo.findByTenantIdAndUserDniAndClosedAtIsNull(TenantContext.getTenantId(), userDni);
     }
 
     @Transactional(readOnly = true)
     public Page<Shift> list(String userDni, Pageable pageable) {
+        String tenantId = TenantContext.getTenantId();
         return userDni == null || userDni.isBlank()
-                ? repo.findAllByOrderByOpenedAtDesc(pageable)
-                : repo.findByUserDniOrderByOpenedAtDesc(userDni, pageable);
+                ? repo.findByTenantIdOrderByOpenedAtDesc(tenantId, pageable)
+                : repo.findByTenantIdAndUserDniOrderByOpenedAtDesc(tenantId, userDni, pageable);
     }
 
     public Shift open(String userDni) {
-        if (repo.findByUserDniAndClosedAtIsNull(userDni).isPresent()) {
+        String tenantId = TenantContext.getTenantId();
+        if (repo.findByTenantIdAndUserDniAndClosedAtIsNull(tenantId, userDni).isPresent()) {
             throw new BadRequestException("Ya tenés un turno abierto.");
         }
-        AdminUser user = users.findByDni(userDni)
+        AdminUser user = users.findByDniForTenant(userDni, tenantId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Usuario", userDni));
         Shift shift = new Shift();
         shift.setId(UUID.randomUUID().toString());
+        shift.setTenantId(tenantId);
         shift.setUserDni(userDni);
         shift.setUserName(user.getNombre() + " " + user.getApellido());
         shift.setOpenedAt(Instant.now());
@@ -66,7 +71,7 @@ public class ShiftService {
             throw new BadRequestException("Ese turno ya está cerrado.");
         }
         if (!shift.getUserDni().equals(actingDni)) {
-            AdminUser acting = users.findByDni(actingDni).orElse(null);
+            AdminUser acting = users.findByDniForTenant(actingDni, TenantContext.getTenantId()).orElse(null);
             boolean canForceClose = acting != null && acting.permissions().contains(Permission.CASH_REGISTER_VIEW);
             if (!canForceClose) {
                 throw new BadRequestException("Sólo el dueño del turno (o alguien que puede ver la caja) puede cerrarlo.");

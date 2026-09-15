@@ -9,9 +9,11 @@ import java.util.Optional;
 
 public interface ShiftRepository extends JpaRepository<Shift, String> {
 
-    Optional<Shift> findByUserDniAndClosedAtIsNull(String userDni);
+    Optional<Shift> findByIdAndTenantId(String id, String tenantId);
 
-    Page<Shift> findAllByOrderByOpenedAtDesc(Pageable pageable);
+    Optional<Shift> findByTenantIdAndUserDniAndClosedAtIsNull(String tenantId, String userDni);
 
-    Page<Shift> findByUserDniOrderByOpenedAtDesc(String userDni, Pageable pageable);
+    Page<Shift> findByTenantIdOrderByOpenedAtDesc(String tenantId, Pageable pageable);
+
+    Page<Shift> findByTenantIdAndUserDniOrderByOpenedAtDesc(String tenantId, String userDni, Pageable pageable);
 }

@@ -1,6 +1,7 @@
 package com.saasweb.service;
 
 import com.saasweb.common.ResourceNotFoundException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.SupplierDtos.SupplierRequest;
 import com.saasweb.model.Supplier;
 import com.saasweb.repository.SupplierRepository;
@@ -22,17 +23,19 @@ public class SupplierService {
 
     @Transactional(readOnly = true)
     public List<Supplier> findAll() {
-        return repo.findAll();
+        return repo.findByTenantId(TenantContext.getTenantId());
     }
 
     @Transactional(readOnly = true)
     public Supplier get(String id) {
-        return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Proveedor", id));
+        return repo.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Proveedor", id));
     }
 
     public Supplier create(SupplierRequest req) {
         Supplier s = new Supplier();
         s.setId(UUID.randomUUID().toString());
+        s.setTenantId(TenantContext.getTenantId());
         apply(s, req);
         return repo.save(s);
     }

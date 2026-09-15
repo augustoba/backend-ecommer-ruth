@@ -2,6 +2,7 @@ package com.saasweb;
 
 import com.saasweb.model.AdminUser;
 import com.saasweb.repository.AdminUserRepository;
+import com.saasweb.service.TenantService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -26,10 +27,13 @@ class AuthFlowTest {
     ObjectMapper mapper;
     @Autowired
     AdminUserRepository adminUsers;
+    @Autowired
+    TenantService tenantService;
 
     @Test
     void adminUserIsSeededWithBcryptHash() {
-        AdminUser admin = adminUsers.findByDni("11111111").orElseThrow();
+        String tenantId = tenantService.resolveCurrentTenantId();
+        AdminUser admin = adminUsers.findByDniForTenant("11111111", tenantId).orElseThrow();
         assertThat(admin.getPasswordHash()).startsWith("$2");           // BCrypt
         assertThat(admin.getPasswordHash()).isNotEqualTo("test-pass");  // no en texto plano
     }

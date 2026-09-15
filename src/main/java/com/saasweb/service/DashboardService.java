@@ -1,5 +1,6 @@
 package com.saasweb.service;
 
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.DashboardDtos.DashboardResponse;
 import com.saasweb.dto.DashboardDtos.LowStockItem;
 import com.saasweb.dto.DashboardDtos.MonthSummary;
@@ -39,15 +40,16 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public DashboardResponse get() {
-        long pending = orderRepo.countByStatus(OrderStatus.PENDIENTE);
+        String tenantId = TenantContext.getTenantId();
+        long pending = orderRepo.countByTenantIdAndStatus(tenantId, OrderStatus.PENDIENTE);
 
         LocalDate today = LocalDate.now();
         Totals month = metricsService.rangeTotals(today.withDayOfMonth(1), today);
 
-        long active = productRepo.countByActiveTrueAndDeletedFalse();
-        long total = productRepo.countByDeletedFalse();
+        long active = productRepo.countByTenantIdAndActiveTrueAndDeletedFalse(tenantId);
+        long total = productRepo.countByTenantIdAndDeletedFalse(tenantId);
 
-        List<RecentOrder> recent = orderRepo.findAllByOrderByCreatedAtDesc().stream()
+        List<RecentOrder> recent = orderRepo.findByTenantIdOrderByCreatedAtDesc(tenantId).stream()
                 .limit(RECENT_ORDERS)
                 .map(o -> new RecentOrder(o.getId(), o.getCode(), o.getCustomerName(),
                         o.getTotal(), o.getStatus().name(), o.getCreatedAt()))
@@ -68,7 +70,7 @@ public class DashboardService {
     @Transactional(readOnly = true)
     public List<LowStockItem> lowStock() {
         List<LowStockItem> items = new ArrayList<>();
-        for (Product p : productRepo.findByActiveTrueAndDeletedFalseOrderByCreatedAtDesc()) {
+        for (Product p : productRepo.findByTenantIdAndActiveTrueAndDeletedFalseOrderByCreatedAtDesc(TenantContext.getTenantId())) {
             if (p.isDiscontinued()) continue; // el dueño/a marcó "no reponer"
             int threshold = p.getLowStockThreshold() != null ? p.getLowStockThreshold() : DEFAULT_LOW_STOCK;
             for (SizeStock s : p.getSizeStocks()) {

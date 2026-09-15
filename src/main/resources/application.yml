@@ -1,8 +1,8 @@
 spring:
   application:
-    name: estilos-pequenos-backend
+    name: saasweb-backend
   datasource:
-    url: jdbc:mysql://localhost:3306/estilos_pequenos?createDatabaseIfNotExist=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+    url: jdbc:mysql://localhost:3306/saasweb?createDatabaseIfNotExist=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
     username: ${DB_USER:root}
     password: ${DB_PASSWORD:root}
   jpa:

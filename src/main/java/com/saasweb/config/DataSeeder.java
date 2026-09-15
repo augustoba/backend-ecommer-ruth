@@ -1,5 +1,6 @@
 package com.saasweb.config;
 
+import com.saasweb.common.TenantContext;
 import com.saasweb.model.Discount;
 import com.saasweb.model.ParamGroup;
 import com.saasweb.model.ParamOption;
@@ -67,12 +68,12 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
         // Tenant único de este deploy: siempre primero, todo lo demás lo asume creado.
-        tenantService.ensureDefault();
+        String tenantId = tenantService.ensureDefault().getId();
         // Roles, config del sitio y usuarios iniciales: siempre (no son "datos de ejemplo").
-        roleService.ensureSystemRole(); // "Superadmin": system=true, siempre todos los permisos.
+        roleService.ensureSystemRole(); // "Superadmin": system=true, siempre todos los permisos, no pertenece a ningún tenant.
         // "Administrador": todo lo operativo de la tienda, salvo la config de plataforma
         // (identidad/logo/whatsapp/redes/textos/carrusel/mail) que queda reservada al superadmin.
-        roleService.ensureRole("Administrador",
+        roleService.ensureRole(tenantId, "Administrador",
                 Permission.PRODUCTS_VIEW, Permission.PRODUCTS_MANAGE,
                 Permission.ORDERS_VIEW, Permission.ORDERS_MANAGE,
                 Permission.POS_USE, Permission.EXCHANGES_USE, Permission.CASH_REGISTER_VIEW,
@@ -80,45 +81,51 @@ public class DataSeeder implements CommandLineRunner {
                 Permission.PARAMS_MANAGE, Permission.SIZE_SCALES_MANAGE, Permission.SUPPLIERS_MANAGE,
                 Permission.DISCOUNTS_MANAGE, Permission.COUPONS_MANAGE, Permission.MARKETING_MANAGE,
                 Permission.METRICS_VIEW, Permission.PAYMENTS_MANAGE, Permission.USERS_MANAGE);
-        roleService.ensureRole("Vendedor",
+        roleService.ensureRole(tenantId, "Vendedor",
                 Permission.ORDERS_VIEW, Permission.ORDERS_MANAGE,
                 Permission.POS_USE, Permission.EXCHANGES_USE,
                 Permission.CASH_REGISTER_VIEW, Permission.SHIFTS_MANAGE, Permission.METRICS_VIEW);
-        authService.ensureInitialAdmin();
+        authService.ensureInitialAdmin(tenantId);
         authService.ensureInitialSuperadmin();
-        siteSettingsService.get();
+        TenantContext.set(tenantId);
+        try {
+            siteSettingsService.get();
 
-        if (!props.getSeed().isEnabled()) return;
-        seedParamGroups();
-        seedSizeScales();
-        seedDiscounts();
-        seedProducts();
+            if (!props.getSeed().isEnabled()) return;
+            seedParamGroups(tenantId);
+            seedSizeScales(tenantId);
+            seedDiscounts(tenantId);
+            seedProducts(tenantId);
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     // --- Parametrías ---
 
-    private void seedParamGroups() {
-        if (paramRepo.count() > 0) return;
-        paramRepo.save(group("grp-publico", "Público", false, true, true, List.of(
+    private void seedParamGroups(String tenantId) {
+        if (!paramRepo.findByTenantId(tenantId).isEmpty()) return;
+        paramRepo.save(group(tenantId, "grp-publico", "Público", false, true, true, List.of(
                 opt("publico-bebe", "Bebé"), opt("publico-nena", "Nena"),
                 opt("publico-nene", "Nene"), opt("publico-unisex", "Unisex"))));
-        paramRepo.save(group("grp-tipo", "Tipo de prenda", false, true, false, List.of(
+        paramRepo.save(group(tenantId, "grp-tipo", "Tipo de prenda", false, true, false, List.of(
                 opt("tipo-remera", "Remera"), opt("tipo-buzo", "Buzo / Campera"),
                 opt("tipo-pantalon", "Pantalón"), opt("tipo-jean", "Jean"),
                 opt("tipo-vestido", "Vestido / Pollera"), opt("tipo-body", "Body / Enterito"),
                 opt("tipo-conjunto", "Conjunto"), opt("tipo-calzado", "Calzado"),
                 opt("tipo-accesorio", "Accesorio"))));
-        paramRepo.save(group("grp-estacion", "Estación", true, true, false, List.of(
+        paramRepo.save(group(tenantId, "grp-estacion", "Estación", true, true, false, List.of(
                 opt("estacion-primavera", "Primavera"), opt("estacion-verano", "Verano"),
                 opt("estacion-otono", "Otoño"), opt("estacion-invierno", "Invierno"),
                 opt("estacion-todo", "Todo el año"))));
         log.info("Seed: 3 parametrías cargadas.");
     }
 
-    private ParamGroup group(String id, String name, boolean multiple, boolean showInCatalog,
+    private ParamGroup group(String tenantId, String id, String name, boolean multiple, boolean showInCatalog,
                              boolean system, List<ParamOption> options) {
         ParamGroup g = new ParamGroup();
         g.setId(id);
+        g.setTenantId(tenantId);
         g.setName(name);
         g.setMultiple(multiple);
         g.setShowInCatalog(showInCatalog);
@@ -136,22 +143,23 @@ public class DataSeeder implements CommandLineRunner {
 
     // --- Escalas de talle ---
 
-    private void seedSizeScales() {
-        if (sizeScaleRepo.count() > 0) return;
-        sizeScaleRepo.save(scale("escala-bebe", "Ropa bebé (por edad)",
+    private void seedSizeScales(String tenantId) {
+        if (!sizeScaleRepo.findByTenantId(tenantId).isEmpty()) return;
+        sizeScaleRepo.save(scale(tenantId, "escala-bebe", "Ropa bebé (por edad)",
                 List.of("RN", "0-3M", "3-6M", "6-12M", "12-18M", "18-24M", "24M")));
-        sizeScaleRepo.save(scale("escala-ninos", "Ropa niños",
+        sizeScaleRepo.save(scale(tenantId, "escala-ninos", "Ropa niños",
                 List.of("1", "2", "3", "4", "6", "8", "10", "12", "14", "16")));
-        sizeScaleRepo.save(scale("escala-adultos", "Ropa adultos",
+        sizeScaleRepo.save(scale(tenantId, "escala-adultos", "Ropa adultos",
                 List.of("XS", "S", "M", "L", "XL", "XXL")));
-        sizeScaleRepo.save(scale("escala-calzado-ninos", "Calzado niños", range(17, 34)));
-        sizeScaleRepo.save(scale("escala-calzado-adultos", "Calzado adultos", range(34, 46)));
+        sizeScaleRepo.save(scale(tenantId, "escala-calzado-ninos", "Calzado niños", range(17, 34)));
+        sizeScaleRepo.save(scale(tenantId, "escala-calzado-adultos", "Calzado adultos", range(34, 46)));
         log.info("Seed: 5 escalas de talle cargadas.");
     }
 
-    private SizeScale scale(String id, String name, List<String> values) {
+    private SizeScale scale(String tenantId, String id, String name, List<String> values) {
         SizeScale s = new SizeScale();
         s.setId(id);
+        s.setTenantId(tenantId);
         s.setName(name);
         s.setSystem(true);
         s.setValues(new ArrayList<>(values));
@@ -164,17 +172,18 @@ public class DataSeeder implements CommandLineRunner {
 
     // --- Descuentos ---
 
-    private void seedDiscounts() {
-        if (discountRepo.count() == 0) {
-            discountRepo.save(montoTier("100000", 20));
-            discountRepo.save(montoTier("200000", 25));
+    private void seedDiscounts(String tenantId) {
+        if (discountRepo.findByTenantId(tenantId).isEmpty()) {
+            discountRepo.save(montoTier(tenantId, "100000", 20));
+            discountRepo.save(montoTier(tenantId, "200000", 25));
             log.info("Seed: 2 descuentos por monto cargados.");
         }
     }
 
-    private Discount montoTier(String minAmount, int percent) {
+    private Discount montoTier(String tenantId, String minAmount, int percent) {
         Discount d = new Discount();
         d.setId(UUID.randomUUID().toString());
+        d.setTenantId(tenantId);
         d.setKind(Discount.Kind.MONTO);
         d.setMinAmount(new BigDecimal(minAmount));
         d.setDiscountPercent(percent);
@@ -184,64 +193,64 @@ public class DataSeeder implements CommandLineRunner {
 
     // --- Productos de ejemplo ---
 
-    private void seedProducts() {
-        if (productRepo.count() > 0) return;
+    private void seedProducts(String tenantId) {
+        if (!productRepo.findByTenantId(tenantId).isEmpty()) return;
 
-        productRepo.save(product("Body manga larga estampado animales",
+        productRepo.save(product(tenantId, "Body manga larga estampado animales",
                 "Body de algodón suave, manga larga, con estampa de animalitos. Ideal para el día a día.",
                 "9800", "0 a 12 meses", "escala-bebe", "🧸", "#fdba74",
                 params("publico-bebe", "tipo-body", List.of("estacion-todo")),
                 stocks("RN:4", "0-3M:3", "3-6M:4", "6-12M:3")));
 
-        productRepo.save(product("Conjunto jogging campera + pantalón",
+        productRepo.save(product(tenantId, "Conjunto jogging campera + pantalón",
                 "Conjunto de frisa perchada, campera con capucha y pantalón con puños. Súper abrigado.",
                 "24500", "2 a 8 años", "escala-ninos", "🧥", "#85d6ff",
                 params("publico-nene", "tipo-conjunto", List.of("estacion-otono", "estacion-invierno")),
                 stocks("2:2", "3:2", "4:3", "6:1", "8:1")));
 
-        productRepo.save(product("Vestido plumeti volados",
+        productRepo.save(product(tenantId, "Vestido plumeti volados",
                 "Vestido liviano de tela plumeti con volados en el ruedo y moño en la espalda.",
                 "19900", "2 a 10 años", "escala-ninos", "👗", "#f9a8d4",
                 params("publico-nena", "tipo-vestido", List.of("estacion-primavera", "estacion-verano")),
                 stocks("2:2", "3:2", "4:3", "6:2", "8:1", "10:1")));
 
-        productRepo.save(product("Remera básica algodón (pack x3)",
+        productRepo.save(product(tenantId, "Remera básica algodón (pack x3)",
                 "Pack de 3 remeras lisas de algodón peinado en colores surtidos. Unisex.",
                 "15600", "1 a 12 años", "escala-ninos", "👕", "#86e6bb",
                 params("publico-unisex", "tipo-remera", List.of("estacion-todo")),
                 stocks("1:3", "2:3", "3:3", "4:4", "6:2", "8:2", "10:2", "12:1")));
 
-        productRepo.save(product("Jean chupín con elástico",
+        productRepo.save(product(tenantId, "Jean chupín con elástico",
                 "Jean chupín de tiro medio con cintura elastizada para mayor comodidad.",
                 "21300", "2 a 12 años", "escala-ninos", "👖", "#60a5fa",
                 params("publico-nena", "tipo-jean", List.of("estacion-otono", "estacion-invierno", "estacion-primavera")),
                 stocks("2:1", "3:1", "4:2", "6:1", "8:1", "10:1", "12:0")));
 
-        productRepo.save(product("Buzo canguro dinosaurios",
+        productRepo.save(product(tenantId, "Buzo canguro dinosaurios",
                 "Buzo canguro de frisa con bolsillo y estampa de dinosaurios.",
                 "18200", "2 a 10 años", "escala-ninos", "🦕", "#fde68a",
                 params("publico-nene", "tipo-buzo", List.of("estacion-otono", "estacion-invierno")),
                 stocks("2:0", "3:0", "4:0", "6:0", "8:0", "10:0")));
 
-        productRepo.save(product("Enterito corto verano",
+        productRepo.save(product(tenantId, "Enterito corto verano",
                 "Enterito liviano de algodón, ideal para el verano, con broches en la entrepierna.",
                 "13400", "3 a 24 meses", "escala-bebe", "🌞", "#fca5a5",
                 params("publico-bebe", "tipo-body", List.of("estacion-primavera", "estacion-verano")),
                 stocks("3-6M:5", "6-12M:6", "12-18M:3", "18-24M:2")));
 
-        productRepo.save(product("Campera inflable con capucha",
+        productRepo.save(product(tenantId, "Campera inflable con capucha",
                 "Campera inflable liviana, abrigada, con capucha desmontable. Repelente al agua.",
                 "32900", "4 a 14 años", "escala-ninos", "🧥", "#a5b4fc",
                 params("publico-unisex", "tipo-buzo", List.of("estacion-otono", "estacion-invierno")),
                 stocks("4:1", "6:1", "8:1", "10:1", "12:1", "14:0")));
 
-        productRepo.save(product("Pollera short con volado",
+        productRepo.save(product(tenantId, "Pollera short con volado",
                 "Pollera short de gabardina liviana con volado, cintura con elástico.",
                 "12800", "2 a 10 años", "escala-ninos", "🩳", "#f0abfc",
                 params("publico-nena", "tipo-vestido", List.of("estacion-primavera", "estacion-verano")),
                 stocks("2:2", "3:2", "4:2", "6:2", "8:1", "10:1")));
 
-        productRepo.save(product("Zapatillas urbanas velcro",
+        productRepo.save(product(tenantId, "Zapatillas urbanas velcro",
                 "Zapatillas livianas con cierre de velcro, suela antideslizante.",
                 "27500", "1 a 8 años", "escala-calzado-ninos", "👟", "#d8b4fe",
                 params("publico-unisex", "tipo-calzado", List.of("estacion-todo")),
@@ -250,11 +259,12 @@ public class DataSeeder implements CommandLineRunner {
         log.info("Seed: 10 productos de ejemplo cargados.");
     }
 
-    private Product product(String name, String description, String price, String ageRange,
+    private Product product(String tenantId, String name, String description, String price, String ageRange,
                             String sizeScaleId, String emoji, String color,
                             Set<ProductParam> params, List<SizeStock> stocks) {
         Product p = new Product();
         p.setId(UUID.randomUUID().toString());
+        p.setTenantId(tenantId);
         p.setName(name);
         p.setDescription(description);
         p.setPrice(new BigDecimal(price));

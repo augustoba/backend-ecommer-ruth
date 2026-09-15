@@ -2,6 +2,7 @@ package com.saasweb.service;
 
 import com.saasweb.common.BadRequestException;
 import com.saasweb.common.ResourceNotFoundException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.DiscountDtos.BreakdownLine;
 import com.saasweb.dto.DiscountDtos.CartDiscountResult;
 import com.saasweb.dto.DiscountDtos.DiscountRequest;
@@ -42,17 +43,19 @@ public class DiscountService {
 
     @Transactional(readOnly = true)
     public List<Discount> findAll() {
-        return repo.findAll();
+        return repo.findByTenantId(TenantContext.getTenantId());
     }
 
     @Transactional(readOnly = true)
     public Discount get(String id) {
-        return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Descuento", id));
+        return repo.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Descuento", id));
     }
 
     public Discount create(DiscountRequest req) {
         Discount d = new Discount();
         d.setId(UUID.randomUUID().toString());
+        d.setTenantId(TenantContext.getTenantId());
         apply(d, req);
         return repo.save(d);
     }
@@ -90,7 +93,7 @@ public class DiscountService {
     }
 
     private List<Discount> activeOfKind(Discount.Kind kind) {
-        return repo.findAll().stream()
+        return repo.findByTenantId(TenantContext.getTenantId()).stream()
                 .filter(d -> d.getKind() == kind && d.activeNow())
                 .toList();
     }
@@ -142,7 +145,7 @@ public class DiscountService {
         List<Instance> instances = new ArrayList<>();
         paramByDiscountId.forEach((id, amount) -> {
             if (amount.signum() > 0) {
-                Discount d = repo.findById(id).orElse(null);
+                Discount d = repo.findByIdAndTenantId(id, TenantContext.getTenantId()).orElse(null);
                 if (d != null) instances.add(new Instance(d, amount, paramLabel(d)));
             }
         });

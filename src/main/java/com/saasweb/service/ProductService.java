@@ -1,6 +1,7 @@
 package com.saasweb.service;
 
 import com.saasweb.common.ResourceNotFoundException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.ProductDtos.ProductRequest;
 import com.saasweb.dto.ProductDtos.SizeStockDto;
 import com.saasweb.model.Product;
@@ -41,16 +42,17 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public List<Product> bestSellers(int limit) {
+        String tenantId = TenantContext.getTenantId();
         Instant from = Instant.now().minus(90, ChronoUnit.DAYS);
         Map<String, Long> units = new LinkedHashMap<>();
-        orderRepo.findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
-                        OrderStatus.PROCESADO, from, Instant.now())
+        orderRepo.findByTenantIdAndStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
+                        tenantId, OrderStatus.PROCESADO, from, Instant.now())
                 .forEach(o -> o.getLines().forEach(l -> {
                     if (l.isAccepted()) units.merge(l.getProductId(), (long) l.getQuantity(), Long::sum);
                 }));
         return units.entrySet().stream()
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                .map(e -> repo.findById(e.getKey()).orElse(null))
+                .map(e -> repo.findByIdAndTenantId(e.getKey(), tenantId).orElse(null))
                 .filter(p -> p != null && p.isActive() && !p.isDeleted())
                 .limit(Math.max(1, limit))
                 .toList();
@@ -58,17 +60,17 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public List<Product> findActive() {
-        return repo.findByActiveTrueAndDeletedFalseOrderByCreatedAtDesc();
+        return repo.findByTenantIdAndActiveTrueAndDeletedFalseOrderByCreatedAtDesc(TenantContext.getTenantId());
     }
 
     @Transactional(readOnly = true)
     public List<Product> findAll() {
-        return repo.findByDeletedFalseOrderByCreatedAtDesc();
+        return repo.findByTenantIdAndDeletedFalseOrderByCreatedAtDesc(TenantContext.getTenantId());
     }
 
     @Transactional(readOnly = true)
     public List<Product> findArchived() {
-        return repo.findByDeletedTrueOrderByCreatedAtDesc();
+        return repo.findByTenantIdAndDeletedTrueOrderByCreatedAtDesc(TenantContext.getTenantId());
     }
 
     /** Listado del panel con filtros (ver ProductRepository.search). */
@@ -84,17 +86,19 @@ public class ProductService {
         String oid = (optionId != null && !optionId.isBlank()) ? optionId.trim() : null;
         // el filtro de parametría necesita el par completo
         if (gid == null || oid == null) { gid = null; oid = null; }
-        return repo.search(s, like, sup, active, gid, oid, noStock, pageable);
+        return repo.search(TenantContext.getTenantId(), s, like, sup, active, gid, oid, noStock, pageable);
     }
 
     @Transactional(readOnly = true)
     public Product get(String id) {
-        return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Producto", id));
+        return repo.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Producto", id));
     }
 
     public Product create(ProductRequest req) {
         Product p = new Product();
         p.setId(UUID.randomUUID().toString());
+        p.setTenantId(TenantContext.getTenantId());
         p.setCreatedAt(Instant.now());
         apply(p, req);
         return repo.save(p);
@@ -115,6 +119,7 @@ public class ProductService {
         Product src = get(id);
         Product copy = new Product();
         copy.setId(UUID.randomUUID().toString());
+        copy.setTenantId(src.getTenantId());
         copy.setCreatedAt(Instant.now());
         copy.setName(src.getName() + " (copia)");
         copy.setDescription(src.getDescription());
@@ -180,7 +185,7 @@ public class ProductService {
 
     /** Descuenta unidades del stock de un talle puntual (al confirmar un pedido). */
     public void decrementStock(String id, String size, int quantity) {
-        repo.findById(id).ifPresent(p -> {
+        repo.findByIdAndTenantId(id, TenantContext.getTenantId()).ifPresent(p -> {
             for (SizeStock s : p.getSizeStocks()) {
                 if (s.getSize().equals(size)) {
                     s.setStock(Math.max(0, s.getStock() - quantity));
@@ -192,7 +197,7 @@ public class ProductService {
 
     /** Suma unidades al stock de un talle (ej: prenda devuelta en un cambio). */
     public void incrementStock(String id, String size, int quantity) {
-        repo.findById(id).ifPresent(p -> {
+        repo.findByIdAndTenantId(id, TenantContext.getTenantId()).ifPresent(p -> {
             boolean found = false;
             for (SizeStock s : p.getSizeStocks()) {
                 if (s.getSize().equals(size)) {
@@ -208,7 +213,7 @@ public class ProductService {
     /** Stock actual de un talle puntual (0 si el producto no viene en ese talle). */
     @Transactional(readOnly = true)
     public int stockOf(String id, String size) {
-        return repo.findById(id)
+        return repo.findByIdAndTenantId(id, TenantContext.getTenantId())
                 .map(p -> p.getSizeStocks().stream()
                         .filter(s -> s.getSize().equals(size))
                         .mapToInt(SizeStock::getStock)

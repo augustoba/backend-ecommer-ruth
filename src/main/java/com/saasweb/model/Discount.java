@@ -31,6 +31,9 @@ public class Discount {
     @Id
     private String id;
 
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Kind kind;
@@ -106,6 +109,14 @@ public class Discount {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public Kind getKind() {

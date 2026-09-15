@@ -3,6 +3,7 @@ package com.saasweb.service;
 import com.saasweb.common.BadRequestException;
 import com.saasweb.common.ResourceNotFoundException;
 import com.saasweb.common.Slugs;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.ParamDtos.GroupRequest;
 import com.saasweb.dto.ParamDtos.OptionRequest;
 import com.saasweb.model.ParamGroup;
@@ -25,17 +26,19 @@ public class ParamService {
 
     @Transactional(readOnly = true)
     public List<ParamGroup> findAll() {
-        return repo.findAll();
+        return repo.findByTenantId(TenantContext.getTenantId());
     }
 
     @Transactional(readOnly = true)
     public ParamGroup get(String id) {
-        return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Parametría", id));
+        return repo.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Parametría", id));
     }
 
     public ParamGroup create(GroupRequest req) {
         ParamGroup g = new ParamGroup();
         g.setId("grp-" + Slugs.slug(req.name()) + "-" + Slugs.shortRandom());
+        g.setTenantId(TenantContext.getTenantId());
         g.setName(req.name().trim());
         g.setMultiple(req.multiple());
         g.setShowInCatalog(req.showInCatalog() == null || req.showInCatalog());

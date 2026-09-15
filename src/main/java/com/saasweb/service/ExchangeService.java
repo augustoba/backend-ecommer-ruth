@@ -2,6 +2,7 @@ package com.saasweb.service;
 
 import com.saasweb.common.BadRequestException;
 import com.saasweb.common.ResourceNotFoundException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.ExchangeDtos.CreateExchangeRequest;
 import com.saasweb.dto.ExchangeDtos.ExchangeItem;
 import com.saasweb.model.Exchange;
@@ -43,24 +44,27 @@ public class ExchangeService {
 
     @Transactional(readOnly = true)
     public List<Exchange> findAll() {
-        return repo.findAllByOrderByCreatedAtDesc();
+        return repo.findByTenantIdOrderByCreatedAtDesc(TenantContext.getTenantId());
     }
 
     @Transactional(readOnly = true)
     public Exchange get(String id) {
-        return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Cambio", id));
+        return repo.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Cambio", id));
     }
 
     public Exchange create(CreateExchangeRequest req, String processedByDni) {
+        String tenantId = TenantContext.getTenantId();
         Exchange ex = new Exchange();
         ex.setId(UUID.randomUUID().toString());
-        ex.setNumber(repo.maxNumber() + 1);
+        ex.setTenantId(tenantId);
+        ex.setNumber(repo.maxNumber(tenantId) + 1);
         ex.setCustomerName(req.customerName() == null || req.customerName().isBlank()
                 ? "Cambio en el local" : req.customerName().trim());
         ex.setNote(req.note() == null || req.note().isBlank() ? null : req.note().trim());
         ex.setProcessedByDni(processedByDni);
         ex.setProcessedByName(processedByDni == null || processedByDni.isBlank() ? null
-                : adminUsers.findByDni(processedByDni).map(u -> u.getNombre() + " " + u.getApellido()).orElse(null));
+                : adminUsers.findByDniForTenant(processedByDni, tenantId).map(u -> u.getNombre() + " " + u.getApellido()).orElse(null));
 
         // Pre-chequeo de stock de lo que se lleva (agrupando por producto+talle).
         List<String> shortages = new ArrayList<>();
@@ -106,7 +110,8 @@ public class ExchangeService {
     }
 
     private Product product(String id) {
-        return productRepo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Producto", id));
+        return productRepo.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Producto", id));
     }
 
     private static ExchangeLine line(ExchangeLine.Kind kind, Product p, ExchangeItem item) {

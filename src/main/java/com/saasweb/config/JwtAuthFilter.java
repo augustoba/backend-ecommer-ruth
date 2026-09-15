@@ -1,5 +1,6 @@
 package com.saasweb.config;
 
+import com.saasweb.common.TenantContext;
 import com.saasweb.model.AdminUser;
 import com.saasweb.model.Permission;
 import com.saasweb.repository.AdminUserRepository;
@@ -45,7 +46,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
             String dni = jwtService.validate(header.substring(7));
             if (dni != null) {
-                AdminUser user = users.findByDni(dni).filter(AdminUser::isEnabled).orElse(null);
+                AdminUser user = users.findByDniForTenant(dni, TenantContext.getTenantId())
+                        .filter(AdminUser::isEnabled).orElse(null);
                 if (user != null) {
                     List<SimpleGrantedAuthority> authorities = new ArrayList<>();
                     authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));

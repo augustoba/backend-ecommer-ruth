@@ -153,7 +153,75 @@ existe pero nada lo lee todavía. Eso es la Fase 4, mucho más invasiva
 (toca ~10 entidades y todos sus repositories/services + JWT), y antes de
 hacerla hay una decisión de producto a confirmar (ver Fase 4).
 
-### Fase 4 — `tenant_id` en entidades CORE + aislamiento real ⏸️ (siguiente paso grande)
+### Fase 4 — `tenant_id` en entidades CORE + aislamiento real ✅
+
+Hecho el 2026-09-15. Alcance completo: 13 entidades pasaron a ser
+tenant-scoped, con filtrado explícito en cada repository/service (no
+Hibernate `@Filter` automático — se prefirió explícito por auditabilidad,
+ver la discusión que quedó más abajo).
+
+**Entidades con `tenant_id` agregado:** Product, Order (+ Exchange, mismo
+patrón de correlativo por tenant), Discount, Coupon, ParamGroup, SizeScale,
+HeroSlide, Supplier, Shift, MarketingSend, AdminUser, Role.
+
+**Convertidas de singleton global a "una fila por tenant":** SiteSettings y
+MarketingConfig — el id de la fila ahora ES el id del tenant (relación 1:1,
+sin columna extra). `PlatformMailSettings` se dejó como estaba (es config
+del operador de la plataforma, no de cada tienda — correcto que siga
+global).
+
+**`AdminUser`/`Role` — el caso especial (confirmado con el usuario):** un
+admin de tienda pertenece a un único tenant; el superadmin (operador de la
+plataforma) tiene `tenantId = null` y no pertenece a ningún tenant.
+`AdminUserRepository.findByDniForTenant(dni, tenantId)` resuelve un DNI
+contra el tenant actual O contra el superadmin — es lo que usan login y
+`JwtAuthFilter`. Mismo patrón en `Role` (el rol de sistema "Superadmin"
+tiene `tenantId = null`, compartido).
+
+**Constraints únicos que pasaron de globales a compuestos (tenant_id + X):**
+`Coupon.code`, `Order.number`, `Exchange.number`, `AdminUser.dni`,
+`AdminUser.email`, `Role.name`.
+
+**Decisión técnica:** filtrado explícito (`findByIdAndTenantId`,
+`findByTenantId...`) en vez de un filtro automático de Hibernate. Es más
+código pero es imposible "olvidarse de activarlo" — alineado con la
+sección 15 de `propuesta_ecommerce_saas.txt` ("no confiar únicamente").
+Cada `get(id)` de cada service quedó como el único punto de entrada para
+mutar una entidad, y todos filtran por tenant — eso previene IDOR
+(que alguien de un tenant edite/borre algo de otro adivinando el id).
+
+**Jobs en background (@Scheduled) no tienen tenant de request:**
+`MarketingCampaignScheduler` no pasa por `TenantResolutionFilter` (no hay
+HTTP request). Se resuelve explícitamente: itera los tenants activos y
+setea `TenantContext` a mano antes de correr la campaña de cada uno — hoy
+un solo tenant, pero el loop ya queda listo para varios.
+
+**Verificado:** compila y los 28 tests pasan (tuve que arreglar un test que
+llamaba directo a un método de repository que cambió de firma).
+
+**Lo que esto NO hizo (a propósito, sigue diferido):**
+- Resolución de tenant por Host/dominio — `TenantResolutionFilter` sigue
+  resolviendo siempre "el único tenant activo", no lee el header `Host`.
+- El JWT no lleva un claim de tenant — no hace falta mientras haya un solo
+  tenant posible.
+- Generalizar talle → variante genérica (sigue siendo Fase 3, diferida).
+
+**Resuelto — pendiente operativo de la MySQL local:** como agregar
+`tenant_id` (NOT NULL) rompía el arranque contra la base MySQL local
+existente (`ddl-auto=update` no puede agregar una columna NOT NULL sin
+default a una tabla con filas), y no había nada importante cargado
+todavía, se decidió (con el usuario) aprovechar y **renombrar también la
+base de `estilos_pequenos` a `saasweb`** — ya no hace falta distinguir
+"identidad de código" de "identidad de datos" para el nombre de la DB en
+este punto. `application.yml` y los scripts `database/*.sql` (que siguen
+sin actualizar el ESQUEMA a la versión con `tenant_id` — sólo se les
+cambió el nombre de la base) quedaron apuntando a `saasweb`. La base vieja
+`estilos_pequenos` queda huérfana en MySQL (no se borró); se puede eliminar
+a mano (`DROP DATABASE estilos_pequenos;`) cuando se confirme que no hace
+falta. Al arrancar la app, `createDatabaseIfNotExist=true` crea `saasweb`
+desde cero con el esquema nuevo.
+
+### Fase 4 (histórico) — texto original antes de ejecutar, dejado como referencia
 Agregar `tenant_id` a las entidades CORE, hacer que los repositories/services
 filtren siempre por `TenantContext.getTenantId()`, convertir los 3
 singletons (`SiteSettings`, `MarketingConfig`) en "una fila por tenant", y
@@ -206,6 +274,17 @@ Ver `propuesta_ecommerce_saas.txt` secciones 2-4 y 15-16 para más detalle.
   para no reescribir trabajo. Implementada la Fase 3 (infraestructura de
   tenant: entidad `Tenant`, `TenantService`, `TenantContext`,
   `TenantResolutionFilter`) sin tocar ninguna entidad de negocio — aditivo,
-  compila, 28 tests en verde. Próximo paso: Fase 4 (tenant_id en entidades
-  CORE), pendiente confirmar el supuesto de `AdminUser`/`superAdmin` antes
-  de arrancar.
+  compila, 28 tests en verde.
+- **2026-09-15**: confirmado el supuesto (1 admin = 1 tenant, superadmin
+  fuera del esquema de tenant) y ejecutada la Fase 4 completa: `tenant_id`
+  en 13 entidades, filtrado explícito en todos los repositories/services,
+  SiteSettings/MarketingConfig pasaron de singleton a "una fila por
+  tenant", uniques compuestos donde correspondía. Compila y los 28 tests
+  pasan. Como no había datos importantes en la MySQL local, se decidió
+  además renombrar la base `estilos_pequenos` → `saasweb` (en vez de migrar
+  los datos existentes) — actualizado `application.yml`, `database/*.sql` y
+  `PROYECTO.md`/`README.md`. La base vieja queda huérfana en MySQL, sin
+  borrar. `database/*.sql` todavía no refleja el ESQUEMA con `tenant_id`
+  (sólo el nombre de la base) — pendiente. Próximo paso: retomar Fase 2
+  (repackage por feature) o seguir con las fases de negocio (5+) cuando
+  corresponda.

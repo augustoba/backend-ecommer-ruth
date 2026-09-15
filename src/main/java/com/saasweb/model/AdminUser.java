@@ -10,14 +10,25 @@ import java.time.Instant;
  * contra esta tabla y devuelve un JWT.
  */
 @Entity
-@Table(name = "admin_user")
+@Table(name = "admin_user", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"tenant_id", "dni"}),
+        @UniqueConstraint(columnNames = {"tenant_id", "email"})
+})
 public class AdminUser {
 
     @Id
     private String id;
 
+    /**
+     * Tenant al que pertenece este usuario. null = cuenta de plataforma
+     * (superadmin, ver {@link #superAdmin}) — no está atada a ninguna tienda.
+     * Todo admin/vendedor normal pertenece a un único tenant.
+     */
+    @Column(name = "tenant_id")
+    private String tenantId;
+
     /** Documento de identidad: es el identificador de login (reemplaza al username viejo). */
-    @Column(nullable = false, unique = true, length = 20)
+    @Column(nullable = false, length = 20)
     private String dni;
 
     @Column(nullable = false)
@@ -26,7 +37,7 @@ public class AdminUser {
     @Column(nullable = false)
     private String apellido;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String email;
 
     /** Hash BCrypt de la contraseña. */
@@ -69,6 +80,14 @@ public class AdminUser {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getDni() {

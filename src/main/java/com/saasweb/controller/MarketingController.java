@@ -5,6 +5,7 @@ import com.saasweb.dto.MarketingDtos.MarketingConfigResponse;
 import com.saasweb.dto.MarketingDtos.MarketingSendResponse;
 import com.saasweb.dto.MarketingDtos.PreviewResult;
 import com.saasweb.dto.MarketingDtos.RunResult;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.PageResponse;
 import com.saasweb.model.MarketingSend;
 import com.saasweb.repository.MarketingSendRepository;
@@ -72,7 +73,7 @@ public class MarketingController {
         ZoneId zone = ZoneId.systemDefault();
         var fromI = from != null ? from.atStartOfDay(zone).toInstant() : null;
         var toI = to != null ? to.plusDays(1).atStartOfDay(zone).toInstant() : null;
-        Page<MarketingSend> result = sendRepo.search(reason, status, fromI, toI,
+        Page<MarketingSend> result = sendRepo.search(TenantContext.getTenantId(), reason, status, fromI, toI,
                 PageRequest.of(Math.max(page, 0), capped));
         return PageResponse.of(result, result.map(MarketingSendResponse::from).getContent());
     }

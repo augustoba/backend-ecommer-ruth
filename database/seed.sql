@@ -7,13 +7,13 @@
 --  la primera vez que arranca con la base vacía).
 --
 --  Uso:
---    mysql -u root -p estilos_pequenos < database/seed.sql
+--    mysql -u root -p saasweb < database/seed.sql
 --
 --  Es idempotente: usa INSERT ... ON DUPLICATE KEY UPDATE, se puede correr
 --  varias veces sin romper nada.
 -- =============================================================================
 
-USE estilos_pequenos;
+USE saasweb;
 
 -- ---------------------------------------------------------------------------
 --  Datos del local (editables desde /admin/ajustes)

@@ -8,14 +8,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", uniqueConstraints = @UniqueConstraint(columnNames = {"tenant_id", "number"}))
 public class Order {
 
     @Id
     private String id;
 
-    /** Correlativo. `code` se deriva de acá: "PED-" + %04d. */
-    @Column(nullable = false, unique = true)
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
+    /** Correlativo (por tenant). `code` se deriva de acá: "PED-" + %04d. */
+    @Column(nullable = false)
     private long number;
 
     @Column(nullable = false)
@@ -122,6 +125,14 @@ public class Order {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public long getNumber() {

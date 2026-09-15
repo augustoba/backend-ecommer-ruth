@@ -1,6 +1,7 @@
 package com.saasweb.controller;
 
 import com.saasweb.common.Csv;
+import com.saasweb.common.TenantContext;
 import com.saasweb.model.Exchange;
 import com.saasweb.model.ExchangeLine;
 import com.saasweb.model.MarketingSend;
@@ -124,7 +125,7 @@ public class CsvExportController {
     @GetMapping("/marketing.csv")
     @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
     public ResponseEntity<String> marketingCsv() {
-        var page = marketingSends.search(null, null, null, null,
+        var page = marketingSends.search(TenantContext.getTenantId(), null, null, null, null,
                 org.springframework.data.domain.PageRequest.of(0, 100_000));
 
         Csv csv = Csv.withHeader("Fecha", "Email", "Motivo", "Cupon", "Estado", "Error");

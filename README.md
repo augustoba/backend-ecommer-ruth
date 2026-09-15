@@ -14,7 +14,7 @@ API REST del catálogo público y del panel de administración de **Estilos Pequ
 
 - JDK 21
 - MySQL 8 corriendo en `localhost:3306` (el service `MySQL80` en esta PC).
-  La base `estilos_pequenos` se crea sola (`createDatabaseIfNotExist=true`).
+  La base `saasweb` se crea sola (`createDatabaseIfNotExist=true`).
 - No hace falta Maven instalado: usá el wrapper `./mvnw`.
 
 ## Configurar credenciales

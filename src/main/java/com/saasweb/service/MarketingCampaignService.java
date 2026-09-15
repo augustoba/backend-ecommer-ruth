@@ -1,5 +1,6 @@
 package com.saasweb.service;
 
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.CouponDtos.CouponRequest;
 import com.saasweb.dto.MarketingDtos.CandidatePreview;
 import com.saasweb.dto.MarketingDtos.PreviewResult;
@@ -89,6 +90,7 @@ public class MarketingCampaignService {
         for (CandidatePreview candidate : toSend) {
             MarketingSend record = new MarketingSend();
             record.setId(UUID.randomUUID().toString());
+            record.setTenantId(TenantContext.getTenantId());
             record.setEmail(candidate.email());
             record.setReason(candidate.reason());
             record.setLifetimeSpendSnapshot(candidate.lifetimeSpend());
@@ -123,9 +125,10 @@ public class MarketingCampaignService {
      * inactivos por antigüedad de última compra.
      */
     private Candidates computeCandidates(MarketingConfig cfg) {
+        String tenantId = TenantContext.getTenantId();
         Instant cutoff = Instant.now().minus(cfg.getInactivityDays(), ChronoUnit.DAYS);
-        List<CustomerAggregateRow> inactive = orderRepo.findInactiveCustomers(cutoff);
-        List<CustomerAggregateRow> vip = orderRepo.findHighSpendCustomers(cfg.getSpendThreshold());
+        List<CustomerAggregateRow> inactive = orderRepo.findInactiveCustomers(tenantId, cutoff);
+        List<CustomerAggregateRow> vip = orderRepo.findHighSpendCustomers(tenantId, cfg.getSpendThreshold());
 
         LinkedHashMap<String, CandidatePreview> byEmail = new LinkedHashMap<>();
         for (CustomerAggregateRow row : vip) {
@@ -138,7 +141,7 @@ public class MarketingCampaignService {
         }
 
         Instant cooldownCutoff = Instant.now().minus(cfg.getCooldownDays(), ChronoUnit.DAYS);
-        Set<String> recentlySent = new HashSet<>(sendRepo.emailsSentSince(cooldownCutoff));
+        Set<String> recentlySent = new HashSet<>(sendRepo.emailsSentSince(tenantId, cooldownCutoff));
 
         List<CandidatePreview> vipList = new ArrayList<>();
         List<CandidatePreview> inactiveList = new ArrayList<>();
@@ -163,8 +166,8 @@ public class MarketingCampaignService {
         ZoneId zone = ZoneId.systemDefault();
         Instant startOfToday = LocalDate.now(zone).atStartOfDay(zone).toInstant();
         Instant startOfTomorrow = LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant();
-        return sendRepo.countBySentAtGreaterThanEqualAndSentAtLessThanAndStatus(
-                startOfToday, startOfTomorrow, MarketingSend.Status.SENT);
+        return sendRepo.countByTenantIdAndSentAtGreaterThanEqualAndSentAtLessThanAndStatus(
+                TenantContext.getTenantId(), startOfToday, startOfTomorrow, MarketingSend.Status.SENT);
     }
 
     private static String truncate(String s) {

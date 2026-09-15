@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, String> {
 
@@ -21,17 +22,21 @@ public interface OrderRepository extends JpaRepository<Order, String> {
         BigDecimal getLifetimeSpend();
     }
 
-    List<Order> findAllByOrderByCreatedAtDesc();
+    Optional<Order> findByIdAndTenantId(String id, String tenantId);
 
-    Page<Order> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    List<Order> findByTenantIdOrderByCreatedAtDesc(String tenantId);
+
+    Page<Order> findByTenantIdOrderByCreatedAtDesc(String tenantId, Pageable pageable);
 
     /**
      * Listado del panel con filtros opcionales: estado, rango de fechas de
-     * creación, y texto (nombre del cliente o número de pedido).
+     * creación, y texto (nombre del cliente o número de pedido). Siempre
+     * acotado al tenant actual.
      */
     @Query("""
             select o from Order o
-            where (:status is null or o.status = :status)
+            where o.tenantId = :tenantId
+              and (:status is null or o.status = :status)
               and (:from is null or o.createdAt >= :from)
               and (:to is null or o.createdAt < :to)
               and (:search is null
@@ -39,7 +44,8 @@ public interface OrderRepository extends JpaRepository<Order, String> {
                    or o.number = :searchNum)
             order by o.createdAt desc
             """)
-    Page<Order> search(@Param("status") OrderStatus status,
+    Page<Order> search(@Param("tenantId") String tenantId,
+                       @Param("status") OrderStatus status,
                        @Param("from") Instant from,
                        @Param("to") Instant to,
                        @Param("search") String search,
@@ -47,40 +53,42 @@ public interface OrderRepository extends JpaRepository<Order, String> {
                        @Param("searchNum") long searchNum,
                        Pageable pageable);
 
-    java.util.Optional<Order> findByNumber(long number);
+    Optional<Order> findByTenantIdAndNumber(String tenantId, long number);
 
-    long countByStatus(OrderStatus status);
+    long countByTenantIdAndStatus(String tenantId, OrderStatus status);
 
     /** Pedidos de un estado con `processedAt` dentro del rango [from, to). Para métricas. */
-    List<Order> findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
-            OrderStatus status, Instant from, Instant to);
+    List<Order> findByTenantIdAndStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
+            String tenantId, OrderStatus status, Instant from, Instant to);
 
     /** Igual, pero sólo lo que confirmó/cobró un usuario puntual. Para la caja de un turno. */
-    List<Order> findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThanAndConfirmedByDni(
-            OrderStatus status, Instant from, Instant to, String confirmedByDni);
+    List<Order> findByTenantIdAndStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThanAndConfirmedByDni(
+            String tenantId, OrderStatus status, Instant from, Instant to, String confirmedByDni);
 
-    @Query("select coalesce(max(o.number), 0) from Order o")
-    long maxNumber();
+    @Query("select coalesce(max(o.number), 0) from Order o where o.tenantId = :tenantId")
+    long maxNumber(@Param("tenantId") String tenantId);
 
     /** Segmento "inactivos": clientes cuyo último pedido procesado es anterior a `cutoff`. */
     @Query("""
             select o.customerEmail as email, max(o.processedAt) as lastOrderAt, sum(o.total) as lifetimeSpend
             from Order o
-            where o.status = com.saasweb.model.OrderStatus.PROCESADO
+            where o.tenantId = :tenantId
+              and o.status = com.saasweb.model.OrderStatus.PROCESADO
               and o.customerEmail is not null
             group by o.customerEmail
             having max(o.processedAt) < :cutoff
             """)
-    List<CustomerAggregateRow> findInactiveCustomers(@Param("cutoff") Instant cutoff);
+    List<CustomerAggregateRow> findInactiveCustomers(@Param("tenantId") String tenantId, @Param("cutoff") Instant cutoff);
 
     /** Segmento "VIP": clientes cuyo gasto acumulado (pedidos procesados) supera `threshold`. */
     @Query("""
             select o.customerEmail as email, max(o.processedAt) as lastOrderAt, sum(o.total) as lifetimeSpend
             from Order o
-            where o.status = com.saasweb.model.OrderStatus.PROCESADO
+            where o.tenantId = :tenantId
+              and o.status = com.saasweb.model.OrderStatus.PROCESADO
               and o.customerEmail is not null
             group by o.customerEmail
             having sum(o.total) > :threshold
             """)
-    List<CustomerAggregateRow> findHighSpendCustomers(@Param("threshold") BigDecimal threshold);
+    List<CustomerAggregateRow> findHighSpendCustomers(@Param("tenantId") String tenantId, @Param("threshold") BigDecimal threshold);
 }

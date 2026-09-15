@@ -2,6 +2,7 @@ package com.saasweb.service;
 
 import com.saasweb.common.BadRequestException;
 import com.saasweb.common.ResourceNotFoundException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.CouponDtos.CouponCheckResponse;
 import com.saasweb.dto.CouponDtos.CouponRequest;
 import com.saasweb.model.Coupon;
@@ -31,17 +32,19 @@ public class CouponService {
 
     @Transactional(readOnly = true)
     public List<Coupon> findAll() {
-        return repo.findAllByOrderByCreatedAtDesc();
+        return repo.findByTenantIdOrderByCreatedAtDesc(TenantContext.getTenantId());
     }
 
     @Transactional(readOnly = true)
     public Coupon get(String id) {
-        return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Cupón", id));
+        return repo.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Cupón", id));
     }
 
     /** Crea uno o varios cupones (según `count`). Devuelve los creados. */
     public List<Coupon> create(CouponRequest req) {
         validateValue(req);
+        String tenantId = TenantContext.getTenantId();
         int count = req.count() != null && req.count() > 1 ? req.count() : 1;
 
         List<Coupon> created = new ArrayList<>();
@@ -49,17 +52,17 @@ public class CouponService {
             String code = req.code() != null && !req.code().isBlank()
                     ? normalize(req.code())
                     : generateCode(req.codePrefix());
-            if (repo.existsByCodeIgnoreCase(code)) {
+            if (repo.existsByTenantIdAndCodeIgnoreCase(tenantId, code)) {
                 throw new BadRequestException("Ya existe un cupón con el código " + code + ".");
             }
-            created.add(repo.save(build(code, req)));
+            created.add(repo.save(build(code, req, tenantId)));
         } else {
             for (int i = 0; i < count; i++) {
                 String code;
                 do {
                     code = generateCode(req.codePrefix());
-                } while (repo.existsByCodeIgnoreCase(code));
-                created.add(repo.save(build(code, req)));
+                } while (repo.existsByTenantIdAndCodeIgnoreCase(tenantId, code));
+                created.add(repo.save(build(code, req, tenantId)));
             }
         }
         return created;
@@ -70,7 +73,7 @@ public class CouponService {
         Coupon c = get(id);
         if (req.code() != null && !req.code().isBlank()) {
             String code = normalize(req.code());
-            if (!code.equalsIgnoreCase(c.getCode()) && repo.existsByCodeIgnoreCase(code)) {
+            if (!code.equalsIgnoreCase(c.getCode()) && repo.existsByTenantIdAndCodeIgnoreCase(c.getTenantId(), code)) {
                 throw new BadRequestException("Ya existe un cupón con el código " + code + ".");
             }
             c.setCode(code);
@@ -101,7 +104,7 @@ public class CouponService {
     /** Valida un código para un subtotal dado. No lo consume. Tira 400 con el motivo si no sirve. */
     @Transactional(readOnly = true)
     public CouponCheckResponse check(String code, BigDecimal subtotal) {
-        Coupon c = repo.findByCodeIgnoreCase(normalize(code))
+        Coupon c = repo.findByTenantIdAndCodeIgnoreCase(TenantContext.getTenantId(), normalize(code))
                 .orElseThrow(() -> new BadRequestException("El cupón no existe."));
         assertUsable(c, subtotal);
         BigDecimal amount = discountFor(c, subtotal);
@@ -117,7 +120,7 @@ public class CouponService {
      * subtotal. Se llama al crear el pedido. Tira 400 con el motivo si no sirve.
      */
     public Redemption redeem(String code, BigDecimal subtotal) {
-        Coupon c = repo.findByCodeIgnoreCase(normalize(code))
+        Coupon c = repo.findByTenantIdAndCodeIgnoreCase(TenantContext.getTenantId(), normalize(code))
                 .orElseThrow(() -> new BadRequestException("El cupón no existe."));
         assertUsable(c, subtotal);
         c.setUsedCount(c.getUsedCount() + 1);
@@ -127,7 +130,7 @@ public class CouponService {
 
     @Transactional(readOnly = true)
     public Coupon findByCode(String code) {
-        return repo.findByCodeIgnoreCase(normalize(code)).orElse(null);
+        return repo.findByTenantIdAndCodeIgnoreCase(TenantContext.getTenantId(), normalize(code)).orElse(null);
     }
 
     private void assertUsable(Coupon c, BigDecimal subtotal) {
@@ -147,9 +150,10 @@ public class CouponService {
         return amount.min(subtotal).max(BigDecimal.ZERO);
     }
 
-    private Coupon build(String code, CouponRequest req) {
+    private Coupon build(String code, CouponRequest req, String tenantId) {
         Coupon c = new Coupon();
         c.setId(UUID.randomUUID().toString());
+        c.setTenantId(tenantId);
         c.setCode(code);
         c.setKind(req.kind());
         c.setValue(req.value());

@@ -2,6 +2,7 @@ package com.saasweb.service;
 
 import com.saasweb.common.BadRequestException;
 import com.saasweb.common.ResourceNotFoundException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.DiscountDtos.CartDiscountResult;
 import com.saasweb.dto.OrderDtos.CartItem;
 import com.saasweb.dto.OrderDtos.CreateOrderRequest;
@@ -56,17 +57,18 @@ public class OrderService {
     /** Resuelve el nombre a mostrar de un usuario del panel a partir de su DNI. */
     private String nameByDni(String dni) {
         if (dni == null || dni.isBlank()) return null;
-        return adminUsers.findByDni(dni).map(u -> u.getNombre() + " " + u.getApellido()).orElse(null);
+        return adminUsers.findByDniForTenant(dni, TenantContext.getTenantId())
+                .map(u -> u.getNombre() + " " + u.getApellido()).orElse(null);
     }
 
     @Transactional(readOnly = true)
     public List<Order> findAll() {
-        return repo.findAllByOrderByCreatedAtDesc();
+        return repo.findByTenantIdOrderByCreatedAtDesc(TenantContext.getTenantId());
     }
 
     @Transactional(readOnly = true)
     public org.springframework.data.domain.Page<Order> findAll(org.springframework.data.domain.Pageable pageable) {
-        return repo.findAllByOrderByCreatedAtDesc(pageable);
+        return repo.findByTenantIdOrderByCreatedAtDesc(TenantContext.getTenantId(), pageable);
     }
 
     private final ZoneId zone = ZoneId.systemDefault();
@@ -92,12 +94,13 @@ public class OrderService {
                 try { num = Long.parseLong(digits); } catch (NumberFormatException ignored) { /* -1 */ }
             }
         }
-        return repo.search(status, fromI, toI, s, like, num, pageable);
+        return repo.search(TenantContext.getTenantId(), status, fromI, toI, s, like, num, pageable);
     }
 
     @Transactional(readOnly = true)
     public Order get(String id) {
-        return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Pedido", id));
+        return repo.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Pedido", id));
     }
 
     /**
@@ -117,21 +120,23 @@ public class OrderService {
         } catch (NumberFormatException e) {
             throw ResourceNotFoundException.of("Pedido", code);
         }
-        return repo.findByNumber(number)
+        return repo.findByTenantIdAndNumber(TenantContext.getTenantId(), number)
                 .filter(o -> o.getCustomerName().trim().equalsIgnoreCase(name.trim()))
                 .orElseThrow(() -> ResourceNotFoundException.of("Pedido", code));
     }
 
     @Transactional(readOnly = true)
     public long pendingCount() {
-        return repo.countByStatus(OrderStatus.PENDIENTE);
+        return repo.countByTenantIdAndStatus(TenantContext.getTenantId(), OrderStatus.PENDIENTE);
     }
 
     /** Crea el pedido desde el carrito: totales + descuentos calculados server-side. */
     public Order create(CreateOrderRequest req) {
+        String tenantId = TenantContext.getTenantId();
         Order order = new Order();
         order.setId(UUID.randomUUID().toString());
-        order.setNumber(repo.maxNumber() + 1);
+        order.setTenantId(tenantId);
+        order.setNumber(repo.maxNumber(tenantId) + 1);
         order.setCustomerName(
                 req.customerName() == null || req.customerName().isBlank()
                         ? "Sin nombre" : req.customerName().trim());
@@ -155,7 +160,7 @@ public class OrderService {
 
         List<CartLineInput> discountInput = new ArrayList<>();
         for (CartItem item : req.items()) {
-            Product p = productRepo.findById(item.productId())
+            Product p = productRepo.findByIdAndTenantId(item.productId(), tenantId)
                     .orElseThrow(() -> ResourceNotFoundException.of("Producto", item.productId()));
 
             OrderLine line = new OrderLine();
@@ -267,7 +272,7 @@ public class OrderService {
         List<String> shortages = new ArrayList<>();
         for (OrderLine l : order.getLines()) {
             if (!l.isAccepted()) continue;
-            int available = productRepo.findById(l.getProductId())
+            int available = productRepo.findByIdAndTenantId(l.getProductId(), order.getTenantId())
                     .map(p -> p.getSizeStocks().stream()
                             .filter(s -> s.getSize().equals(l.getSize()))
                             .mapToInt(com.saasweb.model.SizeStock::getStock)

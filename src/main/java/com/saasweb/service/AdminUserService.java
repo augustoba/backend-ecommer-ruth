@@ -2,6 +2,7 @@ package com.saasweb.service;
 
 import com.saasweb.common.BadRequestException;
 import com.saasweb.common.ResourceNotFoundException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.AdminUserDtos.CreateUserRequest;
 import com.saasweb.dto.AdminUserDtos.UpdateUserRequest;
 import com.saasweb.model.AdminUser;
@@ -32,28 +33,31 @@ public class AdminUserService {
 
     @Transactional(readOnly = true)
     public List<AdminUser> findAll() {
-        return users.findAllByOrderByCreatedAtAsc();
+        return users.findByTenantIdOrderByCreatedAtAsc(TenantContext.getTenantId());
     }
 
     @Transactional(readOnly = true)
     public AdminUser get(String id) {
-        return users.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Usuario", id));
+        return users.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Usuario", id));
     }
 
     public AdminUser create(CreateUserRequest req, String actingDni) {
+        String tenantId = TenantContext.getTenantId();
         String dni = req.dni().trim();
-        if (users.existsByDniIgnoreCase(dni)) {
+        if (users.existsByTenantIdAndDniIgnoreCase(tenantId, dni)) {
             throw new BadRequestException("Ya existe un usuario con ese DNI.");
         }
-        if (users.existsByEmailIgnoreCase(req.email().trim())) {
+        if (users.existsByTenantIdAndEmailIgnoreCase(tenantId, req.email().trim())) {
             throw new BadRequestException("Ya existe un usuario con ese email.");
         }
-        Role role = roles.findById(req.roleId())
+        Role role = roles.findByIdForTenant(req.roleId(), tenantId)
                 .orElseThrow(() -> new BadRequestException("El rol elegido no existe."));
         assertCanAssign(role, actingDni);
 
         AdminUser u = new AdminUser();
         u.setId(UUID.randomUUID().toString());
+        u.setTenantId(tenantId);
         u.setDni(dni);
         u.setNombre(req.nombre().trim());
         u.setApellido(req.apellido().trim());
@@ -69,7 +73,7 @@ public class AdminUserService {
         boolean editingSelf = u.getDni().equalsIgnoreCase(actingDni);
 
         if (req.roleId() != null && !req.roleId().isBlank()) {
-            Role role = roles.findById(req.roleId())
+            Role role = roles.findByIdForTenant(req.roleId(), TenantContext.getTenantId())
                     .orElseThrow(() -> new BadRequestException("El rol elegido no existe."));
             if (editingSelf && u.isSystemAdmin() && !role.isSystem()) {
                 throw new BadRequestException("No podés sacarte a vos mismo el rol de Superadmin.");
@@ -86,13 +90,13 @@ public class AdminUserService {
         if (req.nombre() != null && !req.nombre().isBlank()) u.setNombre(req.nombre().trim());
         if (req.apellido() != null && !req.apellido().isBlank()) u.setApellido(req.apellido().trim());
         if (req.dni() != null && !req.dni().isBlank() && !req.dni().trim().equalsIgnoreCase(u.getDni())) {
-            if (users.existsByDniIgnoreCase(req.dni().trim())) {
+            if (users.existsByTenantIdAndDniIgnoreCase(TenantContext.getTenantId(), req.dni().trim())) {
                 throw new BadRequestException("Ya existe un usuario con ese DNI.");
             }
             u.setDni(req.dni().trim());
         }
         if (req.email() != null && !req.email().isBlank() && !req.email().trim().equalsIgnoreCase(u.getEmail())) {
-            if (users.existsByEmailIgnoreCase(req.email().trim())) {
+            if (users.existsByTenantIdAndEmailIgnoreCase(TenantContext.getTenantId(), req.email().trim())) {
                 throw new BadRequestException("Ya existe un usuario con ese email.");
             }
             u.setEmail(req.email().trim());
@@ -115,7 +119,7 @@ public class AdminUserService {
     }
 
     private long countSystemAdmins() {
-        return users.findAll().stream().filter(AdminUser::isSystemAdmin).count();
+        return users.countByRoleSystemTrue();
     }
 
     /**
@@ -125,7 +129,7 @@ public class AdminUserService {
      */
     private void assertCanAssign(Role role, String actingDni) {
         if (!role.isSystem()) return;
-        AdminUser acting = users.findByDni(actingDni).orElse(null);
+        AdminUser acting = users.findByDniForTenant(actingDni, TenantContext.getTenantId()).orElse(null);
         if (acting == null || !acting.isSystemAdmin()) {
             throw new BadRequestException("Sólo un superadmin puede asignar el rol Superadmin.");
         }

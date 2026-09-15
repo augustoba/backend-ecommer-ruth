@@ -1,6 +1,7 @@
 package com.saasweb.service;
 
 import com.saasweb.common.ResourceNotFoundException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.HeroSlideDtos.SlideRequest;
 import com.saasweb.model.HeroSlide;
 import com.saasweb.repository.HeroSlideRepository;
@@ -22,15 +23,17 @@ public class HeroSlideService {
 
     @Transactional(readOnly = true)
     public List<HeroSlide> findAll() {
-        return repo.findAllByOrderByPositionAsc();
+        return repo.findByTenantIdOrderByPositionAsc(TenantContext.getTenantId());
     }
 
     public HeroSlide create(SlideRequest req) {
+        String tenantId = TenantContext.getTenantId();
         HeroSlide s = new HeroSlide();
         s.setId(UUID.randomUUID().toString());
+        s.setTenantId(tenantId);
         s.setImageUrl(req.imageUrl().trim());
         s.setAlt(alt(req.alt()));
-        s.setPosition(repo.count() == 0 ? 0 : (int) repo.count());
+        s.setPosition((int) repo.countByTenantId(tenantId));
         return repo.save(s);
     }
 
@@ -46,17 +49,19 @@ public class HeroSlideService {
     }
 
     public List<HeroSlide> reorder(List<String> ids) {
-        List<HeroSlide> all = repo.findAllByOrderByPositionAsc();
+        String tenantId = TenantContext.getTenantId();
+        List<HeroSlide> all = repo.findByTenantIdOrderByPositionAsc(tenantId);
         for (HeroSlide s : all) {
             int idx = ids.indexOf(s.getId());
             s.setPosition(idx >= 0 ? idx : ids.size());
         }
         repo.saveAll(all);
-        return repo.findAllByOrderByPositionAsc();
+        return repo.findByTenantIdOrderByPositionAsc(tenantId);
     }
 
     private HeroSlide get(String id) {
-        return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Foto del carrusel", id));
+        return repo.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Foto del carrusel", id));
     }
 
     private static String alt(String alt) {

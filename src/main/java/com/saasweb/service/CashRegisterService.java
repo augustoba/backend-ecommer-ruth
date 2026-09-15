@@ -1,5 +1,6 @@
 package com.saasweb.service;
 
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.CashRegisterDtos.CashRegisterResponse;
 import com.saasweb.dto.CashRegisterDtos.MethodRow;
 import com.saasweb.model.Exchange;
@@ -54,9 +55,12 @@ public class CashRegisterService {
         Instant from = day.atStartOfDay(zone).toInstant();
         Instant to = day.plusDays(1).atStartOfDay(zone).toInstant();
 
+        String tenantId = TenantContext.getTenantId();
         List<Order> orders = orderRepo
-                .findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(OrderStatus.PROCESADO, from, to);
-        List<Exchange> exchanges = exchangeRepo.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(from, to);
+                .findByTenantIdAndStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
+                        tenantId, OrderStatus.PROCESADO, from, to);
+        List<Exchange> exchanges = exchangeRepo.findByTenantIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                tenantId, from, to);
         return build(day.toString(), orders, exchanges);
     }
 
@@ -70,10 +74,12 @@ public class CashRegisterService {
         Instant from = shift.getOpenedAt();
         Instant to = shift.getClosedAt() != null ? shift.getClosedAt() : Instant.now();
 
-        List<Order> orders = orderRepo.findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThanAndConfirmedByDni(
-                OrderStatus.PROCESADO, from, to, shift.getUserDni());
-        List<Exchange> exchanges = exchangeRepo.findByCreatedAtGreaterThanEqualAndCreatedAtLessThanAndProcessedByDni(
-                from, to, shift.getUserDni());
+        List<Order> orders = orderRepo
+                .findByTenantIdAndStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThanAndConfirmedByDni(
+                        shift.getTenantId(), OrderStatus.PROCESADO, from, to, shift.getUserDni());
+        List<Exchange> exchanges = exchangeRepo
+                .findByTenantIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanAndProcessedByDni(
+                        shift.getTenantId(), from, to, shift.getUserDni());
         return build("Turno de " + shift.getUserName(), orders, exchanges);
     }
 

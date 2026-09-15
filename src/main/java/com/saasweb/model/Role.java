@@ -15,13 +15,17 @@ import java.util.Set;
  * de permisos — ver {@code RoleService.ensureRole}.
  */
 @Entity
-@Table(name = "role")
+@Table(name = "role", uniqueConstraints = @UniqueConstraint(columnNames = {"tenant_id", "name"}))
 public class Role {
 
     @Id
     private String id;
 
-    @Column(nullable = false, unique = true, length = 60)
+    /** null = rol de plataforma (el rol de sistema "Superadmin"), compartido, no atado a un tenant. */
+    @Column(name = "tenant_id")
+    private String tenantId;
+
+    @Column(nullable = false, length = 60)
     private String name;
 
     /** true = rol de sistema ("Superadmin"): todos los permisos, no editable. */
@@ -49,6 +53,14 @@ public class Role {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getName() {

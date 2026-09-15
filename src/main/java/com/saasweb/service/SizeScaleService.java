@@ -3,6 +3,7 @@ package com.saasweb.service;
 import com.saasweb.common.BadRequestException;
 import com.saasweb.common.ResourceNotFoundException;
 import com.saasweb.common.Slugs;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.SizeScaleDtos.ScaleRequest;
 import com.saasweb.model.SizeScale;
 import com.saasweb.repository.SizeScaleRepository;
@@ -25,17 +26,19 @@ public class SizeScaleService {
 
     @Transactional(readOnly = true)
     public List<SizeScale> findAll() {
-        return repo.findAll();
+        return repo.findByTenantId(TenantContext.getTenantId());
     }
 
     @Transactional(readOnly = true)
     public SizeScale get(String id) {
-        return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Escala de talle", id));
+        return repo.findByIdAndTenantId(id, TenantContext.getTenantId())
+                .orElseThrow(() -> ResourceNotFoundException.of("Escala de talle", id));
     }
 
     public SizeScale create(ScaleRequest req) {
         SizeScale s = new SizeScale();
         s.setId("escala-" + Slugs.slug(req.name()) + "-" + Slugs.shortRandom());
+        s.setTenantId(TenantContext.getTenantId());
         s.setName(req.name().trim());
         s.setSystem(false);
         s.setValues(dedupe(req.values()));

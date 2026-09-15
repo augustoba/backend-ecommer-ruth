@@ -1,7 +1,7 @@
 -- =============================================================================
 --  Estilos Pequeños — instalación completa de la base (MySQL 8)
 -- =============================================================================
---  UN SOLO script: crea la base `estilos_pequenos`, todas las tablas y la
+--  UN SOLO script: crea la base `saasweb`, todas las tablas y la
 --  config base (admin, parametrías, escalas de talle, descuentos). Es lo que se
 --  corre en un servidor nuevo al desplegar.
 --
@@ -40,9 +40,9 @@
 --  chequea que el esquema coincida con las entidades al arrancar.
 -- =============================================================================
 
-CREATE DATABASE IF NOT EXISTS estilos_pequenos
+CREATE DATABASE IF NOT EXISTS saasweb
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE estilos_pequenos;
+USE saasweb;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -277,13 +277,13 @@ SET FOREIGN_KEY_CHECKS = 1;
 --  la primera vez que arranca con la base vacía).
 --
 --  Uso:
---    mysql -u root -p estilos_pequenos < database/seed.sql
+--    mysql -u root -p saasweb < database/seed.sql
 --
 --  Es idempotente: usa INSERT ... ON DUPLICATE KEY UPDATE, se puede correr
 --  varias veces sin romper nada.
 -- =============================================================================
 
-USE estilos_pequenos;
+USE saasweb;
 
 -- ---------------------------------------------------------------------------
 --  Datos del local (editables desde /admin/config)

@@ -17,6 +17,9 @@ public class MarketingSend {
     @Id
     private String id;
 
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     @Column(nullable = false, length = 200)
     private String email;
 
@@ -50,6 +53,14 @@ public class MarketingSend {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getEmail() {

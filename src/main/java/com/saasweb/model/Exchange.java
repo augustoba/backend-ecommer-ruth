@@ -15,14 +15,17 @@ import java.util.List;
  * cliente ({@code difference} negativo).
  */
 @Entity
-@Table(name = "exchange")
+@Table(name = "exchange", uniqueConstraints = @UniqueConstraint(columnNames = {"tenant_id", "number"}))
 public class Exchange {
 
     @Id
     private String id;
 
-    /** Correlativo → code "CAM-0001". */
-    @Column(nullable = false, unique = true)
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
+    /** Correlativo (por tenant) → code "CAM-0001". */
+    @Column(nullable = false)
     private long number;
 
     @Column(nullable = false)
@@ -78,6 +81,14 @@ public class Exchange {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public long getNumber() {

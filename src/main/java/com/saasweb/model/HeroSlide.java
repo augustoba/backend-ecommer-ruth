@@ -10,6 +10,9 @@ public class HeroSlide {
     @Id
     private String id;
 
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     /** URL o data URI de la imagen. */
     @Column(nullable = false, length = 5_000_000)
     private String imageUrl;
@@ -26,6 +29,14 @@ public class HeroSlide {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getImageUrl() {

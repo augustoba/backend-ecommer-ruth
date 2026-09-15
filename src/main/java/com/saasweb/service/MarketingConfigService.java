@@ -1,6 +1,7 @@
 package com.saasweb.service;
 
 import com.saasweb.common.BadRequestException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.dto.MarketingDtos.MarketingConfigRequest;
 import com.saasweb.model.MarketingConfig;
 import com.saasweb.repository.MarketingConfigRepository;
@@ -17,9 +18,14 @@ public class MarketingConfigService {
         this.repo = repo;
     }
 
-    /** Devuelve la config; si no existe, la crea con los valores por defecto. */
+    /** Devuelve la config del tenant actual; si no existe, la crea con los valores por defecto. */
     public MarketingConfig get() {
-        return repo.findById(MarketingConfig.SINGLETON_ID).orElseGet(() -> repo.save(new MarketingConfig()));
+        String tenantId = TenantContext.getTenantId();
+        return repo.findById(tenantId).orElseGet(() -> {
+            MarketingConfig c = new MarketingConfig();
+            c.setId(tenantId);
+            return repo.save(c);
+        });
     }
 
     public MarketingConfig update(MarketingConfigRequest req) {

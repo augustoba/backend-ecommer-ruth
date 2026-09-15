@@ -2,6 +2,7 @@ package com.saasweb.service;
 
 import com.saasweb.common.BadRequestException;
 import com.saasweb.common.ResourceNotFoundException;
+import com.saasweb.common.TenantContext;
 import com.saasweb.config.AppProperties;
 import com.saasweb.config.JwtService;
 import com.saasweb.model.AdminUser;
@@ -51,7 +52,7 @@ public class AuthService {
      */
     public JwtService.TokenData login(String dni, String rawPassword, String clientIp) {
         loginAttempts.assertNotBlocked(clientIp, dni);
-        AdminUser user = users.findByDni(dni == null ? "" : dni.trim())
+        AdminUser user = users.findByDniForTenant(dni == null ? "" : dni.trim(), TenantContext.getTenantId())
                 .filter(AdminUser::isEnabled)
                 .orElse(null);
         if (user == null || !passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
@@ -69,7 +70,7 @@ public class AuthService {
      */
     public void forgotPassword(String dni, String clientIp) {
         loginAttempts.assertNotBlocked(clientIp, dni);
-        AdminUser user = users.findByDni(dni == null ? "" : dni.trim())
+        AdminUser user = users.findByDniForTenant(dni == null ? "" : dni.trim(), TenantContext.getTenantId())
                 .filter(AdminUser::isEnabled)
                 .orElse(null);
         if (user == null) {
@@ -104,21 +105,22 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AdminUser get(String dni) {
-        return users.findByDni(dni.trim())
+        return users.findByDniForTenant(dni.trim(), TenantContext.getTenantId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Usuario", dni));
     }
 
     /**
      * Crea la cuenta inicial de la dueña de la tienda si no existe (password
      * desde `app.admin.*`, hasheada), con rol "Administrador" (normal, no
-     * system). Se llama desde el DataSeeder.
+     * system). Se llama desde el DataSeeder, una vez por tenant.
      */
-    public void ensureInitialAdmin() {
-        Role adminRole = roles.findByNameIgnoreCase("Administrador").orElse(null);
+    public void ensureInitialAdmin(String tenantId) {
+        Role adminRole = roles.findByTenantIdAndNameIgnoreCase(tenantId, "Administrador").orElse(null);
         String dni = props.getAdmin().getDni();
-        if (users.findByDni(dni).isPresent()) return;
+        if (users.findByDniAndTenantId(dni, tenantId).isPresent()) return;
         AdminUser admin = new AdminUser();
         admin.setId(UUID.randomUUID().toString());
+        admin.setTenantId(tenantId);
         admin.setDni(dni);
         admin.setNombre(props.getAdmin().getNombre());
         admin.setApellido(props.getAdmin().getApellido());
@@ -141,10 +143,11 @@ public class AuthService {
     public void ensureInitialSuperadmin() {
         Role superadminRole = roles.findFirstBySystemTrue().orElse(null);
         String dni = props.getSuperadmin().getDni();
-        AdminUser superadmin = users.findByDni(dni).orElse(null);
+        AdminUser superadmin = users.findByDniAndTenantIdIsNull(dni).orElse(null);
         if (superadmin == null) {
             superadmin = new AdminUser();
             superadmin.setId(UUID.randomUUID().toString());
+            superadmin.setTenantId(null);
             superadmin.setDni(dni);
             superadmin.setNombre(props.getSuperadmin().getNombre());
             superadmin.setApellido(props.getSuperadmin().getApellido());
@@ -169,7 +172,7 @@ public class AuthService {
     }
 
     private AdminUser enabledByDni(String dni) {
-        return users.findByDni(dni == null ? "" : dni.trim())
+        return users.findByDniForTenant(dni == null ? "" : dni.trim(), TenantContext.getTenantId())
                 .filter(AdminUser::isEnabled)
                 .orElseThrow(() -> new BadCredentialsException("DNI o contraseña incorrectos"));
     }

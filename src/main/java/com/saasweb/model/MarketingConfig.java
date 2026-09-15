@@ -5,18 +5,18 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 
 /**
- * Configuración de las campañas automáticas de cupón por email (una sola fila,
- * como {@link SiteSettings}). Mientras `enabled` esté en false, el job diario
- * corre pero no manda nada (no-op seguro hasta cargar credenciales de mail reales).
+ * Configuración de las campañas automáticas de cupón por email (una fila por
+ * tenant, igual que {@link SiteSettings} — el id de la fila ES el id del
+ * tenant). Mientras `enabled` esté en false, el job diario corre pero no
+ * manda nada para ese tenant (no-op seguro hasta cargar credenciales de mail reales).
  */
 @Entity
 @Table(name = "marketing_config")
 public class MarketingConfig {
 
-    public static final String SINGLETON_ID = "config";
-
+    /** Id del tenant dueño de esta config. */
     @Id
-    private String id = SINGLETON_ID;
+    private String id;
 
     @Column(nullable = false)
     private boolean enabled = false;
