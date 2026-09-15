@@ -25,12 +25,13 @@ public class SiteSettingsService {
      * llama {@code TenantProvisioningService} antes de que nadie pida
      * {@link #get()} para ese tenant.
      */
-    public SiteSettings createFor(String tenantId, String storeName, String theme) {
+    public SiteSettings createFor(String tenantId, String storeName, String theme, String logoUrl) {
         SiteSettings s = new SiteSettings();
         s.setId(tenantId);
         s.setTheme(theme);
         s.setStoreName(storeName);
         s.setWhatsappNumber("5491100000000");
+        s.setLogoUrl(logoUrl);
         return repo.save(s);
     }
 

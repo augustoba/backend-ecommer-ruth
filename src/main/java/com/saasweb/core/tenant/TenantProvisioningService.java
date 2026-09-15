@@ -1,5 +1,7 @@
 package com.saasweb.core.tenant;
 
+import com.saasweb.core.hero.HeroSlide;
+import com.saasweb.core.hero.HeroSlideRepository;
 import com.saasweb.core.page.PageBlockService;
 import com.saasweb.core.param.ParamGroup;
 import com.saasweb.core.param.ParamOption;
@@ -15,8 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -47,24 +47,29 @@ public class TenantProvisioningService {
     private final ProductRepository productRepo;
     private final SiteSettingsService siteSettingsService;
     private final PageBlockService pageBlockService;
+    private final HeroSlideRepository heroSlideRepo;
 
     public TenantProvisioningService(TenantService tenantService, ParamRepository paramRepo,
                                      SizeScaleRepository sizeScaleRepo, ProductRepository productRepo,
-                                     SiteSettingsService siteSettingsService, PageBlockService pageBlockService) {
+                                     SiteSettingsService siteSettingsService, PageBlockService pageBlockService,
+                                     HeroSlideRepository heroSlideRepo) {
         this.tenantService = tenantService;
         this.paramRepo = paramRepo;
         this.sizeScaleRepo = sizeScaleRepo;
         this.productRepo = productRepo;
         this.siteSettingsService = siteSettingsService;
         this.pageBlockService = pageBlockService;
+        this.heroSlideRepo = heroSlideRepo;
     }
 
     public Tenant provision(String name, String slug, Rubro rubro) {
         Tenant tenant = tenantService.create(name, slug, rubro);
         String tenantId = tenant.getId();
 
-        siteSettingsService.createFor(tenantId, name, rubro.getDefaultTheme());
+        siteSettingsService.createFor(tenantId, name, rubro.getDefaultTheme(),
+                RubroImages.logo(rubro.getLogoEmoji(), rubro.getLogoColor()));
         pageBlockService.ensureDefaultHomeBlocks(tenantId);
+        seedHeroSlides(tenantId, rubro);
 
         switch (rubro) {
             case ROPA -> seedRopa(tenantId);
@@ -72,6 +77,21 @@ public class TenantProvisioningService {
             case REPUESTOS -> seedRepuestos(tenantId);
         }
         return tenant;
+    }
+
+    /** Fotos del carrusel de la home, para que una tienda nueva nunca arranque sin carrusel (ver PLAN_SAAS.md Fase 9). */
+    private void seedHeroSlides(String tenantId, Rubro rubro) {
+        List<RubroImages.Slide> slides = RubroImages.heroSlidesFor(rubro);
+        for (int i = 0; i < slides.size(); i++) {
+            RubroImages.Slide slide = slides.get(i);
+            HeroSlide hs = new HeroSlide();
+            hs.setId(UUID.randomUUID().toString());
+            hs.setTenantId(tenantId);
+            hs.setImageUrl(slide.imageDataUri());
+            hs.setAlt(slide.alt());
+            hs.setPosition(i);
+            heroSlideRepo.save(hs);
+        }
     }
 
     // --- Ropa (genérica — la tienda piloto tiene su propio seed más grande en DataSeeder) ---
@@ -243,20 +263,11 @@ public class TenantProvisioningService {
         p.setDescription(description);
         p.setPrice(new BigDecimal(price));
         p.setCreatedAt(Instant.now());
-        p.getImages().add(iconDataUri(emoji, color));
+        p.getImages().add(RubroImages.productIcon(emoji, color));
         p.setActive(true);
         p.setSizeScaleId(sizeScaleId);
         p.getParams().addAll(params);
         p.getSizeStocks().addAll(stocks);
         productRepo.save(p);
-    }
-
-    private String iconDataUri(String emoji, String color) {
-        String svg = "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='500' viewBox='0 0 400 500'>"
-                + "<rect width='400' height='500' fill='#f5f5f4'/>"
-                + "<circle cx='200' cy='250' r='150' fill='" + color + "'/>"
-                + "<text x='200' y='300' font-size='140' text-anchor='middle'>" + emoji + "</text></svg>";
-        return "data:image/svg+xml;charset=utf-8," + URLEncoder.encode(svg, StandardCharsets.UTF_8)
-                .replace("+", "%20");
     }
 }

@@ -2,10 +2,15 @@ package com.saasweb.config;
 
 import com.saasweb.common.TenantContext;
 import com.saasweb.core.discount.Discount;
+import com.saasweb.core.hero.HeroSlide;
+import com.saasweb.core.hero.HeroSlideRepository;
 import com.saasweb.core.param.ParamGroup;
 import com.saasweb.core.param.ParamOption;
 import com.saasweb.core.product.Product;
 import com.saasweb.core.product.ProductParam;
+import com.saasweb.core.settings.SiteSettingsRepository;
+import com.saasweb.core.tenant.RubroImages;
+import com.saasweb.core.tenant.Tenant;
 import com.saasweb.modules.ropa.SizeScale;
 import com.saasweb.modules.ropa.SizeStock;
 import com.saasweb.core.discount.DiscountRepository;
@@ -46,6 +51,8 @@ public class DataSeeder implements CommandLineRunner {
     private final SizeScaleRepository sizeScaleRepo;
     private final DiscountRepository discountRepo;
     private final ProductRepository productRepo;
+    private final HeroSlideRepository heroSlideRepo;
+    private final SiteSettingsRepository siteSettingsRepo;
 
     public DataSeeder(AppProperties props,
                       AuthService authService,
@@ -56,7 +63,9 @@ public class DataSeeder implements CommandLineRunner {
                       ParamRepository paramRepo,
                       SizeScaleRepository sizeScaleRepo,
                       DiscountRepository discountRepo,
-                      ProductRepository productRepo) {
+                      ProductRepository productRepo,
+                      HeroSlideRepository heroSlideRepo,
+                      SiteSettingsRepository siteSettingsRepo) {
         this.props = props;
         this.authService = authService;
         this.roleService = roleService;
@@ -67,6 +76,8 @@ public class DataSeeder implements CommandLineRunner {
         this.sizeScaleRepo = sizeScaleRepo;
         this.discountRepo = discountRepo;
         this.productRepo = productRepo;
+        this.heroSlideRepo = heroSlideRepo;
+        this.siteSettingsRepo = siteSettingsRepo;
     }
 
     @Override
@@ -103,6 +114,43 @@ public class DataSeeder implements CommandLineRunner {
             seedProducts(tenantId);
         } finally {
             TenantContext.clear();
+        }
+
+        backfillHeroSlidesAndLogos();
+    }
+
+    /**
+     * Completa carrusel/logo de tenants que ya existían de antes de que
+     * {@code TenantProvisioningService} empezara a sembrarlos (ver
+     * PLAN_SAAS.md Fase 9) — corre en cada arranque, sin efecto si ya están
+     * completos. La tienda piloto (theme "default") no se toca: su logo
+     * real lo maneja el fallback estático del frontend
+     * ({@code LOGO_FALLBACK}), no este seeder.
+     */
+    private void backfillHeroSlidesAndLogos() {
+        for (Tenant t : tenantService.findAll()) {
+            if (heroSlideRepo.countByTenantId(t.getId()) == 0) {
+                List<RubroImages.Slide> slides = RubroImages.heroSlidesFor(t.getRubro());
+                for (int i = 0; i < slides.size(); i++) {
+                    RubroImages.Slide slide = slides.get(i);
+                    HeroSlide hs = new HeroSlide();
+                    hs.setId(UUID.randomUUID().toString());
+                    hs.setTenantId(t.getId());
+                    hs.setImageUrl(slide.imageDataUri());
+                    hs.setAlt(slide.alt());
+                    hs.setPosition(i);
+                    heroSlideRepo.save(hs);
+                }
+                log.info("Seed: carrusel completado para tenant '{}' ({} fotos).", t.getSlug(), slides.size());
+            }
+
+            siteSettingsRepo.findById(t.getId()).ifPresent(s -> {
+                if (s.getLogoUrl() == null && !"default".equals(s.getTheme())) {
+                    s.setLogoUrl(RubroImages.logo(t.getRubro().getLogoEmoji(), t.getRubro().getLogoColor()));
+                    siteSettingsRepo.save(s);
+                    log.info("Seed: logo completado para tenant '{}'.", t.getSlug());
+                }
+            });
         }
     }
 

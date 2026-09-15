@@ -867,6 +867,39 @@ hace falta el mismo paso.
     `el-ciguenal` (REPUESTOS) vía la API nueva; `GET /api/settings` y
     `GET /api/products` con el header demo devuelven marca/catálogo
     aislados por tenant; la tienda piloto sin header no tuvo ninguna
-    regresión. Pendiente: todo el frontend (asistente visual, interceptor
-    del header, banner de tienda demo, CSS de los themes `ferreteria`/
-    `repuestos`) — ver el detalle de "qué NO se hizo" en `PLAN_SAAS.md`.
+    regresión. El frontend (`../frontend-ecommerce---ruth/PROYECTO.md`
+    §11 #56) también quedó armado el mismo día: asistente "Crear tienda",
+    interceptor del header y banner de tienda demo, probados creando una
+    tercera tienda desde la UI. Pendiente en ese momento: el CSS de los
+    themes `ferreteria`/`repuestos`, y el logo/tagline/carrusel por
+    tenant — resuelto después, ver #35.
+35. **Logo, tagline y carrusel propios por tenant (2026-09-15):** a pedido
+    del usuario tras notar que "El Yunque" se veía con el logo y la
+    tagline de Estilos Pequeños. Además cerró la Fase 9 con los themes
+    visuales reales:
+    - **Themes** `[data-theme="ferreteria"]`/`"repuestos"` sumados en
+      `styles.css` (frontend) reasignando `--color-brand-*`/
+      `--color-mint-*`/`--font-display`/`--font-sans` — mismo mecanismo
+      verificado en el #33 (dark mode), sin tocar componentes. Ferretería
+      en rust/ochre + Oswald; repuestos en steel-blue/graphite + Teko;
+      ambos con fondo claro (no oscuro como el mockup standalone, para no
+      tener que auditar el contraste hardcodeado de cada componente).
+    - **`RubroImages`** (nuevo, `core/tenant/`): genera logo/foto de
+      producto/banner de carrusel como SVG data URI por rubro — sin subir
+      nada a Cloudinary. `Rubro` sumó `logoEmoji`/`logoColor`.
+    - **`TenantProvisioningService`** ahora le da a cada tienda nueva un
+      logo propio (antes quedaba `null`, caía al logo real de Estilos
+      Pequeños por el fallback del frontend) y 2 fotos de carrusel
+      (`HeroSlide`) con copy propio del rubro.
+    - **`DataSeeder.backfillHeroSlidesAndLogos()`** (nuevo, corre en cada
+      arranque del backend): completa carrusel/logo de las tiendas que ya
+      existían de antes — idempotente, mismo patrón que el resto del
+      seeder. La piloto sólo recibe carrusel (su logo real lo sigue
+      manejando el fallback estático del frontend).
+    - **Frontend:** la tagline hardcodeada de la home se acotó a la parte
+      genérica (dejó de decir "Indumentaria infantil...").
+    - Probado de punta a punta: reiniciado el backend, el backfill corrió
+      solo (visto en el log de arranque) y sembró carrusel para las 4
+      tiendas + logo para las 3 que no eran la piloto; verificado en el
+      navegador que "El Yunque"/"El Cigüeñal" muestran logo, tagline y
+      carrusel propios, y que la piloto sumó su carrusel sin perder nada.

@@ -425,7 +425,7 @@ los 28 tests pasan.
 
 ### Fase 8 — Dominios propios, SSL, deployment con Docker + reverse proxy ⏸️
 
-### Fase 9 — Agregar un segundo rubro reutilizando la plataforma ✅ (backend: alta de tenant + selector modo demo)
+### Fase 9 — Agregar un segundo rubro reutilizando la plataforma ✅ (alta de tenant, selector modo demo y themes reales)
 
 Rubros concretos definidos con el usuario: **ferretería** y **venta de
 repuestos de vehículos** (2026-09-15).
@@ -537,25 +537,124 @@ el header `X-Demo-Tenant` devuelven marca/catálogo aislados y correctos
 para cada uno; sin header, la tienda piloto (Estilos Pequeños) sigue
 devolviendo exactamente lo mismo que antes — cero regresión.
 
-**Qué NO se hizo todavía (frontend, repo `frontend-ecommerce---ruth`):**
-- No existe el asistente "Crear tienda" en el panel (formulario + listado).
-- No existe el interceptor/servicio que adjunte `X-Demo-Tenant` a los
-  requests ni el selector visual de tienda.
-- No existe el banner "Viendo: <Tienda> (demo)".
-- No existen los bloques CSS `[data-theme="ferreteria"]` /
-  `[data-theme="repuestos"]` en `styles.css` — hoy esos tenants tienen
-  `SiteSettings.theme` seteado pero el frontend sólo sabe pintar
-  `"default"`, así que se ven con la paleta de Estilos Pequeños hasta que
-  se agregue ese CSS.
-- El mockup standalone ("El Yunque y El Cigüeñal", ver artifact separado)
-  usa tipografías/paleta más elaboradas que las que tiene la app real
-  (custom properties `--color-brand-*` etc.) — el CSS real va a ser una
-  versión adaptada y más acotada de esas ideas, no una copia 1:1.
+**Frontend (hecho y verificado, `frontend-ecommerce---ruth`):**
+- `TenantAdminService` (listado/alta de tiendas + `GET /rubros`) y
+  `DemoTenantService` (guarda el slug elegido en `sessionStorage`, por
+  pestaña — no queda pegado entre sesiones ni afecta a otros visitantes).
+- `demoTenantInterceptor` agrega `X-Demo-Tenant` a toda request `/api/*`
+  mientras haya una tienda demo elegida — **incluye las requests del
+  panel admin**, no sólo el sitio público: mientras el superadmin está
+  "viendo" una tienda demo, todo `/admin/**` (productos, parametrías,
+  etc.) opera sobre ESA tienda, no sobre la propia. Es el comportamiento
+  esperado del mecanismo (mismo tenant para todo, ver
+  `TenantResolutionFilter`), no un caso aparte a cubrir.
+- Asistente **"Crear tienda"** en `/admin/superadmin/tiendas` (sólo
+  superadmin, mismo criterio que Cloudinary/mail): formulario
+  nombre + slug (autogenerado, editable) + rubro, listado de tiendas
+  existentes con botón "Ver esta tienda", y banner "Estás viendo la
+  tienda demo `<slug>`" con botón para volver a la tienda por defecto.
+- Verificado de punta a punta en el navegador (`ng serve` + backend real):
+  creada una tienda de ferretería desde el asistente, redirige sola al
+  sitio público y la muestra; los filtros del catálogo ya muestran los
+  `ParamGroup` propios del rubro ("Material", "Unidad de venta"); filtrar
+  por "Acero" devuelve exactamente el único producto con esa opción
+  (confirma que `ProductParam.optionId` quedó bien enlazado al id real
+  de cada `ParamOption`, no a su label). Botón "Volver a la tienda por
+  defecto" limpia el `sessionStorage` y restaura Estilos Pequeños sin
+  ningún cambio visible.
+
+**Themes reales `ferreteria`/`repuestos` (hecho, mismo día):** agregados
+en `styles.css` reasignando los tokens de `@theme` (`--color-brand-*`,
+`--color-mint-*`, `--font-display`, `--font-sans`) dentro de
+`[data-theme="ferreteria"]` / `[data-theme="repuestos"]` — mismo
+mecanismo verificado en Fase 6, sin tocar ningún componente. Paleta
+adaptada (no copiada 1:1) del mockup standalone ("El Yunque y El
+Cigüeñal"): ferretería en rust/ochre con tipografía Oswald; repuestos en
+steel-blue/graphite con tipografía Teko; ambos sobre fondo claro (a
+diferencia del mockup, que hacía "El Cigüeñal" oscuro por diseño) — el
+`body` de la app tiene el color de texto hardcodeado, no tokenizado, así
+que un theme oscuro real habría requerido auditar contraste en cada
+componente, fuera de alcance de este paso. `--color-mint-*` (verde de
+"ahorro/confirmar": envío gratis, botón de enviar pedido) se mantiene
+verde en los tres themes — es semántico, no de marca. Verificado en el
+navegador: header, hero, footer, filtros del catálogo y tarjetas de
+producto de `El Yunque` y `El Cigüeñal` cambian de paleta/tipografía
+correctamente; la tienda piloto (sin `data-theme` propio, usa
+`"default"`) no tuvo ningún cambio visual.
+
+**Logo, tagline y carrusel por tenant (hecho, mismo día — a pedido del
+usuario tras notar que "El Yunque" se veía con el logo y el texto de
+Estilos Pequeños):**
+- La tagline hardcodeada de la home ("Indumentaria infantil con onda 🌈
+  Elegí...") se acotó a la parte genérica ("Elegí, agregá al carrito y
+  coordinamos la compra por WhatsApp.") — ya no asume ropa infantil, sin
+  necesidad de un campo nuevo en `SiteSettings`.
+- `RubroImages` (nueva clase, `core/tenant/`) genera imágenes de ejemplo
+  como SVG data URI — no depende de subir nada a Cloudinary: `logo(emoji,
+  color)` (logo circular), `productIcon(emoji, color)` (foto de
+  producto) y `heroBanner(...)` (banner ancho 21:9 con degradé, texto y
+  emojis decorativos). `Rubro` sumó `logoEmoji`/`logoColor` por rubro
+  (🔧 rust para ferretería, ⚙️ steel-blue para repuestos, 👕 naranja para
+  ropa).
+- `TenantProvisioningService.provision()` ahora también le da a cada
+  tienda nueva un logo propio (antes quedaba `null` → caía al logo real
+  de Estilos Pequeños por el fallback estático del frontend) y 2 fotos de
+  carrusel (`HeroSlide`) con copy de marketing propio del rubro — antes
+  el carrusel quedaba vacío en toda tienda nueva.
+- `DataSeeder.backfillHeroSlidesAndLogos()` (nuevo, corre en cada arranque
+  del backend): completa carrusel/logo de tenants que ya existían de
+  antes de este cambio — sin efecto si ya están completos (mismo patrón
+  `ensureXxx` que el resto del seeder). La tienda piloto sólo recibe
+  carrusel — su logo real lo sigue manejando el fallback estático del
+  frontend (`LOGO_FALLBACK`), no este seeder.
+- Verificado en el navegador: reiniciado el backend, backfill corrió solo
+  y sembró carrusel para las 4 tiendas + logo para las 3 que no eran la
+  piloto (visto en el log de arranque); "El Yunque" y "El Cigüeñal"
+  muestran su propio logo, tagline genérica y un carrusel con 2 banners
+  temáticos; la tienda piloto sumó su propio carrusel sin perder su logo
+  real ni cambiar nada más.
+
+**Qué NO se hizo todavía:**
+- No hay forma de borrar/desactivar un tenant creado por error desde el
+  asistente (sin endpoint de baja todavía) — quedan sólo como datos de
+  prueba locales, sin impacto real.
+- Las fotos de producto siguen siendo el mismo estilo simple (círculo de
+  color + emoji) que ya tenía la tienda piloto — no son fotos reales, pero
+  ya eran así antes de este cambio; no se rediseñaron.
 
 ---
 
 ## 5. Historial
 
+- **2026-09-15**: logo, tagline y carrusel propios por tenant — a pedido
+  del usuario tras notar que "El Yunque" se veía con el logo y el texto
+  de Estilos Pequeños. `RubroImages` (nueva clase) genera logo/fotos de
+  producto/banners de carrusel como SVG data URI por rubro, sin depender
+  de subir nada a Cloudinary. `TenantProvisioningService` ahora siembra
+  logo + 2 fotos de carrusel al crear una tienda; `DataSeeder` completa
+  (en cada arranque) las que ya existían sin eso. Verificado en el
+  navegador: "El Yunque" y "El Cigüeñal" ya muestran su propio logo y
+  carrusel temático; la tienda piloto sumó carrusel sin perder su logo
+  real. Ver detalle en la sección Fase 9.
+- **2026-09-15**: cerrada la Fase 9 con los themes reales de ferretería y
+  repuestos (`[data-theme="ferreteria"]`/`"repuestos"` en `styles.css`,
+  fuentes Oswald/Teko sumadas en `index.html`) — ver detalle en la
+  sección Fase 9. Verificado en el navegador contra las 2 tiendas creadas
+  antes (`el-yunque`, `el-ciguenal`): cambian paleta y tipografía en todo
+  el sitio público sin afectar a la tienda piloto.
+- **2026-09-15 (incidente, no relacionado a código)**: el reset de MySQL
+  de esta misma fase (necesario para la columna `rubro` NOT NULL) borró
+  3 pedidos de prueba y 3 reglas de descuento que sólo existían en una
+  base `estilos_pequenos` vieja (previa al rename a `saasweb`, nunca
+  borrada). Se recuperaron leyendo el binlog de MySQL (retención 30 días,
+  cubría desde la creación original de la base) y migrando esas filas a
+  `saasweb` con `INSERT ... SELECT` cross-database, a pedido explícito
+  del usuario tras notar la diferencia. Se buscaron también URLs de fotos
+  de Cloudinary para el carrusel (`hero_slide`) pedidas por el usuario:
+  no hay rastro en ningún binlog — nunca se guardó una fila ahí, así que
+  no es recuperable desde la base (si las fotos siguen en la cuenta de
+  Cloudinary, hay que volver a cargarlas a mano desde `/admin/carrusel`).
+  Sin cambios de código — sólo datos.
 - **2026-09-15**: implementado el backend de la Fase 9 de verdad (no sólo
   plantillas): `TenantProvisioningService` + `TenantController`
   (`/api/admin/tenants`, sólo superadmin) para crear tenants nuevos con
@@ -566,10 +665,15 @@ devolviendo exactamente lo mismo que antes — cero regresión.
   Verificado de punta a punta contra MySQL real (reset + reseed): creados
   `el-yunque` (FERRETERIA) y `el-ciguenal` (REPUESTOS), cada uno devuelve
   settings/catálogo aislados vía el header demo, y la tienda piloto no
-  tuvo ninguna regresión. Pendiente (frontend): el asistente visual, el
-  interceptor que mande el header, el banner de "viendo tienda demo", y
+  tuvo ninguna regresión. También se construyó el lado frontend (mismo
+  día, repo `frontend-ecommerce---ruth`): asistente "Crear tienda"
+  (`/admin/superadmin/tiendas`), `DemoTenantService` +
+  `demoTenantInterceptor`, y el banner de tienda demo — probado en el
+  navegador creando una tercera tienda desde la UI y confirmando que el
+  catálogo/filtros/precios del rubro elegido se ven correctos. Pendiente:
   el CSS real de los themes `ferreteria`/`repuestos` (ver detalle en
-  sección Fase 9).
+  sección Fase 9) — hoy las tiendas nuevas se ven con la paleta de
+  Estilos Pequeños.
 - **2026-09-15**: agregado modo oscuro real (Fase 6, segundo paso), a
   pedido del usuario, como eje aparte del theme de marca (preferencia del
   visitante en `localStorage`, no del tenant). Alcance acotado a
