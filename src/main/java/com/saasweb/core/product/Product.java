@@ -29,7 +29,13 @@ public class Product {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
-    @Column(nullable = false)
+    /**
+     * "Rango de edad" — específico de indumentaria infantil, opcional a
+     * propósito: otros rubros (ferretería, repuestos) no tienen este
+     * concepto y no deberían tener que inventar un valor. Ver
+     * PLAN_SAAS.md sección 3 (acoplamiento a ropa, todavía no
+     * generalizado a variantes genéricas).
+     */
     private String ageRange;
 
     /**

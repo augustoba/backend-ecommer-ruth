@@ -66,6 +66,7 @@ app:
   tenant:
     slug: ${TENANT_SLUG:estilos-pequenos}
     name: ${TENANT_NAME:Estilos Pequeños}
+    demo-switch-enabled: ${TENANT_DEMO_SWITCH_ENABLED:true}
 
 logging:
   level:

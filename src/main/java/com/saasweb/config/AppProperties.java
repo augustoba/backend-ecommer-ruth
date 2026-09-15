@@ -344,6 +344,16 @@ public class AppProperties {
         private String slug = "estilos-pequenos";
         private String name = "Estilos Pequeños";
 
+        /**
+         * Selector de tienda modo demo: si está en true, un request puede
+         * mandar el header `X-Demo-Tenant: <slug>` para ver otro tenant sin
+         * pasar por resolución real de dominio (ver TenantResolutionFilter).
+         * Pensado para desarrollo/demos locales — se puede apagar con
+         * `TENANT_DEMO_SWITCH_ENABLED=false` el día que esto se despliegue
+         * de verdad para un cliente.
+         */
+        private boolean demoSwitchEnabled = true;
+
         public String getSlug() {
             return slug;
         }
@@ -358,6 +368,14 @@ public class AppProperties {
 
         public void setName(String name) {
             this.name = name;
+        }
+
+        public boolean isDemoSwitchEnabled() {
+            return demoSwitchEnabled;
+        }
+
+        public void setDemoSwitchEnabled(boolean demoSwitchEnabled) {
+            this.demoSwitchEnabled = demoSwitchEnabled;
         }
     }
 }

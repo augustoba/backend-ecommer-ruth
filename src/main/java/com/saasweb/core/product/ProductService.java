@@ -244,7 +244,7 @@ public class ProductService {
         p.setName(req.name().trim());
         p.setDescription(req.description().trim());
         p.setPrice(req.price());
-        p.setAgeRange(req.ageRange().trim());
+        p.setAgeRange(blankToNull(req.ageRange()));
 
         p.getImages().clear();
         if (req.images() != null) {

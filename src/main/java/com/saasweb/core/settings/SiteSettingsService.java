@@ -18,6 +18,22 @@ public class SiteSettingsService {
         this.repo = repo;
     }
 
+    /**
+     * Crea la fila de settings de un tenant nuevo con el nombre elegido —
+     * NO hardcodea la marca de Estilos Pequeños (a diferencia de
+     * {@link #defaults()}, que es específica de esa tienda piloto). La
+     * llama {@code TenantProvisioningService} antes de que nadie pida
+     * {@link #get()} para ese tenant.
+     */
+    public SiteSettings createFor(String tenantId, String storeName, String theme) {
+        SiteSettings s = new SiteSettings();
+        s.setId(tenantId);
+        s.setTheme(theme);
+        s.setStoreName(storeName);
+        s.setWhatsappNumber("5491100000000");
+        return repo.save(s);
+    }
+
     /** Devuelve la fila de settings del tenant actual; si no existe, la crea con los valores por defecto. */
     public SiteSettings get() {
         String tenantId = TenantContext.getTenantId();

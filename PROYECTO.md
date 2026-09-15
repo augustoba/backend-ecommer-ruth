@@ -846,3 +846,27 @@ hace falta el mismo paso.
     atributo. Alcance acotado a header + home (logo/intro + heading de "Lo
     más vendido") — el resto del sitio no reacciona todavía. Probado en el
     navegador en los dos sentidos del toggle.
+34. **Alta de tenant + selector modo demo (2026-09-15, Fase 9 real, ver
+    `PLAN_SAAS.md` §4 Fase 9):** motivado por el pedido real del usuario —
+    un asistente "Crear tienda" en el panel para mostrarlo en su clase.
+    `TenantProvisioningService` (`core/tenant/`) crea un tenant nuevo
+    (`TenantService.create`), su `SiteSettings` (`createFor`, sin
+    hardcodear la marca de Estilos Pequeños), sus bloques de home
+    (`ensureDefaultHomeBlocks`) y 2 `ParamGroup` + 3-4 productos de
+    ejemplo según el `Rubro` elegido (`ROPA`/`FERRETERIA`/`REPUESTOS`,
+    nuevo enum). `TenantController` expone `GET`/`POST
+    /api/admin/tenants` y `GET /api/admin/tenants/rubros`, gateados
+    `hasAuthority('SUPERADMIN')` igual que `/admin/settings/cloudinary`.
+    `TenantResolutionFilter` suma el header `X-Demo-Tenant: <slug>`
+    (activable/desactivable por `app.tenant.demo-switch-enabled`) para ver
+    cualquier tenant sin subdominios reales — decisión explícita del
+    usuario ("selector modo demo alcanza"), NO es resolución por dominio.
+    De paso, `Product.ageRange` dejó de ser obligatorio (ferretería/
+    repuestos no tienen ese concepto). Probado de punta a punta contra
+    MySQL real (reset + reseed): creados `el-yunque` (FERRETERIA) y
+    `el-ciguenal` (REPUESTOS) vía la API nueva; `GET /api/settings` y
+    `GET /api/products` con el header demo devuelven marca/catálogo
+    aislados por tenant; la tienda piloto sin header no tuvo ninguna
+    regresión. Pendiente: todo el frontend (asistente visual, interceptor
+    del header, banner de tienda demo, CSS de los themes `ferreteria`/
+    `repuestos`) — ver el detalle de "qué NO se hizo" en `PLAN_SAAS.md`.

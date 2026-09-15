@@ -425,7 +425,7 @@ los 28 tests pasan.
 
 ### Fase 8 — Dominios propios, SSL, deployment con Docker + reverse proxy ⏸️
 
-### Fase 9 — Agregar un segundo rubro reutilizando la plataforma 🔜 (plantillas preparadas, sin cargar)
+### Fase 9 — Agregar un segundo rubro reutilizando la plataforma ✅ (backend: alta de tenant + selector modo demo)
 
 Rubros concretos definidos con el usuario: **ferretería** y **venta de
 repuestos de vehículos** (2026-09-15).
@@ -485,10 +485,91 @@ donde un producto puede ser de varias estaciones a la vez.
    la Fase 4), es simplemente: crear la fila `Tenant`, crear su `AdminUser`
    inicial, y sembrar estas `ParamGroup` en vez de las de ropa.
 
+#### Implementación: alta de tenant + selector modo demo (2026-09-15)
+
+Motivación real del usuario (no es sólo "agregar un rubro más"): tener un
+asistente **"Crear tienda"** en el panel — elegir un rubro de una lista
+extensible (ropa, ferretería, repuestos, más a futuro), crear la tienda, y
+verla funcionando **en local**, para mostrarlo en su clase. Ver también la
+sección 1 (`X-Demo-Tenant`) — el mecanismo que permite ver varias tiendas
+locales sin subdominios/DNS reales.
+
+**Backend (hecho y verificado contra MySQL real):**
+- `Rubro` (enum: `ROPA`/`FERRETERIA`/`REPUESTOS`) — agregar un rubro nuevo
+  a futuro es agregar un valor acá + su plantilla de seed, no reescribir
+  nada. `Tenant.rubro` (NOT NULL) guarda el elegido; también define el
+  theme por defecto (`Rubro.defaultTheme`, hoy sólo usado como valor de
+  `SiteSettings.theme` — el CSS real de esos themes todavía NO existe, ver
+  "Qué NO se hizo" abajo).
+- `TenantService.create(name, slug, rubro)` — crea la fila `Tenant` (slug
+  único, plan por defecto). `TenantService.findAll()` /
+  `resolveIdBySlug(slug)` para el listado y el selector demo.
+- `TenantProvisioningService` (nuevo, `core/tenant/`) — orquesta el alta
+  completa: crea el tenant, `SiteSettingsService.createFor(...)` (fila de
+  settings con el nombre elegido, SIN hardcodear la marca de Estilos
+  Pequeños), `PageBlockService.ensureDefaultHomeBlocks(...)`, y siembra
+  2 `ParamGroup` + 3-4 productos de ejemplo específicos del rubro (con
+  imagen ilustrativa generada como SVG data-URI, sin depender de
+  Cloudinary). IDs con `UUID.randomUUID()` — no colisionan con los IDs de
+  slug fijo que usa el seed de la tienda piloto (`DataSeeder`).
+  Ferretería/repuestos usan una escala de talle trivial de un solo valor
+  ("Único") en vez de generalizar `SizeScale`/`SizeStock`, siguiendo la
+  decisión ya tomada de "un solo stock por producto" para estos rubros.
+- `TenantController` (`/api/admin/tenants`, gateado `hasAuthority('SUPERADMIN')`
+  igual que `/api/admin/settings/cloudinary`): `GET` lista tenants, `POST`
+  crea uno (delega en `TenantProvisioningService`), `GET /rubros` devuelve
+  el enum con label para no hardcodearlo en el front.
+- **Selector de tienda modo demo**: `TenantResolutionFilter` ahora, si
+  `app.tenant.demo-switch-enabled=true` (default en dev, apagable con
+  `TENANT_DEMO_SWITCH_ENABLED=false`), lee el header `X-Demo-Tenant: <slug>`
+  y resuelve contra ESE tenant en vez del único activo. No es resolución
+  real por dominio — es un atajo a propósito para mostrar varias tiendas
+  locales sin DNS/subdominios (decisión confirmada con el usuario:
+  "Selector modo demo alcanza").
+- `Product.ageRange` (y su DTO/service) dejó de ser obligatorio — es un
+  concepto específico de indumentaria infantil que ferretería/repuestos no
+  tienen; forzarlo hubiera obligado a inventar un valor sin sentido.
+
+**Verificado end-to-end** (MySQL real, reset + reseed): creados dos
+tenants nuevos (`el-yunque` FERRETERIA, `el-ciguenal` REPUESTOS) vía
+`POST /api/admin/tenants`; `GET /api/settings` y `GET /api/products` con
+el header `X-Demo-Tenant` devuelven marca/catálogo aislados y correctos
+para cada uno; sin header, la tienda piloto (Estilos Pequeños) sigue
+devolviendo exactamente lo mismo que antes — cero regresión.
+
+**Qué NO se hizo todavía (frontend, repo `frontend-ecommerce---ruth`):**
+- No existe el asistente "Crear tienda" en el panel (formulario + listado).
+- No existe el interceptor/servicio que adjunte `X-Demo-Tenant` a los
+  requests ni el selector visual de tienda.
+- No existe el banner "Viendo: <Tienda> (demo)".
+- No existen los bloques CSS `[data-theme="ferreteria"]` /
+  `[data-theme="repuestos"]` en `styles.css` — hoy esos tenants tienen
+  `SiteSettings.theme` seteado pero el frontend sólo sabe pintar
+  `"default"`, así que se ven con la paleta de Estilos Pequeños hasta que
+  se agregue ese CSS.
+- El mockup standalone ("El Yunque y El Cigüeñal", ver artifact separado)
+  usa tipografías/paleta más elaboradas que las que tiene la app real
+  (custom properties `--color-brand-*` etc.) — el CSS real va a ser una
+  versión adaptada y más acotada de esas ideas, no una copia 1:1.
+
 ---
 
 ## 5. Historial
 
+- **2026-09-15**: implementado el backend de la Fase 9 de verdad (no sólo
+  plantillas): `TenantProvisioningService` + `TenantController`
+  (`/api/admin/tenants`, sólo superadmin) para crear tenants nuevos con
+  seed de ejemplo por rubro, y el selector de tienda modo demo
+  (`X-Demo-Tenant` header en `TenantResolutionFilter`). Motivado por el
+  pedido real del usuario: un asistente "Crear tienda" en el panel para
+  mostrar en su clase, sin necesitar subdominios/DNS reales todavía.
+  Verificado de punta a punta contra MySQL real (reset + reseed): creados
+  `el-yunque` (FERRETERIA) y `el-ciguenal` (REPUESTOS), cada uno devuelve
+  settings/catálogo aislados vía el header demo, y la tienda piloto no
+  tuvo ninguna regresión. Pendiente (frontend): el asistente visual, el
+  interceptor que mande el header, el banner de "viendo tienda demo", y
+  el CSS real de los themes `ferreteria`/`repuestos` (ver detalle en
+  sección Fase 9).
 - **2026-09-15**: agregado modo oscuro real (Fase 6, segundo paso), a
   pedido del usuario, como eje aparte del theme de marca (preferencia del
   visitante en `localStorage`, no del tenant). Alcance acotado a

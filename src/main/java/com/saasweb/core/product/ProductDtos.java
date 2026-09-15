@@ -25,7 +25,8 @@ public final class ProductDtos {
             @NotBlank @Size(min = 2) String name,
             @NotBlank @Size(min = 5) String description,
             @NotNull @DecimalMin("0.0") BigDecimal price,
-            @NotBlank String ageRange,
+            /** Específico de indumentaria — opcional, otros rubros no lo usan. */
+            String ageRange,
             /** Fotos del producto, en orden. La primera es la portada. Al menos una. */
             @NotEmpty List<@NotBlank String> images,
             /** Link a un video de la prenda (YouTube). Opcional. */

@@ -23,10 +23,21 @@ import java.io.IOException;
 @Component
 public class TenantResolutionFilter extends OncePerRequestFilter {
 
-    private final TenantService tenantService;
+    /**
+     * Selector de tienda modo demo (ver PLAN_SAAS.md): si
+     * {@code app.tenant.demo-switch-enabled} está en true y el request trae
+     * este header con un slug válido, se usa ESE tenant en vez del único
+     * activo. No es resolución real por dominio — es un atajo para mostrar
+     * varias tiendas locales sin subdominios/DNS.
+     */
+    public static final String DEMO_TENANT_HEADER = "X-Demo-Tenant";
 
-    public TenantResolutionFilter(TenantService tenantService) {
+    private final TenantService tenantService;
+    private final AppProperties props;
+
+    public TenantResolutionFilter(TenantService tenantService, AppProperties props) {
         this.tenantService = tenantService;
+        this.props = props;
     }
 
     @Override
@@ -34,10 +45,21 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain chain) throws ServletException, IOException {
         try {
-            TenantContext.set(tenantService.resolveCurrentTenantId());
+            TenantContext.set(resolveTenantId(request));
             chain.doFilter(request, response);
         } finally {
             TenantContext.clear();
         }
+    }
+
+    private String resolveTenantId(HttpServletRequest request) {
+        if (props.getTenant().isDemoSwitchEnabled()) {
+            String slug = request.getHeader(DEMO_TENANT_HEADER);
+            if (slug != null && !slug.isBlank()) {
+                String id = tenantService.resolveIdBySlug(slug.trim());
+                if (id != null) return id;
+            }
+        }
+        return tenantService.resolveCurrentTenantId();
     }
 }

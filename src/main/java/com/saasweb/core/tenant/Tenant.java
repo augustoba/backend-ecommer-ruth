@@ -29,6 +29,11 @@ public class Tenant {
     @Column(name = "plan_id", nullable = false)
     private String planId;
 
+    /** Rubro elegido al crear el tenant (ver {@link Rubro}). Nunca null tras el seed. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Rubro rubro;
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -65,6 +70,14 @@ public class Tenant {
 
     public void setPlanId(String planId) {
         this.planId = planId;
+    }
+
+    public Rubro getRubro() {
+        return rubro;
+    }
+
+    public void setRubro(Rubro rubro) {
+        this.rubro = rubro;
     }
 
     public boolean isActive() {
