@@ -104,6 +104,11 @@ public class Plan {
         this.enabledModules = enabledModules;
     }
 
+    /** Ver {@link Modules} para las claves válidas. */
+    public boolean hasModule(String moduleKey) {
+        return enabledModules.contains(moduleKey);
+    }
+
     public boolean isShowPlatformBranding() {
         return showPlatformBranding;
     }

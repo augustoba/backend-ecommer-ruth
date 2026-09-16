@@ -1128,8 +1128,478 @@ retoma):**
 
 ---
 
+### Fase 12 — Bugs de las previews del asistente + primer módulo real gateado por plan ✅ (2026-09-16)
+
+Sesión mixta: primero 3 bugs reales encontrados por el usuario probando el
+asistente "Crear tienda" y "Apariencia" (Fase 10), después el primer
+feature nuevo construido usando `Plan.enabledModules` (Fase 5) para algo
+de verdad — hasta ahora era mecanismo sin ningún módulo real que gatear.
+
+**Bug 1 — las 6 miniaturas de diseño se veían todas con el mismo color:**
+`admin-appearance`/`tenant-wizard` pintaban las 6 miniaturas de layout con
+el `draftBrandColor()` compartido (el de la ÚLTIMA tienda que se estuvo
+viendo/editando) en vez del color real de cada plantilla — imposible
+comparar diseños así. Se abrió la carpeta `templates/` del Escritorio
+(los 6 temas de WordPress originales, ver Fase 10 Paso 7) y se sacó el
+color de acento REAL de cada uno de sus `customizer`/`style.css` (no
+inventado): Botiga `#212121`, Rife Free `#3957ff`, Shopper `#734f96`,
+Shopping Cart `#f77426` (usado para "mercado", que consolida 3 temas —
+confirmado con el usuario: "usá el de la plantilla, después el cliente
+elige el color que quiera"), Minna/boutique sin archivo descargado
+(aproximado a su estética editorial, `#1c1917`, el usuario lo aceptó).
+`LAYOUTS` (`admin-appearance.component.ts`) ahora tiene `previewColor` por
+layout y `layoutSwatchVars()` (nueva, exportada) genera la rampa fija de
+cada uno — las miniaturas (grid chico de ambas pantallas) usan SIEMPRE su
+propio color, nunca el que se esté editando. El modal "ver en grande" y el
+resto de las previews grandes siguen usando el color en edición (tiene
+sentido ahí: un solo diseño a la vez, sin comparación posible).
+
+**Bug 2 — encabezado/pie de página no reaccionaban al color, y el pie de
+página directamente no aparecía en ninguna preview:** `HeaderComponent`/
+`FooterComponent` sólo leían `headerColor`/`footerColor`/`textColor` de
+`SettingsService` (la config REAL ya guardada) — sin ningún input de
+"borrador" como sí tenía `CatalogPageComponent` (`textColorOverride`/
+`pageBgOverride`). Y ninguna de las previews (asistente, "Apariencia")
+incluía `<app-header>`/`<app-footer>` — sólo `<app-catalog-page>` (hero +
+grilla), así que el pie de página no podía aparecer aunque se lo pintara
+bien. Agregado a ambos componentes: `headerColorOverride`/
+`footerColorOverride`, `textColorOverride`, mismo patrón `undefined` = sin
+tocar / cualquier otro valor pisa. Sumado `<app-header>`/`<app-footer>` a
+las 3 previews grandes reales (asistente pasos 1-4, pantalla completa del
+paso 5, modal "ver en grande" de Apariencia) — NO a las miniaturas chicas
+del grid de diseño, que siguen siendo sólo `<app-catalog-page>` a
+propósito (comparación de estructura, no la tienda completa). Verificado
+en el navegador: cambiar "Encabezado" a rojo y "Pie de página" a azul
+repinta ambos al instante, con el pie de página visible al final del
+scroll.
+
+**Bug 3 — el nombre/logo de una tienda nueva mostraban los de la tienda
+piloto:** mismo problema de fondo que el Bug 2 — `CatalogPageComponent`
+usaba `storeName()`/`logoSrc()` directo de `SettingsService` sin ningún
+override (a diferencia de `logoOverride`, que sí existía pero sólo para
+el logo YA subido a Cloudinary, no aplicaba mientras el asistente sigue en
+los primeros pasos). Agregado `storeNameOverride` a `CatalogPageComponent`
+y `storeNameOverride`/`logoOverride` a `Header`/`FooterComponent`,
+cableados con `draft().name`/`logoDataUrl()` del wizard en las 3 previews
+grandes Y en el grid chico del Paso 1. Sub-bug encontrado al verificar
+esto: el "logo genérico" que se mostraba cuando todavía no se subió
+ninguno en realidad era `LOGO_FALLBACK` (`'logo.jpeg'`) — el logo REAL de
+Estilos Pequeños, usado a propósito como su propio fallback (la piloto no
+tiene `logoUrl` en la fila de `SiteSettings`, ver Fase 9 ampliada #35) —
+osea que una tienda nueva sin logo mostraba la marca de la piloto. Se
+armó `GENERIC_LOGO_PLACEHOLDER` (nuevo, `core/utils/generic-logo.ts`): un
+ícono 🏬 sobre círculo gris como SVG data URI, usado SÓLO en la rama de
+override de los 3 componentes (`logoOverride() !== undefined`) — el
+fallback real de la piloto (`LOGO_FALLBACK`, sin override, tenant ya
+existente) queda intacto. Verificado en el navegador: tienda nueva
+"La Tienda Nueva" en el asistente muestra su propio nombre en las 3
+previews grandes Y en el grid chico, con el ícono genérico en vez del
+logo de la piloto.
+
+**Feature nuevo — "Publicar en redes" (compartir producto a Facebook/
+Instagram):** pedido explícito del usuario: al crear/editar/listar un
+producto, un botón que arme una publicación con la foto y un texto
+(título, descripción, o texto libre) y la mande a redes. Discutido primero
+el alcance real (varias idas y vueltas con el usuario, importante para
+quien retome esto):
+- **NO usa la API de Meta** (Graph API) — eso requeriría una cuenta
+  Instagram Business conectada a una Página de Facebook Y una app de Meta
+  **revisada y aprobada por Meta** (proceso externo de semanas, no
+  depende del código). Se descartó a propósito.
+- **Usa la Web Share API nativa del navegador** (`navigator.share` con
+  `files`) — sin tokens, sin aprobación de nadie, pero por eso **sólo
+  funciona desde el celular** que tiene Facebook/Instagram instalados y
+  logueados: el botón abre el panel nativo de compartir del teléfono, el
+  dueño de la tienda elige la app y publica con su propia cuenta (el
+  código nunca ve ni guarda ninguna credencial de redes). **Desde PC no
+  hay forma real** — ni con esto ni con la API de Meta se puede publicar
+  en Instagram desde una computadora (limitación de la app, no de este
+  proyecto); por eso el botón directamente no se muestra si
+  `navigator.share` no existe (la nota "abrí este panel desde el celular"
+  se muestra en su lugar, sólo en la variante completa del formulario, no
+  en la compacta del listado).
+- **Limitación conocida de Instagram** (no arreglable desde acá): al
+  compartir a Instagram, la foto se abre lista pero el texto casi nunca se
+  prellena en el cuadro de descripción — por eso, además de pasarlo en
+  `ShareData.text`, se copia también al portapapeles (`navigator.
+  clipboard.writeText`) como red de contención, para que se pueda pegar a
+  mano.
+- **Bug de activación de usuario, encontrado y arreglado en la misma
+  sesión:** `navigator.share()` exige estar "manejando un gesto del
+  usuario" (el click) — cualquier `await` de por medio puede consumirlo.
+  La primera versión hacía `fetch` de la foto → `blob()` → **`await
+  navigator.clipboard.writeText(...)`** → recién ahí `navigator.share()`,
+  y ese `await` de más tiraba `NotAllowedError: Must be handling a user
+  gesture` (confirmado en el navegador real, no sólo en teoría). Se
+  reordenó: `navigator.share()` se llama apenas está listo el archivo
+  (sólo `fetch`+`blob()` de por medio), y el `writeText` al portapapeles
+  quedó DESPUÉS, sin `await` bloqueante (`.catch(() => {})`) — ya no hace
+  falta la activación a esa altura. Verificado en el navegador: antes del
+  fix, un click real tiraba el toast de error; después del fix, sin error
+  (el share sheet en sí es UI nativa del SO, fuera del alcance de la
+  automatización del navegador — falta la confirmación final en un
+  celular real antes de dar esto por 100% cerrado).
+- **Opciones de texto:** "Usar el título" / "Usar la descripción" /
+  "Escribir otro texto" (textarea libre, para el caso que motivó el
+  pedido: reflotar un producto viejo con una descripción nueva tipo
+  "¡Volvió a estar disponible!"). Preview en vivo ("Así se vería": la foto
+  + el texto elegido, se actualiza al tipear).
+  **"Volver a publicar" ya funciona sin ningún cambio extra** — el botón
+  no tiene ningún estado de "ya publicado" que lo bloquee; se puede
+  compartir el mismo producto las veces que se quiera, en cualquier
+  momento, desde el listado o el formulario.
+- **`SocialShareButtonComponent`** (nuevo, `shared/components/`): variante
+  completa (formulario, con el selector de texto + preview) y `compact`
+  (listado, sólo un link de texto "📲 Publicar", usa el título como
+  caption por defecto). Cableado en `admin-product-form` (crear y editar —
+  funciona incluso antes de guardar el producto, porque las fotos ya están
+  en Cloudinary apenas se suben) y en `admin-products` (una fila por
+  producto). NO agregado a productos archivados (no tiene sentido
+  promocionar algo fuera del catálogo).
+
+**Modularización pedida explícitamente por el usuario ("ojo, hay que
+modularizar para poder darle o no acceso al cliente según lo que pague"):**
+primer uso real de `Plan.enabledModules` (existía desde la Fase 5, sin
+gatear nada) — nuevo `com.saasweb.core.plan.Modules` (constantes de
+clave de módulo, hoy sólo `SOCIAL_SHARE`), `Plan.hasModule(key)`.
+`GET/PUT /api/settings` (público y admin) suma `socialShareEnabled`
+(boolean, calculado server-side con `PlanService.getCurrent()`) — el
+frontend (`SettingsService.settings().socialShareEnabled`) lo usa para
+ocultar el componente entero si el plan no lo tiene habilitado. **Bug de
+backfill encontrado y arreglado en la misma sesión:** `PlanService.
+ensureDefault()` sólo se llamaba desde `TenantService.ensureDefault()`
+**dentro de la rama `orElseGet` de creación del tenant** — con el tenant
+piloto ya existente (cualquier arranque después del primero), esa rama
+nunca corre, así que el plan ya sembrado nunca recibía el módulo nuevo
+(quedó `enabledModules = {ropa}`, sin `SOCIAL_SHARE`, y el botón no
+aparecía en ningún lado pese a estar todo el resto del código bien).
+Arreglado en dos partes: `PlanService.ensureDefault()` ahora también
+backfillea `SOCIAL_SHARE` al plan YA sembrado (no sólo al crearlo), y
+`DataSeeder.run()` llama a `planService.ensureDefault()` directo (no sólo
+implícito a través de `tenantService.ensureDefault()`) — mismo patrón que
+`DataSeeder.backfillHeroSlidesAndLogos()`, corre en cada arranque.
+Verificado con SQL directo (`plan_module`) y `GET /api/settings` antes y
+después del fix: `{"ropa"}` → `{"ropa","SOCIAL_SHARE"}`,
+`socialShareEnabled: false` → `true`.
+
+**Ajustes pedidos por el usuario después de probarlo, mismo día:**
+- **`navigator.share` NO alcanza para saber "es un celular"** — Windows
+  10/11 con Chrome/Edge moderno también la implementa (abre el panel de
+  Compartir del propio Windows), así que el botón aparecía igual en una
+  PC. Sumada una segunda señal, `isLikelyMobileDevice()`
+  (`navigator.userAgentData.mobile`, con fallback al string de
+  user-agent) — el tamaño de pantalla/ventana se descartó a propósito
+  (discutido con el usuario): no distingue "es un celular" de "la ventana
+  está angosta", da falsos positivos/negativos en ambos sentidos.
+- **El botón no debía desaparecer en PC, sólo avisar** — pedido explícito
+  del usuario tras la primera versión (que ocultaba todo si
+  `!supported`): mejor que el feature se descubra aunque hoy no se pueda
+  usar ahí. Rediseñado: el botón queda SIEMPRE visible (mientras
+  `moduleEnabled()`); si se aprieta sin `supported`, un toast avisa "esto
+  sólo funciona desde el celular" en vez de abrir nada.
+- **Elegir qué fotos mandar, no siempre la portada sola** — pedido tras
+  preguntar el usuario qué pasaba con productos de varias fotos (antes
+  mandaba sólo `images[0]`). `SocialShareButtonComponent` pasó de recibir
+  un `imageUrl` único a `images: string[]` (todas): en la variante
+  completa (formulario) aparece un selector de miniaturas ("¿Qué fotos
+  publicar?", arranca con sólo la portada tildada, mínimo 1 siempre
+  elegida) y la preview "Así se vería" muestra todas las elegidas
+  superpuestas; `share()` hace `fetch` de cada una elegida y arma
+  `files: File[]` con todas para `navigator.share`. Selección por URL, no
+  por índice, para no romperse si se reordenan/sacan fotos en el medio.
+  Documentado en el texto de ayuda: Instagram por este mecanismo
+  generalmente sólo toma la primera aunque se manden varias (limitación
+  de esa app), Facebook/WhatsApp sí arman álbum. La variante `compact`
+  (listado) sigue mandando sólo la portada — no tiene lugar para un
+  selector en una fila de tabla.
+- Verificado todo en el navegador: en PC, con `userAgentData.mobile:
+  false` confirmado por consola, el botón compacto y el completo quedan
+  visibles y al tocarlos muestran el toast de aviso (no un error); en el
+  formulario, elegir ambas fotos de un producto de 2 fotos las tilda a
+  las dos y la preview las muestra juntas.
+
+**NO hecho en esta fase:**
+- Sin pantalla de administración de planes/módulos (asignar módulos a un
+  plan sigue siendo un `UPDATE` a mano en `plan_module`, no hay UI —
+  consistente con que sigue habiendo un solo plan real, ver Fase 5).
+- Sin test automatizado para nada de esto.
+- Sin confirmación en un celular real del flujo de compartir (sólo
+  navegador de escritorio con Chrome DevTools Protocol, que sí expone
+  `navigator.share` pero no hay forma de ver la hoja nativa de compartir
+  del SO desde la automatización).
+- **Mercado Pago (pedido, discutido, NO empezado):** el usuario pidió
+  después, en la misma sesión, un módulo de checkout con pago online real
+  vía Mercado Pago (carrito completo, y que el stock se descuente recién
+  cuando el pago esté confirmado — no al hacer el pedido como hoy),
+  también modularizado para poder ofrecer WhatsApp o pago online según el
+  plan. Es un pedido legítimo y del mismo patrón (`Modules`), pero de un
+  orden de magnitud bien distinto: plata real, credenciales de Mercado
+  Pago que hay que conseguir, un webhook que hay que exponer y validar
+  (firma, idempotencia), y cambiar el momento en que se descuenta stock
+  (hoy es al confirmar el pedido, no al pagarlo) — se le señaló al usuario
+  que esto merece su propia sesión de planificación en vez de sumarlo de
+  apuro a esta. Queda pendiente, no diseñado todavía.
+
+---
+
+### Fase 13 — Checkout con pago online real (Mercado Pago) 🔜 (2026-09-16, backend + frontend construidos, falta la prueba real)
+
+Pedido explícito del usuario en la misma sesión de la Fase 12: carrito
+completo con pago online a través de Mercado Pago, con el stock
+descontándose recién cuando el pago está validado (no al hacer el
+pedido, como hoy) — y modularizado (mismo mecanismo de `Plan.
+enabledModules` que Fase 12) para poder ofrecerlo o no según lo que
+pague cada tenant.
+
+**Decisión de modelo de integración — discutida con el usuario:**
+Mercado Pago tiene dos caminos. "Checkout API — Orders" (el más nuevo)
+requiere armar un formulario de tarjeta propio en el sitio, tokenizado
+con el SDK de MP en el navegador — checkout embebido, más superficie de
+riesgo y trabajo (cuotas, marcas de tarjeta, validaciones a mano).
+"Checkout Pro" (clásico) arma una "preferencia" con los ítems y
+redirige al cliente a una página 100% de Mercado Pago — tarjeta,
+cuotas, validación, todo lo construye y lo aloja Mercado Pago, nuestro
+código nunca ve un número de tarjeta ni siquiera tokenizado. Se eligió
+**Checkout Pro** por ser sustancialmente más simple y seguro para este
+proyecto — la confirmación por webhook es igual en los dos modelos, así
+que no se pierde la parte que le importaba al usuario (validar el pago
+antes de descontar stock). Queda documentado por si en el futuro se
+quiere migrar al checkout embebido — el webhook y la lógica de
+confirmación automática no cambian.
+
+**Módulo (mismo mecanismo que Fase 12):** `Modules.MERCADOPAGO` +
+backfill en `PlanService.ensureDefault()` (ahora generalizado a un
+`Set<String> knownModules` en vez de un `if` por módulo, para no seguir
+repitiendo el patrón a mano cada vez).
+
+**Credenciales — POR TENANT, no de plataforma** (a diferencia de
+Cloudinary): cada tienda cobra a su propia cuenta de Mercado Pago.
+`SiteSettings` suma `mpEnabled` (boolean), `mpAccessToken` (secreto de
+verdad — mismo criterio que `smtpPassword`, nunca se devuelve en
+ninguna respuesta, sólo `accessTokenSet`) y `mpPublicKey` (no secreta).
+Nuevos `MercadoPagoConfigRequest`/`Response` + `GET`/`PUT
+/api/admin/settings/mercadopago`, gateados `PAYMENTS_MANAGE` (el admin
+normal de la tienda, no sólo superadmin — es SU cuenta). Pantalla nueva
+`/admin/config/mercadopago` (mismo patrón que la de SMTP tenant:
+`accessTokenSet` en vez de mostrar el token guardado).
+
+**`GET /api/settings` suma `mercadoPagoAvailable`** (boolean,
+calculado server-side: módulo del plan Y `mpEnabled` Y `mpAccessToken`
+cargado) — el frontend lo usa para decidir si ofrecer "Pagar con
+Mercado Pago".
+
+**Regla de negocio pedida explícitamente por el usuario: si Mercado
+Pago está activo, es el ÚNICO medio de pago que se ofrece en el
+carrito online** (no conviven con transferencia/QR/efectivo ahí — para
+no mezclar un pago validado automáticamente con medios que dependen de
+coordinar a mano por WhatsApp). Implementado en
+`SettingsService.availablePaymentMethods` (frontend): si
+`mercadoPagoAvailable`, devuelve sólo `['MERCADOPAGO']`, ignorando el
+resto de los flags. **"Venta en el local" (`admin-pos`) NO se ve
+afectada** — sigue ofreciendo los 5 medios siempre (efectivo,
+transferencia, QR transferencia, QR/link tarjeta, y ahora también
+Mercado Pago como una etiqueta más, para cuando el vendedor cobra con
+MP en persona) — tiene su propia lista fija, nunca leyó
+`availablePaymentMethods`.
+
+**Modelo de datos (`Order`):** nuevos `paymentStatus` (enum
+`PENDING`/`APPROVED`/`REJECTED`, nuevo — **separado a propósito** de
+`OrderStatus`, que sigue siendo el flujo manual de siempre; `null` para
+cualquier medio de pago que no sea Mercado Pago), `mpPreferenceId`,
+`mpCheckoutUrl` (el link al que se redirige — se guarda para poder
+reofrecerlo si el cliente no pagó todavía), `mpPaymentId`. Migró solo
+(Hibernate `ddl-auto: update`), verificado con `DESCRIBE orders`.
+
+**Flujo completo:**
+1. Checkout público (`POST /api/orders`) ahora llama a
+   `OrderService.createWebCheckout()` (nuevo — NO `POST /api/admin/
+   orders/pos`, que sigue llamando a `create()` a secas): crea el
+   pedido normal (`status=PENDIENTE`, stock sin tocar, igual que
+   siempre) y, si `paymentMethod=MERCADOPAGO`, arranca
+   `startMercadoPagoCheckout()` — arma la preferencia vía
+   `MercadoPagoService.createPreference()` (nuevo, `core/payment/`,
+   usa `Spring RestClient`, primer cliente HTTP saliente del backend —
+   no había ninguno antes, Cloudinary se sube directo desde el
+   navegador y el mail es SMTP) con el Access Token DEL TENANT,
+   `external_reference = order.id`, `notification_url` con
+   `?tenantId=...` en la query string (mecanismo de resolución de
+   tenant del webhook, ver abajo), y `back_urls` a `/mis-pedidos?code=
+   ...`. Guarda `mpPreferenceId`/`mpCheckoutUrl`/`paymentStatus=PENDING`
+   en el pedido. **Todo dentro de la misma transacción que crear el
+   pedido** — si la preferencia falla (token inválido, Mercado Pago
+   caído), el pedido entero se revierte, no queda un pedido roto sin
+   forma de pagarlo. **Verificado con un token falso**: error 403 de
+   Mercado Pago → mensaje claro en el carrito ("No se pudo iniciar el
+   pago... revisá el Access Token") → confirmado por SQL que no quedó
+   ningún pedido húérfano en `orders`.
+2. El frontend (`cart-page.component.ts`), si `paymentMethod ===
+   'MERCADOPAGO'` y vino `mpCheckoutUrl`, limpia el carrito y hace
+   `window.location.href = mpCheckoutUrl` — saca al cliente del sitio
+   directo a la página de Mercado Pago (no abre WhatsApp, ese flujo
+   entero queda sin usar para este medio de pago). Botón y textos del
+   carrito cambian según `isMercadoPagoOnly()`.
+3. **`POST /api/webhooks/mercadopago`** (nuevo, `core/payment/
+   MercadoPagoWebhookController`, público, sin JWT): resuelve el tenant
+   del query param `?tenantId=...` de la URL que se registró (**nunca**
+   del `TenantContext` que ya puso `TenantResolutionFilter` antes de
+   llegar acá, que resuelve "el único tenant activo" por defecto —
+   irrelevante para un webhook que es de un tenant específico). Saca el
+   id del pago del body (`{type, data: {id}}`, formato moderno) o de
+   query params como respaldo. **Nunca confía en el cuerpo de la
+   notificación para el estado real** — vuelve a pedirle el pago a la
+   API de Mercado Pago (`GET /v1/payments/{id}`, autenticado con el
+   Access Token del tenant) para no poder ser falseado. Si
+   `status=approved` → `OrderService.confirmFromPayment()` (nuevo —
+   mismo descuento de stock que la confirmación manual del panel,
+   `doConfirm()` extraído como privado y compartido entre las dos,
+   registrado como "Mercado Pago (pago validado)" en vez de un DNI). Si
+   `rejected`/`cancelled` → `markPaymentRejected()` (cancela el pedido
+   — nunca se tocó el stock, cancelar es seguro). Cualquier excepción
+   al aplicar el pago (ej. se quedó sin stock justo antes de que se
+   apruebe) queda sólo logueada, **siempre responde 200** — Mercado
+   Pago reintenta agresivo ante cualquier respuesta que no sea 2xx, y
+   reintentar no soluciona un problema de stock.
+4. `/mis-pedidos` (consulta pública) muestra el estado del pago y,
+   si sigue `PENDING`, un botón "Terminar de pagar" con el
+   `mpCheckoutUrl` guardado — no hace falta que el cliente vuelva a
+   armar el pedido si no llegó a pagar la primera vez.
+
+**Bug evitado antes de escribirlo mal (encontrado pensando el pedido
+del usuario "en el local también podría recibir Mercado Pago"):** si
+`OrderService.create()` hubiera arrancado el checkout online para
+CUALQUIER pedido con `paymentMethod=MERCADOPAGO` sin importar el canal,
+una venta de "Venta en el local" marcada como "me pagaron con Mercado
+Pago en el momento" (una etiqueta nada más, no un pago real que haya
+que validar) habría intentado crear una preferencia y un link de pago
+sin sentido. Por eso `create()` en sí NO toca Mercado Pago — sólo
+`createWebCheckout()` (checkout público) lo hace; `createPos()` sigue
+llamando a `create()` a secas.
+
+**`AppProperties`/`application.yml` suma `app.urls.backend`/
+`app.urls.frontend`** (`BACKEND_PUBLIC_URL`/`FRONTEND_URL`, default
+`localhost`) — hacían falta para armar `notification_url`/`back_urls`
+absolutas; no existía ningún concepto de "URL pública del deploy" en
+el proyecto antes (los mails de recuperación de cuenta mandan una
+contraseña nueva en texto, no un link).
+
+**Verificado en el navegador (con un Access Token de prueba FALSO —
+todavía no real):**
+- Pantalla `/admin/config/mercadopago`: activar + guardar token +
+  `GET /api/settings` confirma `mercadoPagoAvailable: true`.
+- Carrito público: con Mercado Pago activo, "¿Cómo vas a pagar?"
+  muestra sólo "Mercado Pago" (el resto desaparece), botón cambia a
+  "🅿️ Pagar con Mercado Pago".
+- Enviar el pedido con el token falso: error 403 de Mercado Pago
+  mostrado claro en el carrito, sin pedido huérfano en la base
+  (confirmado por SQL) — la transacción revirtió todo correctamente.
+- Desactivado el token falso al terminar para no dejar el checkout de
+  la tienda piloto roto.
+
+**2026-09-16 (continuación tras corte por límite de tokens):** cerrados
+los dos pendientes que no dependían de la cuenta real de Mercado Pago:
+- `admin-order-detail` (panel) ahora muestra el estado del pago debajo
+  de "Forma de pago" cuando `paymentMethod === 'MERCADOPAGO'` (mismo
+  patrón visual que "Mis pedidos" público: ⏳ pendiente / ✓ acreditado /
+  ✕ rechazado), leyendo `order.paymentStatus` que ya venía en el DTO
+  pero no se mostraba en ningún lado del panel. No se agregó
+  `mpPreferenceId` a la vista — es un id técnico interno sin utilidad
+  para el dueño de la tienda, no vale la pena exponerlo.
+- Arreglado el bug cosmético del banner "Promos disponibles" del
+  carrito: `promoHints()` (`cart-page.component.ts`) ahora omite los
+  hints de descuento por medio de pago (`Pagando con Transferencia o
+  Efectivo: X% off`) cuando `isMercadoPagoOnly()` es true, porque esos
+  medios dejan de ser elegibles en ese caso.
+- **Verificado en el navegador** (no sólo compilado): los 3 estados de
+  `paymentStatus` en `admin-order-detail` se probaron pisando
+  temporalmente `payment_method`/`payment_status` por SQL directo en un
+  pedido de prueba real (`PED-0002`) y revirtiendo el UPDATE al
+  terminar — no se creó un pedido de Mercado Pago real porque todavía
+  no hay Access Token de verdad (ver abajo). El fix del banner se
+  verificó con Mercado Pago activo de verdad en el carrito público: la
+  línea de "Pagando con Transferencia..." ya no aparece y "¿Cómo vas a
+  pagar?" sigue mostrando sólo Mercado Pago, sin regresión.
+
+**LO QUE FALTA — sigue bloqueado por el lado de Mercado Pago, no es
+código pendiente:**
+- **La prueba real con un Access Token de prueba de verdad** (el
+  usuario está sacando su cuenta de Mercado Pago) — sin eso no se vio
+  ni una vez la página de pago real de Mercado Pago (tarjeta, cuotas,
+  total), sólo el rechazo del token falso.
+- **El webhook nunca recibió una notificación real** — Mercado Pago no
+  puede pegarle a `localhost:8080`; hace falta un túnel (ngrok o
+  similar) para probarlo desde una compra de prueba real, o simularlo
+  a mano con `curl` contra el endpoint.
+- Sin test automatizado para nada de esta fase.
+
+---
+
 ## 5. Historial
 
+- **2026-09-16**: bug reportado por el usuario, en dos vueltas — en "Ver en
+  grande" de Apariencia y, más importante (lo que realmente había notado el
+  usuario), en el asistente **"Crear tienda"**: el pie de página de la vista
+  previa aparecía siempre con un marrón fijo, sin importar el rubro
+  elegido ni el color de marca, en vez de la paleta que le correspondería
+  a esa tienda en la página real.
+  - **Primer intento (insuficiente):** `FooterComponent.footerBg()`
+    trataba cualquier valor del input `footerColorOverride` (incluido
+    `null` explícito, que es como arranca `draftFooterColor()` mientras
+    nadie eligió un color de pie de página propio) como "el color a
+    usar" en vez de "sin elegir todavía" — eso dejaba el pie de página
+    sin ningún color (transparente, texto blanco invisible). El primer
+    fix lo tapó con un fallback fijo (`#7c2d12`), lo cual arregló que se
+    viera *algo* pero rompió la premisa real: todas las tiendas nuevas,
+    sin importar el rubro, mostraban el mismo marrón — el usuario lo
+    marcó explícitamente ("cuando pongo crear una tienda... todas me
+    aparecen con el footer marrón cuando debería ser por defecto como
+    es la página en realidad").
+  - **Causa raíz real:** el pie de página, desde su versión original (Fase
+    10, antes de romperse), no tiene un color fijo — usa la clase
+    Tailwind `bg-brand-700`, que lee la variable de tema `--color-brand-700`
+    (redefinida por `[data-theme]` según el rubro en el sitio real — ver
+    Fase 9 — y por `previewVars()`/`generateBrandRamp()` según el color de
+    marca elegido en las vistas previas de Apariencia y del asistente). En
+    una sesión anterior (Fase 12) alguien sacó esa clase del `<footer>` y
+    forzó siempre un `[style.background-color]` con `!important`, lo que
+    de entrada desconectó el pie de página del sistema de temas — el
+    fallback `#7c2d12` de mi primer intento heredó ese error en vez de
+    corregirlo.
+  - **Fix final:** restaurada la clase `bg-brand-700` en
+    `footer.component.html` (sacado el `!important`); `footerBg()` en
+    `footer.component.ts` ahora devuelve `null` (sin pisar nada) cuando no
+    hay color guardado ni override elegido — igual que `headerBg()` en
+    `HeaderComponent` — dejando que la clase (y por lo tanto el tema del
+    rubro / el color de marca de la preview) se aplique sola. Un solo
+    cambio en `FooterComponent` corrige los 3 lugares que lo usan
+    (Apariencia "ver en grande" y las dos vistas del asistente
+    "Crear tienda").
+  - **Verificado en el navegador:** en el asistente, creando (sin llegar a
+    confirmar) una tienda de rubro Ferretería sin tocar ningún color, el
+    pie de página de la preview pasó de un marrón fijo y desentonado a
+    seguir el mismo naranja que el resto de la vista previa (coherente,
+    ya que el asistente no ata el rubro a `[data-theme]` en la preview,
+    sólo al color de marca — eso es una limitación previa y separada, no
+    parte de este bug). En el sitio real se confirmaron los dos extremos:
+    la tienda piloto (`Estilos Pequeños`) sigue con su footer naranja de
+    siempre, sin regresión, y "El Yunque" (rubro Ferretería, con su propio
+    `data-theme="ferreteria"`) muestra el pie de página en el marrón-madera
+    propio de ese tema — ya no el marrón genérico fijo.
+- **2026-09-16**: Fase 12 — 3 bugs de las previews del asistente/Apariencia
+  (miniaturas de diseño todas con el mismo color, encabezado/pie de página
+  sin reaccionar al color y el pie de página ni aparecía, nombre/logo de
+  tienda nueva mostrando los de la piloto) encontrados por el usuario
+  probando la Fase 10, todos arreglados y verificados en el navegador.
+  Después, primer módulo real gateado por `Plan.enabledModules` (Fase 5,
+  hasta ahora sin usar): "Publicar en redes" — botón en el
+  formulario/listado de productos que comparte foto + texto (título,
+  descripción o texto libre, con preview en vivo) vía la Web Share API
+  nativa del celular, sin API de Meta ni credenciales guardadas. Corregido
+  en la misma sesión un bug real de pérdida de "activación de usuario" por
+  un `await` de más antes de `navigator.share()`, y un bug de backfill que
+  dejaba el módulo nuevo sin activar en el plan ya sembrado. Mercado Pago
+  (checkout con pago online, pedido por el usuario en la misma sesión)
+  discutido pero explícitamente diferido a su propia sesión de
+  planificación — ver detalle completo en la sección Fase 12.
 - **2026-09-16**: Fase 11 (nueva) — pausar/reanudar y eliminar tiendas,
   ambos a pedido del usuario. Pausar: `Tenant.active` (ya existía, sin
   usar) ahora se enforce de verdad en `TenantResolutionFilter` (503 en

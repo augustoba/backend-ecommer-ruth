@@ -21,6 +21,7 @@ import com.saasweb.core.admin.Permission;
 import com.saasweb.core.auth.AuthService;
 import com.saasweb.core.admin.RoleService;
 import com.saasweb.core.page.PageBlockService;
+import com.saasweb.core.plan.PlanService;
 import com.saasweb.core.settings.SiteSettingsService;
 import com.saasweb.core.tenant.TenantService;
 import org.slf4j.Logger;
@@ -46,6 +47,7 @@ public class DataSeeder implements CommandLineRunner {
     private final RoleService roleService;
     private final SiteSettingsService siteSettingsService;
     private final TenantService tenantService;
+    private final PlanService planService;
     private final PageBlockService pageBlockService;
     private final ParamRepository paramRepo;
     private final SizeScaleRepository sizeScaleRepo;
@@ -59,6 +61,7 @@ public class DataSeeder implements CommandLineRunner {
                       RoleService roleService,
                       SiteSettingsService siteSettingsService,
                       TenantService tenantService,
+                      PlanService planService,
                       PageBlockService pageBlockService,
                       ParamRepository paramRepo,
                       SizeScaleRepository sizeScaleRepo,
@@ -71,6 +74,7 @@ public class DataSeeder implements CommandLineRunner {
         this.roleService = roleService;
         this.siteSettingsService = siteSettingsService;
         this.tenantService = tenantService;
+        this.planService = planService;
         this.pageBlockService = pageBlockService;
         this.paramRepo = paramRepo;
         this.sizeScaleRepo = sizeScaleRepo;
@@ -84,6 +88,12 @@ public class DataSeeder implements CommandLineRunner {
     public void run(String... args) {
         // Tenant único de este deploy: siempre primero, todo lo demás lo asume creado.
         String tenantId = tenantService.ensureDefault().getId();
+        // `TenantService.ensureDefault()` sólo llama a `planService.ensureDefault()`
+        // la primera vez que crea el tenant (rama `orElseGet`) — en cualquier
+        // arranque posterior, con el tenant ya existente, nunca la vuelve a
+        // llamar. Sin esta línea, un módulo agregado a `Modules` después del
+        // primer arranque nunca se backfillearía al plan ya sembrado.
+        planService.ensureDefault();
         // Roles, config del sitio y usuarios iniciales: siempre (no son "datos de ejemplo").
         roleService.ensureSystemRole(); // "Superadmin": system=true, siempre todos los permisos, no pertenece a ningún tenant.
         // "Administrador": todo lo operativo de la tienda, salvo la config de plataforma

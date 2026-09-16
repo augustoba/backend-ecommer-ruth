@@ -6,6 +6,7 @@ import com.saasweb.core.tenant.TenantRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -31,17 +32,29 @@ public class PlanService {
 
     /** Crea el plan único de este deploy si todavía no existe. Idempotente. */
     public Plan ensureDefault() {
-        return repo.findBySlug(DEFAULT_SLUG).orElseGet(() -> {
-            Plan p = new Plan();
-            p.setId(UUID.randomUUID().toString());
-            p.setSlug(DEFAULT_SLUG);
-            p.setName("Plan por defecto");
-            p.setMaxProducts(null); // sin límite: todavía no hay planes de negocio definidos
-            p.setMaxAdminUsers(null);
-            p.setEnabledModules(Set.of("ropa"));
-            p.setShowPlatformBranding(false);
-            return repo.save(p);
+        Plan p = repo.findBySlug(DEFAULT_SLUG).orElseGet(() -> {
+            Plan created = new Plan();
+            created.setId(UUID.randomUUID().toString());
+            created.setSlug(DEFAULT_SLUG);
+            created.setName("Plan por defecto");
+            created.setMaxProducts(null); // sin límite: todavía no hay planes de negocio definidos
+            created.setMaxAdminUsers(null);
+            created.setEnabledModules(new LinkedHashSet<>(Set.of("ropa", Modules.SOCIAL_SHARE, Modules.MERCADOPAGO)));
+            created.setShowPlatformBranding(false);
+            return repo.save(created);
         });
+        // Backfill de módulos agregados después del primer arranque (mismo
+        // criterio que DataSeeder.backfillHeroSlidesAndLogos): un módulo
+        // nuevo no debe quedar desactivado en silencio para el plan que ya
+        // estaba sembrado. Agregar acá cada módulo nuevo que sume `Modules`.
+        Set<String> knownModules = Set.of(Modules.SOCIAL_SHARE, Modules.MERCADOPAGO);
+        if (!p.getEnabledModules().containsAll(knownModules)) {
+            Set<String> next = new LinkedHashSet<>(p.getEnabledModules());
+            next.addAll(knownModules);
+            p.setEnabledModules(next);
+            p = repo.save(p);
+        }
+        return p;
     }
 
     /** Plan del tenant actual (vía TenantContext). null si el tenant no tiene uno asignado. */

@@ -143,6 +143,26 @@ public class SiteSettings {
     @Column(nullable = false)
     private boolean paymentCashEnabled = false;
 
+    // --- Mercado Pago (Fase 13) — checkout con pago online real ---
+    // Credenciales POR TENANT (cada tienda cobra a su propia cuenta de
+    // Mercado Pago, no una cuenta de plataforma como Cloudinary) — mismo
+    // criterio de "secreto de verdad" que `smtpPassword`: `mpAccessToken`
+    // nunca se devuelve en ninguna respuesta, sólo se puede pisar. Editable
+    // por `PAYMENTS_MANAGE` (el admin normal de la tienda, no sólo
+    // superadmin) porque es SU cuenta, no una compartida.
+
+    /** Módulo del plan habilitado Y el tenant activó el checkout. */
+    @Column(nullable = false)
+    private boolean mpEnabled = false;
+
+    /** Access Token (de prueba o de producción) de la cuenta de Mercado Pago del tenant. Secreto real. */
+    @Column(length = 300)
+    private String mpAccessToken;
+
+    /** Public Key — no es secreta, se puede exponer al frontend si hiciera falta. */
+    @Column(length = 300)
+    private String mpPublicKey;
+
     // --- Cloudinary (subida de imágenes desde el panel) ---
     // Editable solo por superadmin (ver AdminUser.superAdmin); se leen desde el
     // endpoint público de settings porque cualquier sesión de admin las necesita
@@ -462,5 +482,29 @@ public class SiteSettings {
 
     public void setPaymentCashEnabled(boolean paymentCashEnabled) {
         this.paymentCashEnabled = paymentCashEnabled;
+    }
+
+    public boolean isMpEnabled() {
+        return mpEnabled;
+    }
+
+    public void setMpEnabled(boolean mpEnabled) {
+        this.mpEnabled = mpEnabled;
+    }
+
+    public String getMpAccessToken() {
+        return mpAccessToken;
+    }
+
+    public void setMpAccessToken(String mpAccessToken) {
+        this.mpAccessToken = mpAccessToken;
+    }
+
+    public String getMpPublicKey() {
+        return mpPublicKey;
+    }
+
+    public void setMpPublicKey(String mpPublicKey) {
+        this.mpPublicKey = mpPublicKey;
     }
 }

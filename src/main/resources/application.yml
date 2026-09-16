@@ -67,6 +67,13 @@ app:
     slug: ${TENANT_SLUG:estilos-pequenos}
     name: ${TENANT_NAME:Estilos Pequeños}
     demo-switch-enabled: ${TENANT_DEMO_SWITCH_ENABLED:true}
+  # URLs públicas de este deploy (Fase 13, Mercado Pago): BACKEND_PUBLIC_URL
+  # tiene que ser alcanzable desde internet para que Mercado Pago pueda
+  # avisar al webhook — en desarrollo local hace falta un túnel (ngrok o
+  # similar), "localhost" no sirve para probar un pago real.
+  urls:
+    backend: ${BACKEND_PUBLIC_URL:http://localhost:8080}
+    frontend: ${FRONTEND_URL:http://localhost:4200}
 
 logging:
   level:

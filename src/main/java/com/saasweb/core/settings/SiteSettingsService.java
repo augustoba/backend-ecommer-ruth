@@ -142,6 +142,23 @@ public class SiteSettingsService {
         return repo.save(s);
     }
 
+    /**
+     * Sólo lo puede llamar el controller gateado por la authority
+     * PAYMENTS_MANAGE (es la cuenta de Mercado Pago DEL TENANT, no una
+     * compartida — a diferencia de Cloudinary/SMTP no hace falta ser
+     * superadmin). {@code accessToken} en blanco = no tocar el que ya
+     * está guardado.
+     */
+    public SiteSettings updateMercadoPago(SiteSettingsDtos.MercadoPagoConfigRequest req) {
+        SiteSettings s = get();
+        s.setMpEnabled(Boolean.TRUE.equals(req.mpEnabled()));
+        if (req.accessToken() != null && !req.accessToken().isBlank()) {
+            s.setMpAccessToken(req.accessToken().trim());
+        }
+        s.setMpPublicKey(blankToNull(req.publicKey()));
+        return repo.save(s);
+    }
+
     private static SiteSettings defaults() {
         SiteSettings s = new SiteSettings();
         s.setTheme("default");

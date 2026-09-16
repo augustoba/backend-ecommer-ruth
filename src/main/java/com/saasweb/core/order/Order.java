@@ -71,6 +71,23 @@ public class Order {
     @Column(length = 20)
     private PaymentMethod paymentMethod;
 
+    /** Sólo para `paymentMethod = MERCADOPAGO` — null para cualquier otro medio. Ver {@link PaymentStatus}. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private PaymentStatus paymentStatus;
+
+    /** Id de la preferencia de pago creada en Mercado Pago (ver `core/payment/MercadoPagoService`). */
+    @Column(length = 100)
+    private String mpPreferenceId;
+
+    /** Link de pago (`init_point`) devuelto al crear la preferencia — para poder reofrecerlo si el cliente no pagó todavía. */
+    @Column(length = 500)
+    private String mpCheckoutUrl;
+
+    /** Id del pago aprobado en Mercado Pago, una vez confirmado por webhook. */
+    @Column(length = 100)
+    private String mpPaymentId;
+
     /** Si al crear el pedido aplicaba "envío gratis": el texto para mostrarle al cliente. null = no. */
     @Column(length = 300)
     private String freeShippingNote;
@@ -253,6 +270,38 @@ public class Order {
 
     public void setPaymentMethod(PaymentMethod paymentMethod) {
         this.paymentMethod = paymentMethod;
+    }
+
+    public PaymentStatus getPaymentStatus() {
+        return paymentStatus;
+    }
+
+    public void setPaymentStatus(PaymentStatus paymentStatus) {
+        this.paymentStatus = paymentStatus;
+    }
+
+    public String getMpPreferenceId() {
+        return mpPreferenceId;
+    }
+
+    public void setMpPreferenceId(String mpPreferenceId) {
+        this.mpPreferenceId = mpPreferenceId;
+    }
+
+    public String getMpCheckoutUrl() {
+        return mpCheckoutUrl;
+    }
+
+    public void setMpCheckoutUrl(String mpCheckoutUrl) {
+        this.mpCheckoutUrl = mpCheckoutUrl;
+    }
+
+    public String getMpPaymentId() {
+        return mpPaymentId;
+    }
+
+    public void setMpPaymentId(String mpPaymentId) {
+        this.mpPaymentId = mpPaymentId;
     }
 
     public String getFreeShippingNote() {

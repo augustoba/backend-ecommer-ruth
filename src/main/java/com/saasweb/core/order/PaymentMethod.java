@@ -9,5 +9,7 @@ public enum PaymentMethod {
     /** QR o link de pago con tarjeta. */
     QR_CARD,
     /** Efectivo al recibir/retirar. */
-    CASH
+    CASH,
+    /** Pago online real con Mercado Pago (Fase 13, checkout redirect) — ver `core/payment/`. */
+    MERCADOPAGO
 }
