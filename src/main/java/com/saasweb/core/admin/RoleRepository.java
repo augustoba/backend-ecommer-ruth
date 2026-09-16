@@ -23,4 +23,12 @@ public interface RoleRepository extends JpaRepository<Role, String> {
 
     @Query("select r from Role r where r.id = :id and (r.tenantId = :tenantId or r.system = true)")
     Optional<Role> findByIdForTenant(@Param("id") String id, @Param("tenantId") String tenantId);
+
+    /**
+     * Borra los roles propios del tenant — ver TenantDeletionService. Nunca
+     * toca el rol de sistema (`system = true`, `tenantId` null): el filtro
+     * `tenantId = :tenantId` ya lo excluye solo. Correr DESPUÉS de borrar
+     * los AdminUser del tenant (ver esa nota en AdminUserRepository).
+     */
+    void deleteAllByTenantId(String tenantId);
 }

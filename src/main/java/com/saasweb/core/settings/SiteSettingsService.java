@@ -25,14 +25,64 @@ public class SiteSettingsService {
      * llama {@code TenantProvisioningService} antes de que nadie pida
      * {@link #get()} para ese tenant.
      */
-    public SiteSettings createFor(String tenantId, String storeName, String theme, String logoUrl) {
+    public SiteSettings createFor(String tenantId, String storeName, String theme, String layout, String logoUrl) {
         SiteSettings s = new SiteSettings();
         s.setId(tenantId);
         s.setTheme(theme);
+        s.setLayout(layout);
         s.setStoreName(storeName);
         s.setWhatsappNumber("5491100000000");
         s.setLogoUrl(logoUrl);
+        // Cloudinary es una cuenta de plataforma, no por tenant (ver javadoc del
+        // campo) — sin esto, una tienda nueva no puede subir ninguna imagen
+        // desde el panel hasta que un superadmin la configure a mano.
+        repo.findFirstByCloudinaryCloudNameIsNotNull().ifPresent(existing -> {
+            s.setCloudinaryCloudName(existing.getCloudinaryCloudName());
+            s.setCloudinaryUploadPreset(existing.getCloudinaryUploadPreset());
+        });
         return repo.save(s);
+    }
+
+    /**
+     * Aplica identidad + color de marca directo por id de tenant — a
+     * diferencia de {@link #updatePlatform}/{@link #updateAppearance}, NO
+     * pasa por {@link TenantContext} (durante el alta de un tenant nuevo la
+     * request todavía está en el contexto del superadmin, no en el del
+     * tenant recién creado). La usa {@code TenantProvisioningService} para
+     * que el asistente "Crear tienda" pueda mandar todo junto en el alta
+     * (ver PLAN_SAAS.md Fase 10). Parámetros null se ignoran.
+     */
+    /**
+     * Todos los campos opcionales que junta el asistente "Crear tienda"
+     * ANTES de crear nada (ver PLAN_SAAS.md Fase 10) — un objeto en vez de
+     * seguir sumando parámetros String sueltos a `applyOnboardingExtras`.
+     * Cada uno, si no es null, pisa el valor por defecto de esa fila recién
+     * creada; si es null, queda el default de siempre.
+     */
+    public record OnboardingExtras(String brandColor, String headerColor, String footerColor, String textColor,
+                                    String pageBackgroundColor, String whatsappNumber, String instagram,
+                                    String facebookUrl, String logoUrl, String logoShape) {
+        public boolean isEmpty() {
+            return brandColor == null && headerColor == null && footerColor == null && textColor == null
+                    && pageBackgroundColor == null && whatsappNumber == null && instagram == null
+                    && facebookUrl == null && logoUrl == null && logoShape == null;
+        }
+    }
+
+    public void applyOnboardingExtras(String tenantId, OnboardingExtras extras) {
+        if (extras.isEmpty()) return;
+        SiteSettings s = repo.findById(tenantId).orElseThrow();
+        if (extras.brandColor() != null) s.setBrandColor(extras.brandColor());
+        if (extras.headerColor() != null) s.setHeaderColor(extras.headerColor());
+        if (extras.footerColor() != null) s.setFooterColor(extras.footerColor());
+        if (extras.textColor() != null) s.setTextColor(extras.textColor());
+        if (extras.pageBackgroundColor() != null) s.setPageBackgroundColor(extras.pageBackgroundColor());
+        if (extras.whatsappNumber() != null) s.setWhatsappNumber(extras.whatsappNumber());
+        if (extras.instagram() != null) s.setInstagram(cleanHandle(extras.instagram()));
+        if (extras.facebookUrl() != null) s.setFacebookUrl(extras.facebookUrl());
+        if (extras.logoUrl() != null) s.setLogoUrl(extras.logoUrl());
+        if (extras.logoShape() != null) s.setLogoShape(extras.logoShape());
+        repo.save(s);
     }
 
     /** Devuelve la fila de settings del tenant actual; si no existe, la crea con los valores por defecto. */
@@ -58,11 +108,24 @@ public class SiteSettingsService {
         s.setInstagram(cleanHandle(req.instagram()));
         s.setFacebookUrl(blankToNull(req.facebookUrl()));
         s.setLogoUrl(blankToNull(req.logoUrl()));
+        s.setLogoShape(blankToNull(req.logoShape()));
         s.setWhatsappIntro(blankToNull(req.whatsappIntro()));
         s.setWhatsappClosing(blankToNull(req.whatsappClosing()));
         s.setStoreAddress(blankToNull(req.storeAddress()));
         s.setHelpText(blankToNull(req.helpText()));
         s.setFaqText(blankToNull(req.faqText()));
+        return repo.save(s);
+    }
+
+    /** Diseño de página + color de marca (ver PLAN_SAAS.md Fase 10). */
+    public SiteSettings updateAppearance(SiteSettingsDtos.AppearanceRequest req) {
+        SiteSettings s = get();
+        s.setLayout(blankToNull(req.layout()));
+        s.setBrandColor(blankToNull(req.brandColor()));
+        s.setHeaderColor(blankToNull(req.headerColor()));
+        s.setFooterColor(blankToNull(req.footerColor()));
+        s.setTextColor(blankToNull(req.textColor()));
+        s.setPageBackgroundColor(blankToNull(req.pageBackgroundColor()));
         return repo.save(s);
     }
 

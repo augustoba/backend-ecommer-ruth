@@ -11,4 +11,7 @@ public interface CouponRepository extends JpaRepository<Coupon, String> {
     Optional<Coupon> findByTenantIdAndCodeIgnoreCase(String tenantId, String code);
     boolean existsByTenantIdAndCodeIgnoreCase(String tenantId, String code);
     List<Coupon> findByTenantIdOrderByCreatedAtDesc(String tenantId);
+
+    /** Ver TenantDeletionService. */
+    void deleteAllByTenantId(String tenantId);
 }

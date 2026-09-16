@@ -13,6 +13,9 @@ public interface ExchangeRepository extends JpaRepository<Exchange, String> {
 
     Optional<Exchange> findByIdAndTenantId(String id, String tenantId);
 
+    /** Borra los cambios del tenant (y sus líneas, cascade ALL/orphanRemoval) — ver TenantDeletionService. */
+    void deleteAllByTenantId(String tenantId);
+
     List<Exchange> findByTenantIdOrderByCreatedAtDesc(String tenantId);
 
     List<Exchange> findByTenantIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(

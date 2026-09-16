@@ -5,7 +5,7 @@
 > multi-tenant. Se actualiza cada vez que se avanza una fase (no día a día:
 > para eso está el Historial de `PROYECTO.md`).
 
-Última actualización: 2026-09-15.
+Última actualización: 2026-09-16.
 
 Origen: propuesta inicial en `propuesta_ecommerce_saas.txt` (escritorio del
 usuario) + análisis del código actual hecho en esta conversación.
@@ -622,10 +622,586 @@ Estilos Pequeños):**
   color + emoji) que ya tenía la tienda piloto — no son fotos reales, pero
   ya eran así antes de este cambio; no se rediseñaron.
 
+### Fase 10 — Layout + color de marca configurables por tenant ✅ (completa para Ropa; Pasos 1-11)
+
+A pedido del usuario: además del `theme` con nombre (Fase 6/9, sólo
+colores/tipografía), poder elegir **un layout de página realmente
+distinto** (estructura de home/catálogo) y **un color de marca libre**
+(no una lista fija de paletas), como dos ejes independientes entre sí.
+Confirmado con el usuario: el color se elige libre (color picker), no de
+un catálogo curado; y el layout actual de la tienda piloto ("Estilos
+Pequeños") queda como una opción más (`"classic"`), no se reemplaza.
+Se avanza en 5 pasos chicos, cada uno verificado en el navegador antes
+del siguiente (mismo criterio que las fases anteriores).
+
+**Paso 1 (backend, ✅):** `SiteSettings.layout` (String, nullable) y
+`SiteSettings.brandColor` (String, nullable, hex) — mismo patrón aditivo
+que `theme`. `Rubro.defaultLayout` por constante (hoy `"classic"` para
+los 3 rubros — es el único layout que existe). Verificado: `GET
+/api/settings` de la tienda piloto devuelve `layout:"classic"` y
+`brandColor:null` sin ningún otro cambio.
+
+**Paso 2 (frontend, ✅):** `SettingsService` aplica `data-layout` en
+`<html>` (mismo patrón que `data-theme`). Nuevo
+`core/utils/color-ramp.ts` (`generateBrandRamp`): deriva las 8 paradas
+`--color-brand-50..700` de un solo hex por mezcla con blanco/negro (el
+500 queda igual al color elegido). Se aplican inline con
+`style.setProperty` sobre `<html>`, por encima del `[data-theme]` con
+nombre — mismo mecanismo de override en runtime verificado en Fase 6.
+Verificado en el navegador: sin `brandColor`, cero cambio; fijando uno a
+mano repinta header/hero/botones al instante.
+
+**Paso 3 (frontend, ✅):** primer segundo layout real, `"editorial"` —
+en vez de un componente Angular separado (duplicaría los ~150 líneas de
+lógica de filtros/orden/paginación de `CatalogPageComponent`), se
+implementó como una segunda rama de template dentro del mismo
+`catalog-page.component.html` (`@if (layout() === 'editorial')`),
+seleccionada por el signal `layout` del mismo componente — misma lógica
+de catálogo para cualquier layout, sólo cambia la portada (hero de fondo
+sólido, tipografía grande, sin avatar circular) y la grilla (3 columnas
+en vez de 4). 100% basado en clases `brand-*`/`font-display` (nada de
+color hardcodeado), para que cualquier `brandColor` lo pinte bien.
+Verificado en el navegador contra `el-yunque` (seteando `layout`/
+`brandColor` a mano en la fila de `site_settings` y revirtiendo después):
+la tienda piloto no cambió ni un píxel; `el-yunque` con
+`layout="editorial"` + un `brandColor` de prueba mostró la estructura
+nueva repintada en ese color, mientras sus fotos de carrusel (imágenes,
+no tokens) siguieron con su propia paleta — confirma los dos ejes
+(layout, color) funcionando de forma independiente.
+
+**Replanteo tras el Paso 3 — el gap real no era el formulario de "Crear
+tienda":** al revisarlo con el usuario, un tenant nuevo no tiene ningún
+`AdminUser` propio (`TenantProvisioningService.provision()` no crea
+uno), así que no hay forma de loguearse como esa tienda para entrar a
+`/admin/config`. Investigando el mecanismo de "modo demo"
+(`X-Demo-Tenant` + `JwtAuthFilter.findByDniForTenant` con `tenantId IS
+NULL` para superadmin + roles `system=true`) se confirmó que **ya
+alcanza para que el superadmin edite cualquier tenant sin loguearse como
+su admin** — no hizo falta backend nuevo para eso, sólo conectar la
+navegación.
+
+**Paso 4 (backend, ✅):** `PUT /api/admin/settings/appearance
+{layout, brandColor}` (`SiteSettingsController`/`Service`/`Dtos`), mismo
+nivel de permiso que `platform`. Validado con `curl` + `X-Demo-Tenant`.
+
+**Paso 5 (✅):** pantalla "Apariencia" en `/admin/config/apariencia`
+(`admin-appearance`, tarjeta nueva en el hub). Las miniaturas de diseño
+son el `CatalogPageComponent` real escalado (nuevo `input()`
+`layoutOverride`, para forzar un layout puntual sin pisar
+`SiteSettings`) — no imágenes estáticas. El color se previsualiza sólo
+dentro de las miniaturas (variables CSS scoped con `[ngStyle]`, reusando
+`generateBrandRamp`), sin repintar el resto del panel hasta guardar.
+
+**Paso 6 (✅):** botón "Configurar esta tienda" en
+`admin-superadmin-tiendas` (junto a "Ver esta tienda"): activa el mismo
+demo-switch y navega a `/admin/config` en vez de `/`. Con esto el
+superadmin ya edita identidad, redes, WhatsApp, logo, carrusel y
+apariencia de cualquier tienda — pantallas que ya existían, cero
+duplicación. `submit()` ahora lleva ahí directo después de crear.
+Verificado en el navegador contra `el-yunque` (cambio de nombre y de
+apariencia, revertidos después, confirmados por SQL): sólo cambió esa
+fila, el piloto y las demás tiendas quedaron intactas.
+
+**Paso 7 (✅, 2026-09-16): consolidación final de layouts (6 en total) +
+logo en cada uno.**
+
+Los primeros 3 layouts nuevos que se probaron después del Paso 3
+(`"editorial"`, `"marketplace"`, `"vidriera"`) se armaron de memoria vaga
+de unos Figma que había mostrado el usuario antes en la conversación —
+**el usuario los rechazó explícitamente dos veces** ("estas inventando
+disenos que no tiene absolutamenta nada que ver con lo que te mostre";
+"son iguales a la de estilo pequeno con cambios taan chicos que ni se
+notan"). Se **borraron los 3** y se cambió de método: en vez de reconstruir
+de memoria o clonar screenshots de sitios comerciales reales (se probó
+también eso — el usuario pidió explícitamente ser honesto si no se podía
+replicar exacto, y la respuesta fue que no, por la dependencia de
+fotografía real del sitio), se usaron **6 temas de WordPress reales,
+gratuitos/GPL, bajados por el usuario a una carpeta `templates/` en el
+Escritorio** como referencia estructural (layout/composición, no código):
+`shopper-store`, `rife-free`, `shoppingcart`, `big-store`, `botiga`,
+`online-shop`. Se verificó la licencia (header GPL v2/v3 en `style.css` de
+cada zip) antes de usarlos como referencia.
+
+**Set final de 6 layouts** (todos como ramas `@if/@else if` dentro del
+mismo `catalog-page.component.html`, no componentes separados — mismo
+criterio que el Paso 3, para no duplicar la lógica de filtros/orden/
+paginación):
+- `classic` — el diseño original de la tienda piloto (avatar circular
+  grande + degradé).
+- `minimal` (inspirado en Botiga) — hero partido texto/foto sobre fondo
+  gris.
+- `boutique` (inspirado en Minna, visto en Framer) — foto grande a sangre
+  con etiqueta de promo superpuesta.
+- `curva` (inspirado en Rife Free) — foto oscurecida con borde inferior
+  curvo, texto centrado.
+- `grid` (inspirado en Shopper) — franja de foto chica + título, directo a
+  la grilla.
+- `mercado` (consolida Shopping Cart + Big Store + Online Shop — los 3
+  eran estructuralmente casi idénticos: sidebar de categorías + banner +
+  tarjetas de promo) — el más denso, tipo marketplace.
+
+Fotos de las 5 demos nuevas: Unsplash, licencia gratuita de uso comercial,
+buscadas con browser automation filtrando resultados patrocinados/iStock.
+Íconos de producto de la demo "Ropa" (antes emoji+color) también se
+cambiaron a fotos reales de Unsplash (`RubroImages.productIcon` sumó un
+overload con `imageUrl`) — sólo para la demo de Ropa; production
+tenants siguen subiendo sus propias fotos.
+
+**Logo en cada layout (a pedido del usuario, tras notar que sólo Clásico
+tenía uno grande):** se creó `shared/components/logo/logo.component.ts`
+(`LogoComponent`, nuevo) — `<app-logo [src] [alt] [size] [extraClass]>`,
+lee `SettingsService.settings().logoShape` (ver Paso 8) para decidir las
+clases de recorte, `host: { style: 'display: contents' }` para no romper
+el `flex`/`gap` de los contenedores que lo usan (bug real encontrado y
+corregido: sin esto, el host del componente ocupaba su propio espacio de
+layout y desalineaba el logo respecto al texto al lado). Reemplazó los
+`<img>` sueltos con `CldImagePipe` en `header`, `footer`, y el avatar de
+Clásico. Se agregó un `<app-logo>` en cada uno de los otros 5 layouts, en
+el lugar que mejor encaja con la composición de cada uno (no el mismo
+tratamiento en todos):
+- `minimal`: chico, arriba del título, como marca de encabezado.
+- `boutique`: al lado del nombre en la barra de texto debajo de la foto.
+- `curva`: centrado, con anillo blanco, arriba del título (sobre la foto
+  oscurecida).
+- `grid`: al lado del nombre en la barra de título.
+- `mercado`: al lado del nombre, dentro del banner (junto al texto "Envío
+  gratis").
+
+El header/footer YA mostraban el logo chico en los 6 layouts (es un
+componente global, no depende del layout) — este paso agrega un SEGUNDO
+lugar más protagónico específico de cada diseño, no reemplaza al del
+header.
+
+**Paso 8 (✅, 2026-09-16): forma del logo (`logoShape`).**
+
+El logo se mostraba siempre recortado en círculo (`rounded-full`), sin
+importar la forma real del archivo subido — un logo rectangular/cuadrado
+quedaba mal. En vez de detectar automáticamente la forma del archivo (se
+evaluó y se descartó: heurísticas de aspect-ratio son poco confiables y
+generan sorpresas), se decidió con el usuario que sea una **elección
+explícita** de quien sube el logo.
+
+- Backend: `SiteSettings.logoShape` (String nullable — null se trata como
+  `"circle"` en `SettingsResponse`, así ningún logo ya cargado cambia de
+  golpe), validado `^$|^(circle|square|rectangle)$`. Sumado a
+  `PlatformSettingsRequest` (edición de una tienda existente, vía
+  `PUT /api/admin/settings/platform`) y a `TenantCreateRequest`/
+  `SiteSettingsService.OnboardingExtras` (alta de tienda nueva vía el
+  asistente — ver Paso 11). **No está en `AppearanceRequest`** (ese
+  endpoint es sólo `layout`+`brandColor`+los 4 colores del Paso 9).
+- Frontend: `LogoComponent.classes()` (computed) decide
+  `rounded-full object-cover` (circle) / `rounded-lg object-cover`
+  (square) / `rounded-md object-contain` (rectangle, con `max-width`
+  mayor para no recortar el ancho). Selector de 3 botones (Redondo/
+  Cuadrado/Rectangular) agregado en `admin-config-section` (pantalla
+  "Identidad y contacto", junto al upload de logo existente) y en el
+  asistente "Crear tienda" (paso Logo — ver Paso 11). El mini-mockup de
+  `site-preview.component` (usado en esa misma pantalla, al costado del
+  form) también refleja la forma elegida en vivo (`logoShapeClass`
+  computed), aunque **NO refleja los colores granulares del Paso 9** —
+  sólo se extendió para la forma del logo.
+
+**Paso 9 (✅, 2026-09-16): colores independientes del color de marca.**
+
+El usuario pidió, dos veces, poder elegir por separado el color del
+encabezado, el del pie de página, el de los títulos/nombre y el del fondo
+de la página — no sólo un color de marca único que deriva una rampa.
+
+- Backend: `SiteSettings` sumó 4 campos nullable, todos hex, todos
+  independientes entre sí y de `brandColor`: `headerColor`, `footerColor`,
+  `textColor`, `pageBackgroundColor`. `null` en cualquiera = seguir
+  derivando esa parte de `brandColor`/del layout, como siempre (cero
+  cambio para tenants existentes). Sumados a `AppearanceRequest` (tienda
+  existente) Y a `TenantCreateRequest`/`OnboardingExtras` (tienda nueva).
+  **Nota:** `SiteSettingsService.applyOnboardingExtras` tenía ya 7
+  parámetros String sueltos antes de este paso; en vez de seguir sumando
+  parámetros posicionales (con 4 más iba a tener 11), se refactorizó a
+  recibir un record `SiteSettingsService.OnboardingExtras` — si se agrega
+  un campo más a futuro, va ahí, no como parámetro nuevo del método.
+- Mecanismo (frontend) — **importante para no reinventar esto mal**: se
+  evaluó y se DESCARTÓ hacer esto con variables CSS + `var(--x, revert)`
+  (la idea era que el valor por defecto "revierta" a la clase Tailwind de
+  siempre) — **no es válido**: la spec de CSS Custom Properties prohíbe un
+  keyword de "CSS-wide" (`revert`/`initial`/`unset`) como fallback de
+  `var()`, así que esa declaración quedaría inválida en todos los
+  navegadores. El mecanismo real que se usó:
+  - Header/Footer (`header.component`, `footer.component`): un
+    `computed()` que lee `SettingsService.settings().headerColor`/
+    `footerColor`/`textColor` directo, atado con
+    `[style.background-color]`/`[style.color]`. Cuando el valor es
+    `null`, Angular **quita** el estilo inline por completo (no lo pone en
+    blanco) — así la clase Tailwind de siempre (incluida su variante
+    `dark:`) sigue mandando. Esto NO sirve para preview-antes-de-guardar
+    porque header/footer siempre leen el `SettingsService` global, nunca
+    un borrador.
+  - `CatalogPageComponent`: se agregaron 2 inputs nuevos,
+    `textColorOverride`/`pageBgOverride` (mismo patrón ya existente de
+    `layoutOverride`/`logoOverride`): `undefined` = usar `SiteSettings` de
+    siempre, string/`null` = lo que mande un borrador (Apariencia o el
+    asistente) sin tocar la config real. `pageBg` se aplica en el HOST del
+    componente (`host: { '[style.background-color]': 'pageBg()' }`) — se
+    ve en las zonas de cada layout que hoy NO tienen fondo propio (la
+    sección "Lo más vendido" y la grilla del catálogo en los 6 layouts,
+    verificado que ninguno declara un `background` ahí). `headingColor` se
+    ató con `[style.color]` en el `<h1>` principal de cada uno de los 6
+    layouts.
+  - **A propósito NO se tocó**: el interior de las fotos/degradés de cada
+    hero (`curva`, `boutique`, `mercado` tienen imagen de fondo — pisar
+    sólo `background-color` ahí no cambia nada visualmente porque
+    `background-image` se pinta encima), ni los mil matices de gris de
+    texto secundario/párrafos/labels de cada layout — sólo el título/nombre
+    de marca. Esto es una decisión de alcance, no un olvido: cubrir "cada
+    gris posible" con un solo color rompería la jerarquía visual que cada
+    layout ya tiene.
+- UI: 4 selectores de color (Encabezado / Pie de página / Títulos y nombre
+  / Fondo de la página, cada uno "elegido + quitar", mismo patrón que el
+  picker de `brandColor` que ya existía) agregados en DOS lugares
+  distintos, con implementación duplicada (NO es un componente
+  compartido — si se quiere refactorizar a uno compartido, hoy hay 2
+  copias de la misma UI a mantener):
+  - `admin-appearance.component` (pantalla "Apariencia" de una tienda
+    existente) — signals `draftHeaderColor`/`draftFooterColor`/
+    `draftTextColor`/`draftPageBgColor`.
+  - `tenant-wizard.component` (paso "Color" del asistente — ver Paso 11)
+    — mismos 4 signals, mismo patrón, código separado.
+  - Las miniaturas de diseño de `admin-appearance` y la vista previa del
+    asistente pasan `[textColorOverride]`/`[pageBgOverride]` con el
+    borrador actual a `<app-catalog-page>` para que el cambio se vea al
+    instante sin guardar nada.
+- **NO hecho**: el resumen de "Confirmar" del asistente (paso 6) NO
+  muestra los 4 colores granulares elegidos (sólo muestra `brandColor` +
+  logo + forma) — si se elige un color de encabezado/pie/etc. en el paso
+  Color, no aparece en el resumen antes de crear. Gap de UX menor, no
+  bloqueante.
+
+**Paso 10 (✅, 2026-09-16): sugerir el color de marca a partir del logo.**
+
+A pedido del usuario ("se podria hacer algo asi como elegir colores
+acordes al logo y que el logo se analice"): nuevo
+`core/utils/logo-color.ts` (`extractLogoColor(imageUrl): Promise<string |
+null>`) — 100% client-side, sin pegarle al backend. Dibuja la imagen en un
+`<canvas>` de 48×48, descarta píxeles casi blancos/negros/de baja
+saturación (asume que son fondo del logo, no el color de marca), agrupa
+los píxeles restantes en buckets de a pasos de 24 (para tolerar
+antialiasing/compresión JPG) y devuelve el color promedio del bucket más
+grande, en hex.
+
+- Botón "Sugerir color de marca según el logo" en `admin-appearance`
+  (sólo visible si la tienda ya tiene un logo guardado — usa
+  `settingsService.settings().logoUrl`) y en el paso Color del asistente
+  (sólo visible si ya se subió un logo en el paso anterior — usa el
+  `logoDataUrl` en memoria del asistente, ver Paso 11; funciona porque una
+  data URL nunca tiene problema de CORS con `canvas.getImageData`, a
+  diferencia de una URL de Cloudinary cross-origin, que si algún día falla
+  ahí es por eso — el código ya maneja el error con `try/catch` y
+  `resolve(null)`, mostrando "no se pudo sacar un color claro, elegilo a
+  mano").
+- El color sugerido sólo pisa `draftBrandColor` — el usuario puede seguir
+  ajustándolo a mano después (input de color normal), y los 4 colores
+  granulares del Paso 9 son 100% independientes de esto.
+- Este pedido fue lo que motivó reordenar el asistente para que el paso
+  Logo vaya ANTES que el paso Color (ver Paso 11) — si no, no habría logo
+  todavía para sugerir nada.
+
+**Paso 11 (✅, 2026-09-16): asistente "Crear tienda" — reordenado a 7
+pasos + logo diferido hasta confirmar.**
+
+Orden final: **1 Diseño → 2 Logo → 3 Color (con sugerencia del logo) → 4
+Identidad (WhatsApp/Instagram/Facebook) → 5 Previsualización (pantalla
+completa) → 6 Confirmar → 7 Listo.** Antes eran 6 pasos (Diseño → Color →
+Identidad-con-logo-adentro → Preview → Confirmar → Listo); el logo se
+separó de "Identidad" a su propio paso y se movió antes de "Color" (ver
+Paso 10, motivo).
+
+Dos bugs reales encontrados por el usuario probando el asistente y
+corregidos en el momento:
+1. **El logo elegido no se veía en la vista previa** (ni en el panel
+   persistente de los pasos 1-4, ni en la pantalla completa del paso 5).
+   Causa: `CatalogPageComponent` leía el logo del `SettingsService` GLOBAL
+   (la tienda piloto u otra ya activa), no el borrador local del
+   asistente — la tienda todavía no existe en ese punto, así que no hay
+   ningún `SiteSettings` propio para leer. Arreglado con un input nuevo,
+   `logoOverride` (mismo patrón de override que `layoutOverride`/
+   `textColorOverride`/`pageBgOverride`), pasado como
+   `[logoOverride]="logoDataUrl()"` en las 2 instancias de
+   `<app-catalog-page>` del asistente.
+2. **El paso de Previsualización (5) no tenía botón "← Atrás"** — sólo
+   "Ver a pantalla completa" y "Saltear este paso" (ambos hacia adelante).
+   Se agregó "← Atrás" al lado de "Saltear este paso".
+
+**Cambio de comportamiento importante, a pedido explícito del usuario**
+("el logo... no se deberia subir a la nube si no crea la pagina"): el
+archivo del logo YA NO se sube a Cloudinary al elegirlo en el asistente.
+Se redimensiona localmente (reusa `resizeImageFile`, ya existía) y queda
+SÓLO como una data URL en memoria (`logoDataUrl` signal) — esa misma data
+URL sirve de preview (`<img [src]>`) Y de fuente para la sugerencia de
+color (Paso 10). La subida real a Cloudinary ocurre recién dentro de
+`crearTienda()`, justo antes de llamar a `tenantAdmin.create(...)` — si el
+asistente se cancela antes de ese punto, nunca se mandó nada a Cloudinary
+(cero imágenes húerfanas). **Este mismo problema (subida inmediata al
+elegir el archivo) sigue existiendo tal cual en `admin-config-section`**
+(pantalla "Identidad y contacto" de una tienda YA CREADA) — ahí SÍ tiene
+sentido subir de inmediato porque la tienda ya existe y no hay "cancelar
+la creación"; no se tocó y no hace falta tocarlo. El usuario también
+mencionó "las fotos de carrusel" en el mismo pedido, pero **el asistente
+hoy no tiene ningún paso de carrusel** (el carrusel se carga después de
+creada la tienda, vía `/admin/carrusel`, donde la tienda ya existe de
+verdad) — no había nada que diferir ahí; si en el futuro se agrega un
+paso de carrusel al asistente, aplicar el mismo patrón de "diferir hasta
+confirmar".
+
+`TenantAdminService.TenantCreateRequest` (interfaz frontend) y el DTO
+backend `TenantCreateRequest` quedaron con estos campos opcionales,
+todos ignorados si vienen vacíos/ausentes: `layout`, `brandColor`,
+`headerColor`, `footerColor`, `textColor`, `pageBackgroundColor`,
+`whatsappNumber`, `instagram`, `facebookUrl`, `logoUrl`, `logoShape`.
+
+**Verificado en el navegador (todos los pasos 7-11), sin tocar datos
+reales:** los 6 layouts muestran su logo en el lugar esperado (miniaturas
+de "Apariencia"); cambiar la forma del logo en "Identidad y contacto"
+repinta el preview en vivo sin guardar; en el asistente, subir un logo de
+prueba (PNG azul sólido generado por canvas) lo mostró correcto en las 2
+vistas previas, "Sugerir color según el logo" devolvió exactamente
+`#1d4ed8` (el color exacto del PNG de prueba) y repintó toda la vista
+previa; los 4 colores granulares del asistente cambiaron el fondo/textos
+de la vista previa en vivo; se confirmó con Network/consola que NO hay
+ningún request a Cloudinary hasta tocar "Crear tienda", y que cancelar el
+asistente después de subir un logo no genera ningún request tampoco.
+
+**Discutido con el usuario pero explícitamente diferido — NO implementar
+sin que el usuario lo pida de nuevo (no son bugs ni "olvidos"):**
+- **Campos de formulario distintos según el layout elegido.** El usuario
+  preguntó si algún día cada layout va a necesitar campos propios en el
+  formulario de identidad (ej. tagline editable, foto de hero propia por
+  layout). Respuesta dada en su momento: no todavía — hoy los 6 layouts
+  comparten exactamente los mismos campos (`storeName`, `logoUrl`,
+  `logoShape`, WhatsApp, Instagram, Facebook); esto recién se justifica el
+  día que un layout concreto necesite un dato que otro no necesita.
+- **Guía de tamaño de foto de hero por layout.** Se confirmó con el
+  usuario que las fotos de hero de los 6 layouts SÍ tienen proporciones
+  reales distintas entre sí (alturas fijas en `catalog-page.component.html`:
+  `minimal` 280-380px, `boutique` 320-440px, `curva` 420-520px, `grid`
+  224-288px, `mercado` variable con `aspect-ratio`, `classic` usa el
+  carrusel de siempre a 21:9) — pero no se construyó ninguna guía/ayuda en
+  el formulario de subida que le diga a quien sube una foto "para este
+  layout conviene tal proporción". Sigue pendiente si se quiere agregar.
+- **Selector de forma del logo por detección automática del archivo.** Se
+  evaluó (¿se puede saber si el archivo subido es redondo/cuadrado/
+  rectangular?) y se descartó a favor de la elección explícita del Paso 8
+  — no hay heurística de detección automática en ningún lado del código,
+  no intentar agregarla sin discutirlo de nuevo.
+
+---
+
+### Fase 11 — Ciclo de vida del tenant: pausar y eliminar ✅ (2026-09-16)
+
+A pedido del usuario: un botón para pausar una tienda (dejarla de mostrar
+al público sin borrar nada) y otro para eliminarla por completo (borrado
+real e irreversible de todos sus datos). Dos features independientes,
+gateadas igual que el resto de `TenantController` (`hasAuthority
+('SUPERADMIN')`).
+
+**Pausar / reanudar:**
+
+- `Tenant.active` **ya existía** en el modelo desde la Fase 3 (default
+  `true`) pero no estaba enforced en ningún lado salvo
+  `MarketingCampaignScheduler` (que ya salteaba campañas de tenants
+  inactivos) — no bloqueaba ver el storefront de una tienda "inactiva".
+  Este paso lo conecta de verdad por primera vez.
+- Nuevo: `TenantRepository.existsByIdAndActiveTrue`,
+  `TenantService.isActive(tenantId)` / `setActive(tenantId, active)`.
+- `TenantController`: `PATCH /api/admin/tenants/{id}/active
+  {active: boolean}`.
+- **Enforcement real, en `TenantResolutionFilter`** (después de resolver
+  el tenant de la request): si el tenant resuelto NO está activo Y el
+  path de la request no empieza con `/api/admin/` ni `/api/auth/` →
+  responde `503` con JSON `{"error":"tienda_pausada","message":"Esta
+  tienda está pausada."}` (con `setCharacterEncoding("UTF-8")` explícito —
+  sin eso la tilde de "está" se mostraba mal, se detectó y corrigió en la
+  misma verificación) y CORTA la cadena de filtros ahí (no llega ni a
+  Spring Security ni al controller). La distinción es por **path**, no por
+  si la request trae JWT — así el panel de administración de esa misma
+  tienda (y el login, `/api/auth/**`) siguen accesibles siempre, pausada o
+  no: es la única forma de que el superadmin (o el admin de esa tienda)
+  pueda entrar a reanudarla.
+- Frontend: `TenantAdminService.setActive(id, active, onSuccess, onError)`,
+  botón "Pausar"/"Reanudar" + badge "Pausada" (con la fila atenuada,
+  `opacity-60`) en `admin-superadmin-tiendas`.
+- **LIMITACIÓN CONOCIDA, no construida:** la respuesta 503 es JSON plano
+  para el backend — no hay ninguna pantalla "Esta tienda está pausada"
+  en el frontend Angular. Qué ve exactamente un visitante real (la SPA
+  falla a cargar `/api/settings` y de ahí en más no está definido/
+  probado) no se verificó ni se construyó un manejo de error especial.
+  Si se quiere una experiencia prolija para el visitante, falta esa
+  pantalla — es candidato a próximo paso si se sigue esta fase.
+- Verificado con `fetch` autenticado desde la consola del navegador
+  (token real del `localStorage` de una sesión ya logueada): pausada
+  `estilos-pequenos` vía `X-Demo-Tenant`, `GET /api/settings` público dio
+  503 con el mensaje esperado; `GET /api/admin/tenants` con el MISMO
+  header siguió dando 200; reanudada al toque después — cero impacto
+  final en la tienda piloto.
+
+**Eliminar (borrado permanente e irreversible):**
+
+- Mecanismo de confirmación **elegido explícitamente por el usuario**
+  (se le preguntó con `AskUserQuestion` dado el riesgo): "escribir el
+  identificador exacto de la tienda" (mismo patrón que usa GitHub para
+  borrar un repo), no un simple diálogo "¿Estás seguro?".
+- Nuevo `core/tenant/TenantDeletionService.java` — recorre y vacía, EN
+  ESTE ORDEN (documentado con comentarios en el archivo, no improvisar un
+  orden distinto si se toca esto — rompe FKs):
+  1. `Order` (cascada a `OrderLine` — `cascade=ALL, orphanRemoval=true` ya
+     existía en la entidad; el borrado usa `deleteAllByTenantId`
+     **derivado de Spring Data**, que borra entidad-por-entidad —
+     NO un bulk `DELETE` SQL — a propósito, para que Hibernate respete esa
+     cascada. Un bulk delete la hubiera saltado.)
+  2. `Exchange` (cascada a `ExchangeLine`, mismo mecanismo)
+  3. `ParamGroup` (cascada a `ParamOption` — **ojo:** el repository se
+     llama `ParamRepository`, no `ParamGroupRepository`)
+  4. `Product` (sus `@ElementCollection` — imágenes, tags, stock por
+     talle — las borra Hibernate solo al borrar el `Product`, no
+     necesitan tratamiento aparte)
+  5. `Coupon`, `Discount`, `HeroSlide`, `MarketingSend`, `PageBlock`,
+     `Shift`, `Supplier`, `SizeScale` (`modules/ropa/`) — sin relaciones
+     entrantes entre ellos, el orden entre estos 8 no importa
+  6. `AdminUser` — **tiene que ir antes que `Role`**: `AdminUser.role` es
+     `@ManyToOne` SIN cascade; borrar el `Role` primero rompería esa FK
+  7. `Role` (el filtro `tenantId = :id` ya excluye solo el rol de sistema,
+     que tiene `tenantId = null` — nunca hace falta chequearlo aparte)
+  8. `SiteSettings` (fila por id = tenantId, `deleteById` sólo si
+     `existsById`)
+  9. `MarketingConfig` (ídem, fila por id = tenantId)
+  10. `Tenant` (al final)
+  - Todo dentro de una única `@Transactional` — si algo falla a mitad de
+    camino, se revierte todo.
+  - Se agregó el método derivado `deleteAllByTenantId(String tenantId)` a
+    estos 14 repositories (todos con un comentario `Ver
+    TenantDeletionService`): `OrderRepository`, `ExchangeRepository`,
+    `ParamRepository`, `ProductRepository`, `CouponRepository`,
+    `DiscountRepository`, `HeroSlideRepository`,
+    `MarketingSendRepository`, `PageBlockRepository`, `ShiftRepository`,
+    `SupplierRepository`, `SizeScaleRepository`, `AdminUserRepository`,
+    `RoleRepository`.
+- `TenantController`: `POST /api/admin/tenants/{id}/delete
+  {confirmSlug: string}` — el backend **vuelve a validar** que
+  `confirmSlug` matchee el slug real de la tienda antes de borrar nada
+  (no confía en que el frontend ya lo haya validado — mismo criterio de
+  "no confiar únicamente" que ya se usó en la Fase 4 para el filtrado por
+  tenant).
+- Frontend: `TenantAdminService.deleteTenant(id, confirmSlug, onSuccess,
+  onError)`, modal de confirmación en `admin-superadmin-tiendas` (input de
+  texto + botón "Eliminar para siempre" deshabilitado hasta que el texto
+  matchee el slug exacto, con anillo rojo mientras no matchea).
+- **LIMITACIÓN CONOCIDA E IMPORTANTE — Cloudinary NO se limpia.** El
+  preset de Cloudinary de esta plataforma es "unsigned" (sólo `cloudName`
+  + `uploadPreset`, sin API key/secret guardada en ningún lado) — borrar
+  assets requiere la Admin API firmada de Cloudinary, que esta app no
+  tiene configurada. Al eliminar una tienda, sus fotos (logo, carrusel,
+  productos) **quedan huérfanas en la cuenta de Cloudinary** — no hay
+  forma de limpiarlas desde el código actual; hay que borrarlas a mano
+  desde el dashboard de Cloudinary si se quiere liberar espacio. El
+  pedido original del usuario fue "eliminar todos los datos... de la
+  nube... de la db... todo" — **la parte de DB está 100% cubierta, la de
+  "la nube" (Cloudinary) NO** por esta limitación de infraestructura. Si
+  en algún momento se carga una API key/secret de Cloudinary real (dónde
+  guardarla con seguridad es una decisión aparte, no trivial), ahí sí
+  conviene volver a `TenantDeletionService` y agregar el borrado de la
+  carpeta `{slug}/` completa en Cloudinary ANTES del borrado de DB (si
+  Cloudinary falla, mejor no haber borrado nada todavía).
+- Verificado de punta a punta en el navegador: creado un tenant
+  descartable (`delete-test`) vía API directa, borrado desde la UI real
+  (probado que un slug incorrecto deja el botón deshabilitado con anillo
+  rojo, y que el slug correcto lo habilita y borra), confirmado que
+  desaparece del listado de tiendas y que el resto (piloto incluida) no
+  se tocó.
+
+**NO hecho en esta fase (ninguno pedido explícitamente, anotado por si se
+retoma):**
+- Sin test automatizado (unitario ni de integración) para
+  `TenantDeletionService`, el enforcement de pausa, ni ninguna feature de
+  la Fase 10 ampliada — todo se verificó a mano en el navegador/consola
+  esta sesión.
+- Sin soft-delete / papelera de reciclaje — el borrado es directo y
+  permanente, no hay forma de "deshacer" ni de recuperar una tienda
+  borrada por error salvo restaurar un backup de MySQL.
+- Sin auditoría/log de quién pausó o eliminó qué tienda y cuándo.
+
 ---
 
 ## 5. Historial
 
+- **2026-09-16**: Fase 11 (nueva) — pausar/reanudar y eliminar tiendas,
+  ambos a pedido del usuario. Pausar: `Tenant.active` (ya existía, sin
+  usar) ahora se enforce de verdad en `TenantResolutionFilter` (503 en
+  cualquier ruta que no sea `/api/admin/**` o `/api/auth/**`) — el panel
+  de esa tienda sigue accesible siempre para poder reanudarla. Eliminar:
+  `TenantDeletionService` nuevo, borra las 14 tablas propias del tenant en
+  el orden correcto (AdminUser antes que Role, Order/Exchange/ParamGroup
+  entidad-por-entidad para respetar sus cascadas) y por último la fila de
+  `Tenant`, todo en una transacción; confirmación elegida por el usuario
+  (escribir el slug exacto, validado también en el backend, no sólo en el
+  frontend). Limitación conocida y documentada: no borra nada de
+  Cloudinary (preset unsigned, sin API key/secret configurada) — quedan
+  fotos huérfanas en la nube. Verificado de punta a punta con un tenant
+  descartable creado y borrado en el navegador; el resto de las tiendas
+  (piloto incluida) no se tocó. Ver detalle completo en la sección Fase 11.
+- **2026-09-16**: Fase 10 ampliada, Pasos 7-11 — cierre del set de layouts
+  y el asistente "Crear tienda", todo a pedido del usuario en la misma
+  sesión larga de trabajo:
+  - Paso 7: descartados los 3 layouts que el usuario rechazó dos veces
+    (`editorial`/`marketplace`/`vidriera`, hechos de memoria vaga y
+    "iguales a Clásico"); reemplazados por 5 layouts reales inspirados en
+    6 temas de WordPress GPL que bajó el usuario (`minimal`, `boutique`,
+    `curva`, `grid`, `mercado` — este último consolida 3 temas casi
+    idénticos entre sí), set final de 6 layouts contando `classic`.
+    Agregado un logo (`LogoComponent` nuevo) en cada uno de los 5
+    layouts que no lo tenían, en un lugar propio de cada composición.
+  - Paso 8: `logoShape` (circle/square/rectangle) — elección explícita
+    del usuario al subir el logo, no detección automática (se descartó
+    por poco confiable). Selector en "Identidad y contacto" y en el
+    asistente.
+  - Paso 9: 4 colores independientes del color de marca (encabezado, pie
+    de página, títulos/nombre, fondo de página) — mecanismo vía inputs
+    `[style.x]`/overrides de componente (NO `var(--x, revert)`: ese
+    fallback es inválido según la spec de CSS Custom Properties, se
+    evaluó y se descartó). UI duplicada (no componente compartido) en
+    "Apariencia" y en el paso Color del asistente.
+  - Paso 10: sugerencia de color de marca extraído del logo
+    (`core/utils/logo-color.ts`, 100% client-side con `<canvas>`) —
+    motivó mover el paso Logo del asistente antes que el paso Color.
+  - Paso 11: asistente reordenado a 7 pasos (Diseño→Logo→Color→
+    Identidad→Preview→Confirmar→Listo); 2 bugs corregidos (el logo no se
+    veía en la vista previa — faltaba un input `logoOverride`; el paso de
+    Previsualización no tenía botón "Atrás"); y un cambio de
+    comportamiento a pedido del usuario: el logo ya NO se sube a
+    Cloudinary al elegirlo, queda en memoria (data URL) hasta que se
+    confirma "Crear tienda" — evita imágenes húerfanas si se cancela.
+  Todo verificado en el navegador esta sesión, sin tocar datos reales de
+  ninguna tienda existente. Ver detalle completo (incluyendo qué NO se
+  hizo) en la sección Fase 10.
+- **2026-09-16**: Fase 10, Pasos 4-6 — el superadmin ya puede configurar
+  cualquier tienda (no sólo mirarla): endpoint de apariencia
+  (`layout`+`brandColor`), pantalla "Apariencia" con miniaturas reales
+  (`CatalogPageComponent` con un `layoutOverride` nuevo) y botón
+  "Configurar esta tienda" en el listado de tiendas, que reutiliza el
+  demo-switch para llegar a `/admin/config` de cualquier tenant. La causa
+  del reclamo original del usuario ("no puedo poner nombre, redes,
+  contacto, logo, nada" al crear una tienda) no era el formulario de
+  creación sino que ningún tenant nuevo tenía un `AdminUser` propio —
+  se resolvió reutilizando el mecanismo de superadmin cross-tenant que ya
+  existía, en vez de crear usuarios admin por tenant. Verificado en el
+  navegador contra `el-yunque`, revertido después.
+- **2026-09-15**: arrancada la Fase 10 (layout + color de marca
+  configurables, independientes entre sí) — Pasos 1 a 3 hechos y
+  verificados en el navegador: campos `SiteSettings.layout`/`brandColor`
+  (backend, 100% aditivo), `SettingsService` aplicando `data-layout` +
+  una rampa de color derivada en runtime (`core/utils/color-ramp.ts`), y
+  un primer segundo layout real (`"editorial"`) como una rama de
+  template dentro de `CatalogPageComponent` en vez de un componente
+  duplicado. Confirmado contra `el-yunque` (revertido después) que la
+  tienda piloto no cambia y que layout/color son independientes. Falta
+  el editor real (Paso 4) y los layouts 3-5 (Paso 5) — ver detalle en la
+  sección Fase 10.
 - **2026-09-15**: logo, tagline y carrusel propios por tenant — a pedido
   del usuario tras notar que "El Yunque" se veía con el logo y el texto
   de Estilos Pequeños. `RubroImages` (nueva clase) genera logo/fotos de

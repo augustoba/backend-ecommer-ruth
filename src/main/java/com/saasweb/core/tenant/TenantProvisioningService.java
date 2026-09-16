@@ -10,6 +10,7 @@ import com.saasweb.core.product.Product;
 import com.saasweb.core.product.ProductParam;
 import com.saasweb.core.product.ProductRepository;
 import com.saasweb.core.settings.SiteSettingsService;
+import com.saasweb.core.tenant.TenantAdminDtos.TenantCreateRequest;
 import com.saasweb.modules.ropa.SizeScale;
 import com.saasweb.modules.ropa.SizeScaleRepository;
 import com.saasweb.modules.ropa.SizeStock;
@@ -41,6 +42,20 @@ public class TenantProvisioningService {
 
     private static final String UNICO_SCALE = "Único";
 
+    /**
+     * Fotos de banco de imágenes (Unsplash, licencia libre para uso
+     * comercial) para el seed genérico de Ropa — ver javadoc de
+     * {@code product(..., String imageUrl, ...)}. `w=800&q=80&auto=format`
+     * son parámetros propios de la API de Unsplash (recorte/calidad), no
+     * hace falta una cuenta ni API key para usarlos así.
+     */
+    private static final String UNSPLASH_REMERA =
+            "https://images.unsplash.com/photo-1553859943-a02c5418b798?w=800&q=80&auto=format&fit=crop";
+    private static final String UNSPLASH_PANTALON =
+            "https://images.unsplash.com/photo-1584865288642-42078afe6942?w=800&q=80&auto=format&fit=crop";
+    private static final String UNSPLASH_VESTIDO =
+            "https://images.unsplash.com/photo-1520026582657-4daf5bb60adb?w=800&q=80&auto=format&fit=crop";
+
     private final TenantService tenantService;
     private final ParamRepository paramRepo;
     private final SizeScaleRepository sizeScaleRepo;
@@ -63,10 +78,25 @@ public class TenantProvisioningService {
     }
 
     public Tenant provision(String name, String slug, Rubro rubro) {
-        Tenant tenant = tenantService.create(name, slug, rubro);
+        return provision(new TenantCreateRequest(
+                name, slug, rubro, null, null, null, null, null, null, null, null, null, null, null));
+    }
+
+    /**
+     * Alta de tenant con lo que haya juntado el asistente ANTES de crear
+     * nada (diseño, color, identidad — ver PLAN_SAAS.md Fase 10): se aplica
+     * todo en la misma transacción, así la tienda nace ya configurada en vez
+     * de crearse vacía y editarse con PUTs sueltos después. Los campos
+     * opcionales de {@code req} that vengan vacíos/null se ignoran y quedan
+     * los defaults de siempre del rubro.
+     */
+    public Tenant provision(TenantCreateRequest req) {
+        Rubro rubro = req.rubro();
+        Tenant tenant = tenantService.create(req.name().trim(), req.slug().trim(), rubro);
         String tenantId = tenant.getId();
 
-        siteSettingsService.createFor(tenantId, name, rubro.getDefaultTheme(),
+        String layout = blankToNull(req.layout()) != null ? req.layout() : rubro.getDefaultLayout();
+        siteSettingsService.createFor(tenantId, req.name().trim(), rubro.getDefaultTheme(), layout,
                 RubroImages.logo(rubro.getLogoEmoji(), rubro.getLogoColor()));
         pageBlockService.ensureDefaultHomeBlocks(tenantId);
         seedHeroSlides(tenantId, rubro);
@@ -76,7 +106,17 @@ public class TenantProvisioningService {
             case FERRETERIA -> seedFerreteria(tenantId);
             case REPUESTOS -> seedRepuestos(tenantId);
         }
+
+        siteSettingsService.applyOnboardingExtras(tenantId, new SiteSettingsService.OnboardingExtras(
+                blankToNull(req.brandColor()), blankToNull(req.headerColor()), blankToNull(req.footerColor()),
+                blankToNull(req.textColor()), blankToNull(req.pageBackgroundColor()),
+                blankToNull(req.whatsappNumber()), blankToNull(req.instagram()), blankToNull(req.facebookUrl()),
+                blankToNull(req.logoUrl()), blankToNull(req.logoShape())));
         return tenant;
+    }
+
+    private static String blankToNull(String v) {
+        return (v == null || v.isBlank()) ? null : v.trim();
     }
 
     /** Fotos del carrusel de la home, para que una tienda nueva nunca arranque sin carrusel (ver PLAN_SAAS.md Fase 9). */
@@ -113,15 +153,15 @@ public class TenantProvisioningService {
         String scaleId = scale(tenantId, "Talles", List.of("S", "M", "L", "XL"));
 
         product(tenantId, "Remera básica algodón", "Remera lisa de algodón peinado, corte clásico.",
-                "8900", scaleId, "👕", "#86e6bb",
+                "8900", scaleId, UNSPLASH_REMERA,
                 params(publico.getId(), pubUnisex.getId(), tipo.getId(), tipoRemera.getId()),
                 stocks(scaleId, "S:8", "M:10", "L:6", "XL:3"));
         product(tenantId, "Pantalón cargo", "Pantalón cargo con bolsillos laterales, friza reforzada.",
-                "15400", scaleId, "👖", "#60a5fa",
+                "15400", scaleId, UNSPLASH_PANTALON,
                 params(publico.getId(), pubNene.getId(), tipo.getId(), tipoPantalon.getId()),
                 stocks(scaleId, "S:4", "M:6", "L:5", "XL:2"));
         product(tenantId, "Vestido casual", "Vestido liviano de tela plana, ideal entretiempo.",
-                "13800", scaleId, "👗", "#f9a8d4",
+                "13800", scaleId, UNSPLASH_VESTIDO,
                 params(publico.getId(), pubNena.getId(), tipo.getId(), tipoVestido.getId()),
                 stocks(scaleId, "S:5", "M:5", "L:3", "XL:1"));
     }
@@ -256,6 +296,22 @@ public class TenantProvisioningService {
     private void product(String tenantId, String name, String description, String price,
                          String sizeScaleId, String emoji, String color,
                          Set<ProductParam> params, List<SizeStock> stocks) {
+        product(tenantId, name, description, price, sizeScaleId, RubroImages.productIcon(emoji, color), params, stocks);
+    }
+
+    /**
+     * Variante con una foto de verdad en vez de ícono generado — la usa
+     * {@code seedRopa} para que las tiendas nuevas de indumentaria arranquen
+     * con fotos reales de banco de imágenes (Unsplash, licencia libre para
+     * uso comercial) en vez de círculos de color. Son fotos de PRUEBA: el
+     * día que la tienda tenga fotos propias, se reemplazan desde el panel
+     * como cualquier otra foto de producto. Ferretería y repuestos siguen
+     * con {@code RubroImages.productIcon} — no se eligieron fotos de stock
+     * para esos rubros todavía.
+     */
+    private void product(String tenantId, String name, String description, String price,
+                         String sizeScaleId, String imageUrl,
+                         Set<ProductParam> params, List<SizeStock> stocks) {
         Product p = new Product();
         p.setId(UUID.randomUUID().toString());
         p.setTenantId(tenantId);
@@ -263,7 +319,7 @@ public class TenantProvisioningService {
         p.setDescription(description);
         p.setPrice(new BigDecimal(price));
         p.setCreatedAt(Instant.now());
-        p.getImages().add(RubroImages.productIcon(emoji, color));
+        p.getImages().add(imageUrl);
         p.setActive(true);
         p.setSizeScaleId(sizeScaleId);
         p.getParams().addAll(params);

@@ -13,6 +13,9 @@ import java.util.Optional;
 public interface ProductRepository extends JpaRepository<Product, String> {
     Optional<Product> findByIdAndTenantId(String id, String tenantId);
     List<Product> findByTenantId(String tenantId);
+
+    /** Borra los productos del tenant (y sus colecciones @ElementCollection) — ver TenantDeletionService. */
+    void deleteAllByTenantId(String tenantId);
     List<Product> findByTenantIdAndActiveTrueAndDeletedFalseOrderByCreatedAtDesc(String tenantId);
     List<Product> findByTenantIdAndDeletedFalseOrderByCreatedAtDesc(String tenantId);
     List<Product> findByTenantIdAndDeletedTrueOrderByCreatedAtDesc(String tenantId);

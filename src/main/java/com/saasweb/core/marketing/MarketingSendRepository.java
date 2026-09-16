@@ -15,6 +15,9 @@ public interface MarketingSendRepository extends JpaRepository<MarketingSend, St
     long countByTenantIdAndSentAtGreaterThanEqualAndSentAtLessThanAndStatus(
             String tenantId, Instant from, Instant to, MarketingSend.Status status);
 
+    /** Ver TenantDeletionService. */
+    void deleteAllByTenantId(String tenantId);
+
     /** Emails que ya recibieron una campaña (enviada con éxito) desde `cutoff` — para el cooldown. */
     @Query("select s.email from MarketingSend s where s.tenantId = :tenantId "
             + "and s.status = com.saasweb.core.marketing.MarketingSend.Status.SENT and s.sentAt >= :cutoff")

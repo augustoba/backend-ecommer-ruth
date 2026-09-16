@@ -9,4 +9,7 @@ import java.util.Optional;
 public interface ParamRepository extends JpaRepository<ParamGroup, String> {
     Optional<ParamGroup> findByIdAndTenantId(String id, String tenantId);
     List<ParamGroup> findByTenantId(String tenantId);
+
+    /** Borra las parametrías del tenant (y sus opciones, cascade ALL/orphanRemoval) — ver TenantDeletionService. */
+    void deleteAllByTenantId(String tenantId);
 }

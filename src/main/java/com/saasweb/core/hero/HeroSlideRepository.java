@@ -10,4 +10,7 @@ public interface HeroSlideRepository extends JpaRepository<HeroSlide, String> {
     Optional<HeroSlide> findByIdAndTenantId(String id, String tenantId);
     List<HeroSlide> findByTenantIdOrderByPositionAsc(String tenantId);
     long countByTenantId(String tenantId);
+
+    /** Ver TenantDeletionService. */
+    void deleteAllByTenantId(String tenantId);
 }

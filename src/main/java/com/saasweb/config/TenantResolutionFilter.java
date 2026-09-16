@@ -45,11 +45,31 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain chain) throws ServletException, IOException {
         try {
-            TenantContext.set(resolveTenantId(request));
+            String tenantId = resolveTenantId(request);
+            TenantContext.set(tenantId);
+            if (isPausedForVisitor(tenantId, request)) {
+                response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+                response.setCharacterEncoding("UTF-8");
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"tienda_pausada\",\"message\":\"Esta tienda está pausada.\"}");
+                return;
+            }
             chain.doFilter(request, response);
         } finally {
             TenantContext.clear();
         }
+    }
+
+    /**
+     * Una tienda pausada (`Tenant.active = false`) deja de poder verse desde
+     * afuera, pero el panel de administración sigue accesible siempre — así
+     * el superadmin (o el admin de esa tienda) puede entrar a reanudarla.
+     * `/api/auth/**` también queda siempre libre: hace falta para loguearse.
+     */
+    private boolean isPausedForVisitor(String tenantId, HttpServletRequest request) {
+        if (tenantId == null || tenantService.isActive(tenantId)) return false;
+        String path = request.getRequestURI();
+        return !path.startsWith("/api/admin/") && !path.startsWith("/api/auth/");
     }
 
     private String resolveTenantId(HttpServletRequest request) {

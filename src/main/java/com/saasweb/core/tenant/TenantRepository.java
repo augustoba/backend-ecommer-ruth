@@ -13,4 +13,6 @@ public interface TenantRepository extends JpaRepository<Tenant, String> {
     Optional<Tenant> findFirstByActiveTrueOrderByCreatedAtAsc();
 
     List<Tenant> findAllByOrderByCreatedAtAsc();
+
+    boolean existsByIdAndActiveTrue(String id);
 }

@@ -36,6 +36,15 @@ public class SiteSettings {
     private String logoUrl;
 
     /**
+     * Forma en la que se recorta el logo dondequiera que se muestre (header,
+     * pie de página, portada de Clásico): `"circle"` (por defecto),
+     * `"square"` o `"rectangle"`. Nullable a propósito — null se trata como
+     * `"circle"` (el único recorte que existía antes de este campo) en
+     * {@code SettingsResponse}, así ningún logo ya cargado cambia de golpe.
+     */
+    private String logoShape;
+
+    /**
      * Theme visual del sitio (ver PLAN_SAAS.md Fase 6). Hoy sólo existe
      * `"default"` — el campo es la base para poder ofrecer más de una
      * apariencia sin redeploy el día que haya una segunda. Nullable a
@@ -43,6 +52,36 @@ public class SiteSettings {
      * seteado): null se trata como `"default"` en {@code SettingsResponse}.
      */
     private String theme;
+
+    /**
+     * Diseño de página elegido (ver PLAN_SAAS.md Fase 10) — eje independiente
+     * de {@code theme}: mientras {@code theme} sólo cambia colores/tipografía,
+     * este campo elige entre layouts realmente distintos (estructura de
+     * home/catálogo). Nullable a propósito: null se trata como `"classic"`
+     * (el único layout que existe hoy) en {@code SettingsResponse}.
+     */
+    private String layout;
+
+    /**
+     * Color de marca elegido libremente por el tenant (hex, ej. `"#e8432a"`),
+     * ver PLAN_SAAS.md Fase 10. Cuando no es null, el frontend deriva la
+     * rampa `--color-brand-50..700` a partir de este valor y la aplica en
+     * runtime, por encima del `[data-theme]` con nombre de `theme`. Null =
+     * seguir usando la paleta con nombre de siempre (cero cambio para los
+     * tenants existentes).
+     */
+    private String brandColor;
+
+    /**
+     * Colores independientes de {@code brandColor} (ver PLAN_SAAS.md Fase 10
+     * ampliada): cada uno pisa sólo su propia zona (encabezado, pie de
+     * página, texto de títulos, fondo de página) — null = seguir derivando
+     * ese color de la rampa de {@code brandColor}/del layout, como siempre.
+     */
+    private String headerColor;
+    private String footerColor;
+    private String textColor;
+    private String pageBackgroundColor;
 
     /**
      * Texto de saludo del mensaje de pedido de WhatsApp (antes del detalle).
@@ -257,12 +296,68 @@ public class SiteSettings {
         this.logoUrl = logoUrl;
     }
 
+    public String getLogoShape() {
+        return logoShape;
+    }
+
+    public void setLogoShape(String logoShape) {
+        this.logoShape = logoShape;
+    }
+
     public String getTheme() {
         return theme;
     }
 
     public void setTheme(String theme) {
         this.theme = theme;
+    }
+
+    public String getLayout() {
+        return layout;
+    }
+
+    public void setLayout(String layout) {
+        this.layout = layout;
+    }
+
+    public String getBrandColor() {
+        return brandColor;
+    }
+
+    public void setBrandColor(String brandColor) {
+        this.brandColor = brandColor;
+    }
+
+    public String getHeaderColor() {
+        return headerColor;
+    }
+
+    public void setHeaderColor(String headerColor) {
+        this.headerColor = headerColor;
+    }
+
+    public String getFooterColor() {
+        return footerColor;
+    }
+
+    public void setFooterColor(String footerColor) {
+        this.footerColor = footerColor;
+    }
+
+    public String getTextColor() {
+        return textColor;
+    }
+
+    public void setTextColor(String textColor) {
+        this.textColor = textColor;
+    }
+
+    public String getPageBackgroundColor() {
+        return pageBackgroundColor;
+    }
+
+    public void setPageBackgroundColor(String pageBackgroundColor) {
+        this.pageBackgroundColor = pageBackgroundColor;
     }
 
     public String getWhatsappIntro() {

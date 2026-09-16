@@ -20,11 +20,34 @@ public final class SiteSettingsDtos {
             String facebookUrl,
             /** Logo: URL o data URI. Vacío = usar el logo por defecto. */
             @Size(max = 5_000_000) String logoUrl,
+            @Pattern(regexp = "^$|^(circle|square|rectangle)$", message = "Forma de logo desconocida")
+            String logoShape,
             @Size(max = 2000) String whatsappIntro,
             @Size(max = 2000) String whatsappClosing,
             @Size(max = 500) String storeAddress,
             @Size(max = 8000) String helpText,
             @Size(max = 20000) String faqText
+    ) {}
+
+    /**
+     * Diseño de página + color de marca (ver PLAN_SAAS.md Fase 10) — mismo
+     * nivel de permiso que identidad/logo. Ambos campos son opcionales:
+     * vacío/null = volver al valor por defecto del rubro (`layout`) o a la
+     * paleta con nombre de siempre (`brandColor`).
+     */
+    public record AppearanceRequest(
+            @Pattern(regexp = "^$|^(classic|minimal|boutique|curva|grid|mercado)$", message = "Diseño desconocido")
+            String layout,
+            @Pattern(regexp = "^$|^#[0-9a-fA-F]{6}$", message = "Color inválido (formato #rrggbb)")
+            String brandColor,
+            @Pattern(regexp = "^$|^#[0-9a-fA-F]{6}$", message = "Color inválido (formato #rrggbb)")
+            String headerColor,
+            @Pattern(regexp = "^$|^#[0-9a-fA-F]{6}$", message = "Color inválido (formato #rrggbb)")
+            String footerColor,
+            @Pattern(regexp = "^$|^#[0-9a-fA-F]{6}$", message = "Color inválido (formato #rrggbb)")
+            String textColor,
+            @Pattern(regexp = "^$|^#[0-9a-fA-F]{6}$", message = "Color inválido (formato #rrggbb)")
+            String pageBackgroundColor
     ) {}
 
     /** Medios de pago. Editable por el admin normal de la tienda. */
@@ -46,7 +69,14 @@ public final class SiteSettingsDtos {
             String instagram,
             String facebookUrl,
             String logoUrl,
+            String logoShape,
             String theme,
+            String layout,
+            String brandColor,
+            String headerColor,
+            String footerColor,
+            String textColor,
+            String pageBackgroundColor,
             String whatsappIntro,
             String whatsappClosing,
             String storeAddress,
@@ -72,7 +102,11 @@ public final class SiteSettingsDtos {
             return new SettingsResponse(
                     s.getStoreName(), s.getWhatsappNumber(), s.getAboutText(),
                     s.getInstagram(), s.getFacebookUrl(), s.getLogoUrl(),
+                    s.getLogoShape() != null ? s.getLogoShape() : "circle",
                     s.getTheme() != null ? s.getTheme() : "default",
+                    s.getLayout() != null ? s.getLayout() : "classic",
+                    s.getBrandColor(),
+                    s.getHeaderColor(), s.getFooterColor(), s.getTextColor(), s.getPageBackgroundColor(),
                     s.getWhatsappIntro(), s.getWhatsappClosing(), s.getStoreAddress(),
                     s.getHelpText(), s.getFaqText(),
                     s.isPaymentTransferEnabled(), s.getPaymentTransferAlias(),

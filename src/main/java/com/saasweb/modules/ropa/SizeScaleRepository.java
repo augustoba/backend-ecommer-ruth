@@ -9,4 +9,7 @@ import java.util.Optional;
 public interface SizeScaleRepository extends JpaRepository<SizeScale, String> {
     Optional<SizeScale> findByIdAndTenantId(String id, String tenantId);
     List<SizeScale> findByTenantId(String tenantId);
+
+    /** Ver TenantDeletionService. */
+    void deleteAllByTenantId(String tenantId);
 }

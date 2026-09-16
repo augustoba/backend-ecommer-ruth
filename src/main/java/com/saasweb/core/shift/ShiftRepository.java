@@ -16,4 +16,7 @@ public interface ShiftRepository extends JpaRepository<Shift, String> {
     Page<Shift> findByTenantIdOrderByOpenedAtDesc(String tenantId, Pageable pageable);
 
     Page<Shift> findByTenantIdAndUserDniOrderByOpenedAtDesc(String tenantId, String userDni, Pageable pageable);
+
+    /** Ver TenantDeletionService. */
+    void deleteAllByTenantId(String tenantId);
 }

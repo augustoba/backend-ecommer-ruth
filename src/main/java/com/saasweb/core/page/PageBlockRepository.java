@@ -9,4 +9,7 @@ public interface PageBlockRepository extends JpaRepository<PageBlock, String> {
     Optional<PageBlock> findByIdAndTenantId(String id, String tenantId);
     List<PageBlock> findByTenantIdAndPageTypeOrderByPositionAsc(String tenantId, String pageType);
     List<PageBlock> findByTenantIdAndPageTypeAndVisibleTrueOrderByPositionAsc(String tenantId, String pageType);
+
+    /** Ver TenantDeletionService. */
+    void deleteAllByTenantId(String tenantId);
 }

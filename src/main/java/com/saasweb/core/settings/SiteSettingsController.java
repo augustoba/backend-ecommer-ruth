@@ -1,5 +1,6 @@
 package com.saasweb.core.settings;
 
+import com.saasweb.core.settings.SiteSettingsDtos.AppearanceRequest;
 import com.saasweb.core.settings.SiteSettingsDtos.CloudinaryConfigRequest;
 import com.saasweb.core.settings.SiteSettingsDtos.CloudinaryConfigResponse;
 import com.saasweb.core.settings.SiteSettingsDtos.MailConfigRequest;
@@ -38,6 +39,13 @@ public class SiteSettingsController {
     @PreAuthorize("hasAuthority('PLATFORM_SETTINGS_MANAGE')")
     public SettingsResponse updatePlatform(@Valid @RequestBody PlatformSettingsRequest req) {
         return SettingsResponse.from(service.updatePlatform(req));
+    }
+
+    /** Diseño de página + color de marca (ver PLAN_SAAS.md Fase 10). Mismo nivel que identidad/logo. */
+    @PutMapping("/api/admin/settings/appearance")
+    @PreAuthorize("hasAuthority('PLATFORM_SETTINGS_MANAGE')")
+    public SettingsResponse updateAppearance(@Valid @RequestBody AppearanceRequest req) {
+        return SettingsResponse.from(service.updateAppearance(req));
     }
 
     /** Medios de pago. Lo edita el admin normal de la tienda. */

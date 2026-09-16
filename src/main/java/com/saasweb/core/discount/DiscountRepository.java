@@ -9,4 +9,7 @@ import java.util.Optional;
 public interface DiscountRepository extends JpaRepository<Discount, String> {
     Optional<Discount> findByIdAndTenantId(String id, String tenantId);
     List<Discount> findByTenantId(String tenantId);
+
+    /** Ver TenantDeletionService. */
+    void deleteAllByTenantId(String tenantId);
 }

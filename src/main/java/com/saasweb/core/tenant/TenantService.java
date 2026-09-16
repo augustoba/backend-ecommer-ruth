@@ -72,4 +72,18 @@ public class TenantService {
     public String resolveIdBySlug(String slug) {
         return repo.findBySlug(slug).map(Tenant::getId).orElse(null);
     }
+
+    /** true si el tenant existe y no está pausado (ver TenantResolutionFilter). */
+    @Transactional(readOnly = true)
+    public boolean isActive(String tenantId) {
+        return tenantId != null && repo.existsByIdAndActiveTrue(tenantId);
+    }
+
+    /** Pausar/reanudar una tienda (ver TenantResolutionFilter): pausada, su storefront deja de poder verse. */
+    public Tenant setActive(String tenantId, boolean active) {
+        Tenant t = repo.findById(tenantId)
+                .orElseThrow(() -> new BadRequestException("La tienda no existe."));
+        t.setActive(active);
+        return repo.save(t);
+    }
 }

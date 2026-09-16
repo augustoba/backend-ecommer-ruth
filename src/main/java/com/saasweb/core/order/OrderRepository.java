@@ -24,6 +24,9 @@ public interface OrderRepository extends JpaRepository<Order, String> {
 
     Optional<Order> findByIdAndTenantId(String id, String tenantId);
 
+    /** Borra los pedidos del tenant (y sus líneas, cascade ALL/orphanRemoval) — ver TenantDeletionService. */
+    void deleteAllByTenantId(String tenantId);
+
     List<Order> findByTenantIdOrderByCreatedAtDesc(String tenantId);
 
     Page<Order> findByTenantIdOrderByCreatedAtDesc(String tenantId, Pageable pageable);

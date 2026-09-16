@@ -39,4 +39,12 @@ public interface AdminUserRepository extends JpaRepository<AdminUser, String> {
 
     /** Cantidad de cuentas con el rol de sistema (Superadmin) — invariante de plataforma, no por tenant. */
     long countByRoleSystemTrue();
+
+    /**
+     * Borra los admins del tenant — ver TenantDeletionService. Tiene que
+     * correr ANTES de borrar los Role del tenant (AdminUser.role es
+     * @ManyToOne sin cascade, así que un Role borrado antes rompería la FK).
+     * Nunca toca al superadmin (tenantId null).
+     */
+    void deleteAllByTenantId(String tenantId);
 }

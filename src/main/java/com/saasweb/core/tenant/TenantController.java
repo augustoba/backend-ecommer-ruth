@@ -1,6 +1,8 @@
 package com.saasweb.core.tenant;
 
+import com.saasweb.core.tenant.TenantAdminDtos.TenantActiveRequest;
 import com.saasweb.core.tenant.TenantAdminDtos.TenantCreateRequest;
+import com.saasweb.core.tenant.TenantAdminDtos.TenantDeleteRequest;
 import com.saasweb.core.tenant.TenantAdminDtos.TenantResponse;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,10 +23,13 @@ public class TenantController {
 
     private final TenantProvisioningService provisioningService;
     private final TenantService tenantService;
+    private final TenantDeletionService deletionService;
 
-    public TenantController(TenantProvisioningService provisioningService, TenantService tenantService) {
+    public TenantController(TenantProvisioningService provisioningService, TenantService tenantService,
+            TenantDeletionService deletionService) {
         this.provisioningService = provisioningService;
         this.tenantService = tenantService;
+        this.deletionService = deletionService;
     }
 
     @GetMapping
@@ -45,7 +50,23 @@ public class TenantController {
 
     @PostMapping
     public TenantResponse create(@Valid @RequestBody TenantCreateRequest req) {
-        Tenant t = provisioningService.provision(req.name().trim(), req.slug().trim(), req.rubro());
+        Tenant t = provisioningService.provision(req);
         return TenantResponse.from(t);
+    }
+
+    /** Pausar (deja de poder verse el storefront) o reanudar una tienda. */
+    @PatchMapping("/{id}/active")
+    public TenantResponse setActive(@PathVariable String id, @Valid @RequestBody TenantActiveRequest req) {
+        return TenantResponse.from(tenantService.setActive(id, req.active()));
+    }
+
+    /**
+     * Borrado permanente e irreversible de la tienda y TODOS sus datos (ver
+     * TenantDeletionService) — {@code confirmSlug} tiene que ser exactamente
+     * el slug de la tienda, tal como lo tipeó el superadmin en el frontend.
+     */
+    @PostMapping("/{id}/delete")
+    public void delete(@PathVariable String id, @Valid @RequestBody TenantDeleteRequest req) {
+        deletionService.deleteTenant(id, req.confirmSlug());
     }
 }
