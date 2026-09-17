@@ -27,4 +27,8 @@ public class DashboardDtos {
 
     public record LowStockItem(
             String productId, String productName, String size, int stock, int threshold) {}
+
+    /** Un pedido con Factura ARCA cuyo CAE vence pronto (ítem 5). */
+    public record ExpiringCaeItem(
+            String orderId, String code, String invoiceType, String caeVencimiento, long diasRestantes) {}
 }

@@ -1,9 +1,11 @@
 package com.saasweb.core.dashboard;
 
 import com.saasweb.core.dashboard.DashboardDtos.DashboardResponse;
+import com.saasweb.core.dashboard.DashboardDtos.ExpiringCaeItem;
 import com.saasweb.core.dashboard.DashboardDtos.LowStockItem;
 import com.saasweb.core.dashboard.DashboardService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -27,5 +29,11 @@ public class DashboardController {
     @GetMapping("/api/admin/low-stock")
     public List<LowStockItem> lowStock() {
         return service.lowStock();
+    }
+
+    /** Facturas ARCA cuyo CAE vence pronto (para el badge del menú, ítem 5). */
+    @GetMapping("/api/admin/expiring-cae")
+    public List<ExpiringCaeItem> expiringCae(@RequestParam(defaultValue = "15") int days) {
+        return service.expiringCae(Math.min(Math.max(days, 1), 90));
     }
 }

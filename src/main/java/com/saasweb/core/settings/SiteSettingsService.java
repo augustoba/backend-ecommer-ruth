@@ -178,6 +178,13 @@ public class SiteSettingsService {
         return repo.save(s);
     }
 
+    public SiteSettings updateStockAlerts(SiteSettingsDtos.StockAlertSettingsRequest req) {
+        SiteSettings s = get();
+        s.setLowStockAlertEnabled(Boolean.TRUE.equals(req.lowStockAlertEnabled()));
+        s.setLowStockAlertEmail(blankToNull(req.lowStockAlertEmail()));
+        return repo.save(s);
+    }
+
     private static SiteSettings defaults() {
         SiteSettings s = new SiteSettings();
         s.setTheme("default");

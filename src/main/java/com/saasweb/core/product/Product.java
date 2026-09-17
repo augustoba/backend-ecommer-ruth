@@ -96,6 +96,14 @@ public class Product {
     private BigDecimal costPrice;
 
     /**
+     * Alícuota de IVA (21, 10.5, 5, 2.5 o 0) — null = 21% (el default de
+     * casi toda la mercadería). Sólo importa para Factura A/B de ARCA (la
+     * C no discrimina IVA); ver {@code core.arca.ArcaInvoiceService}.
+     */
+    @Column(precision = 4, scale = 2)
+    private BigDecimal ivaRate;
+
+    /**
      * A partir de cuántas unidades por talle este producto se considera "stock
      * bajo" (para las alertas de reposición). null = usar el default global (3).
      */
@@ -242,6 +250,14 @@ public class Product {
 
     public void setCostPrice(BigDecimal costPrice) {
         this.costPrice = costPrice;
+    }
+
+    public BigDecimal getIvaRate() {
+        return ivaRate;
+    }
+
+    public void setIvaRate(BigDecimal ivaRate) {
+        this.ivaRate = ivaRate;
     }
 
     public Integer getLowStockThreshold() {

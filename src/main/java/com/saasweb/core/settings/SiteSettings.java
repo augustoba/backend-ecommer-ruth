@@ -194,17 +194,33 @@ public class SiteSettings {
     @Column(length = 40)
     private String arcaCondicionIva;
 
-    /** Certificado X.509 (.crt) que ARCA asoció al Access Token del WS, en PEM. Secreto real. */
-    @Column(length = 8000)
+    /**
+     * Certificado X.509 (.crt) que ARCA asoció al Access Token del WS, en PEM.
+     * Secreto real. `length` grande (no un VARCHAR chico) para que Hibernate
+     * lo mapee a MEDIUMTEXT — mismo patrón que {@code helpText}/{@code faqText}
+     * más abajo: dos VARCHAR(8000) en utf8mb4 ya sumaban ~64000 bytes
+     * contados "en fila" por MySQL al crear la tabla, y sumado al resto de
+     * `site_settings` superaba el límite de 65535 bytes por fila ("Row size
+     * too large") — la tabla no se podía crear desde cero en una base nueva.
+     */
+    @Column(length = 100_000)
     private String arcaCertificadoPem;
 
     /** Clave privada del certificado de arriba, en PEM. Secreto real — nunca sale de este campo. */
-    @Column(length = 8000)
+    @Column(length = 100_000)
     private String arcaClavePrivadaPem;
 
     /** TICKET_INTERNO (no fiscal) | FACTURA_ARCA (real, con CAE) — qué emite el punto de venta por defecto. */
     @Column(length = 20, nullable = false)
     private String invoiceMode = "TICKET_INTERNO";
+
+    /** true = mandar un mail diario cuando haya talles en stock bajo (ver LowStockAlertScheduler). */
+    @Column(nullable = false)
+    private boolean lowStockAlertEnabled = false;
+
+    /** Mail a donde mandar la alerta de stock bajo. null = no manda nada aunque esté habilitada. */
+    @Column(length = 255)
+    private String lowStockAlertEmail;
 
     // --- Cloudinary (subida de imágenes desde el panel) ---
     // Editable solo por superadmin (ver AdminUser.superAdmin); se leen desde el
@@ -613,5 +629,21 @@ public class SiteSettings {
 
     public void setInvoiceMode(String invoiceMode) {
         this.invoiceMode = invoiceMode;
+    }
+
+    public boolean isLowStockAlertEnabled() {
+        return lowStockAlertEnabled;
+    }
+
+    public void setLowStockAlertEnabled(boolean lowStockAlertEnabled) {
+        this.lowStockAlertEnabled = lowStockAlertEnabled;
+    }
+
+    public String getLowStockAlertEmail() {
+        return lowStockAlertEmail;
+    }
+
+    public void setLowStockAlertEmail(String lowStockAlertEmail) {
+        this.lowStockAlertEmail = lowStockAlertEmail;
     }
 }

@@ -113,7 +113,7 @@ public class DataSeeder implements CommandLineRunner {
                 Permission.PARAMS_MANAGE, Permission.SIZE_SCALES_MANAGE, Permission.SUPPLIERS_MANAGE,
                 Permission.DISCOUNTS_MANAGE, Permission.COUPONS_MANAGE, Permission.MARKETING_MANAGE,
                 Permission.METRICS_VIEW, Permission.PAYMENTS_MANAGE, Permission.USERS_MANAGE,
-                Permission.EXPENSES_MANAGE, Permission.FINANCE_VIEW);
+                Permission.EXPENSES_MANAGE, Permission.FINANCE_VIEW, Permission.STOCK_MOVEMENTS_VIEW);
         roleService.ensureRole(tenantId, "Vendedor",
                 Permission.ORDERS_VIEW, Permission.ORDERS_MANAGE,
                 Permission.POS_USE, Permission.EXCHANGES_USE,
@@ -149,7 +149,7 @@ public class DataSeeder implements CommandLineRunner {
     private void backfillNewPermissions() {
         for (Tenant t : tenantService.findAll()) {
             roleService.grantPermissionsIfMissing(t.getId(), "Administrador",
-                    Permission.EXPENSES_MANAGE, Permission.FINANCE_VIEW);
+                    Permission.EXPENSES_MANAGE, Permission.FINANCE_VIEW, Permission.STOCK_MOVEMENTS_VIEW);
         }
     }
 

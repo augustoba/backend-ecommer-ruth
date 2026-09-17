@@ -2,10 +2,12 @@ package com.saasweb.core.tenant;
 
 import com.saasweb.common.BadRequestException;
 import com.saasweb.core.admin.AdminUserRepository;
+import com.saasweb.core.arca.CreditNoteRepository;
 import com.saasweb.core.admin.RoleRepository;
 import com.saasweb.core.coupon.CouponRepository;
 import com.saasweb.core.discount.DiscountRepository;
 import com.saasweb.core.exchange.ExchangeRepository;
+import com.saasweb.core.finance.ExpenseBudgetRepository;
 import com.saasweb.core.finance.ExpenseRepository;
 import com.saasweb.core.hero.HeroSlideRepository;
 import com.saasweb.core.marketing.MarketingConfigRepository;
@@ -14,6 +16,7 @@ import com.saasweb.core.order.OrderRepository;
 import com.saasweb.core.page.PageBlockRepository;
 import com.saasweb.core.param.ParamRepository;
 import com.saasweb.core.product.ProductRepository;
+import com.saasweb.core.product.StockMovementRepository;
 import com.saasweb.core.settings.SiteSettingsRepository;
 import com.saasweb.core.shift.ShiftRepository;
 import com.saasweb.core.supplier.SupplierRepository;
@@ -63,6 +66,9 @@ public class TenantDeletionService {
     private final AdminUserRepository adminUserRepo;
     private final RoleRepository roleRepo;
     private final ExpenseRepository expenseRepo;
+    private final StockMovementRepository stockMovementRepo;
+    private final CreditNoteRepository creditNoteRepo;
+    private final ExpenseBudgetRepository expenseBudgetRepo;
 
     public TenantDeletionService(TenantRepository tenantRepo, SiteSettingsRepository siteSettingsRepo,
             MarketingConfigRepository marketingConfigRepo, OrderRepository orderRepo,
@@ -70,7 +76,9 @@ public class TenantDeletionService {
             CouponRepository couponRepo, DiscountRepository discountRepo, HeroSlideRepository heroSlideRepo,
             MarketingSendRepository marketingSendRepo, PageBlockRepository pageBlockRepo,
             ShiftRepository shiftRepo, SupplierRepository supplierRepo, SizeScaleRepository sizeScaleRepo,
-            AdminUserRepository adminUserRepo, RoleRepository roleRepo, ExpenseRepository expenseRepo) {
+            AdminUserRepository adminUserRepo, RoleRepository roleRepo, ExpenseRepository expenseRepo,
+            StockMovementRepository stockMovementRepo, CreditNoteRepository creditNoteRepo,
+            ExpenseBudgetRepository expenseBudgetRepo) {
         this.tenantRepo = tenantRepo;
         this.siteSettingsRepo = siteSettingsRepo;
         this.marketingConfigRepo = marketingConfigRepo;
@@ -89,6 +97,9 @@ public class TenantDeletionService {
         this.adminUserRepo = adminUserRepo;
         this.roleRepo = roleRepo;
         this.expenseRepo = expenseRepo;
+        this.stockMovementRepo = stockMovementRepo;
+        this.creditNoteRepo = creditNoteRepo;
+        this.expenseBudgetRepo = expenseBudgetRepo;
     }
 
     /**
@@ -118,6 +129,9 @@ public class TenantDeletionService {
         supplierRepo.deleteAllByTenantId(tenantId);
         sizeScaleRepo.deleteAllByTenantId(tenantId);
         expenseRepo.deleteAllByTenantId(tenantId);
+        stockMovementRepo.deleteAllByTenantId(tenantId);
+        creditNoteRepo.deleteAllByTenantId(tenantId);
+        expenseBudgetRepo.deleteAllByTenantId(tenantId);
 
         // AdminUser antes que Role (ver javadoc de la clase).
         adminUserRepo.deleteAllByTenantId(tenantId);

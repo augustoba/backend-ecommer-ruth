@@ -63,6 +63,13 @@ public interface OrderRepository extends JpaRepository<Order, String> {
 
     long countByTenantIdAndStatus(String tenantId, OrderStatus status);
 
+    /** Pedidos con Factura ARCA aprobada (CAE cargado) — para el monitoreo de vencimiento (ítem 5). */
+    List<Order> findByTenantIdAndInvoiceCaeIsNotNull(String tenantId);
+
+    /** Pedidos LOCAL/PROCESADO que quedaron en ticket interno por un error de ARCA — para el reintento automático. */
+    List<Order> findByTenantIdAndChannelAndStatusAndInvoiceTypeAndInvoiceErrorIsNotNull(
+            String tenantId, SaleChannel channel, OrderStatus status, String invoiceType);
+
     /** Pedidos de un estado con `processedAt` dentro del rango [from, to). Para métricas. */
     List<Order> findByTenantIdAndStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(
             String tenantId, OrderStatus status, Instant from, Instant to);

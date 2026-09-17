@@ -125,6 +125,20 @@ public class SiteSettingsController {
         return ArcaConfigResponse.from(service.updateArca(req));
     }
 
+    /** Alerta de stock bajo por mail — la edita el admin normal de la tienda (ítem 10). */
+    @GetMapping("/api/admin/settings/stock-alerts")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
+    public com.saasweb.core.settings.SiteSettingsDtos.StockAlertSettingsResponse stockAlertSettings() {
+        return com.saasweb.core.settings.SiteSettingsDtos.StockAlertSettingsResponse.from(service.get());
+    }
+
+    @PutMapping("/api/admin/settings/stock-alerts")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
+    public com.saasweb.core.settings.SiteSettingsDtos.StockAlertSettingsResponse updateStockAlertSettings(
+            @Valid @RequestBody com.saasweb.core.settings.SiteSettingsDtos.StockAlertSettingsRequest req) {
+        return com.saasweb.core.settings.SiteSettingsDtos.StockAlertSettingsResponse.from(service.updateStockAlerts(req));
+    }
+
     /**
      * Config de Cloudinary (cuenta usada para subir fotos desde el panel). Separada
      * del resto de `site_settings` porque sólo un superadmin la puede tocar — no es

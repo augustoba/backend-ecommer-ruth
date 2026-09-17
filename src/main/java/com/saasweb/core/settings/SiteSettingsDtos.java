@@ -1,6 +1,7 @@
 package com.saasweb.core.settings;
 
 import com.saasweb.core.settings.SiteSettings;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -217,6 +218,15 @@ public final class SiteSettingsDtos {
                     s.getArcaCertificadoPem() != null && !s.getArcaCertificadoPem().isBlank(),
                     s.getArcaClavePrivadaPem() != null && !s.getArcaClavePrivadaPem().isBlank(),
                     s.getInvoiceMode());
+        }
+    }
+
+    /** Alerta de stock bajo por mail (ver `LowStockAlertScheduler`) — la edita el admin normal de la tienda. */
+    public record StockAlertSettingsRequest(Boolean lowStockAlertEnabled, @Email String lowStockAlertEmail) {}
+
+    public record StockAlertSettingsResponse(boolean lowStockAlertEnabled, String lowStockAlertEmail) {
+        public static StockAlertSettingsResponse from(SiteSettings s) {
+            return new StockAlertSettingsResponse(s.isLowStockAlertEnabled(), s.getLowStockAlertEmail());
         }
     }
 

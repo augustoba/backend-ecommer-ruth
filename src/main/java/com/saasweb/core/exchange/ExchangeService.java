@@ -12,6 +12,7 @@ import com.saasweb.core.admin.AdminUserRepository;
 import com.saasweb.core.exchange.ExchangeRepository;
 import com.saasweb.core.product.ProductRepository;
 import com.saasweb.core.product.ProductService;
+import com.saasweb.core.product.StockMovementReason;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,7 +89,8 @@ public class ExchangeService {
             BigDecimal line = p.getPrice().multiply(BigDecimal.valueOf(item.quantity()));
             returnedTotal = returnedTotal.add(line);
             ex.addLine(line(ExchangeLine.Kind.DEVUELTA, p, item));
-            productService.incrementStock(p.getId(), item.size(), item.quantity());
+            productService.incrementStock(p.getId(), item.size(), item.quantity(),
+                    StockMovementReason.CAMBIO_DEVUELTA, ex.getId(), null, processedByDni);
         }
 
         BigDecimal takenTotal = BigDecimal.ZERO;
@@ -96,8 +98,12 @@ public class ExchangeService {
             Product p = product(item.productId());
             BigDecimal line = p.getPrice().multiply(BigDecimal.valueOf(item.quantity()));
             takenTotal = takenTotal.add(line);
-            ex.addLine(line(ExchangeLine.Kind.LLEVADA, p, item));
-            productService.decrementStock(p.getId(), item.size(), item.quantity());
+            ExchangeLine takenLine = line(ExchangeLine.Kind.LLEVADA, p, item);
+            // Costo congelado ACÁ (al procesar el cambio, momento real de la salida de stock).
+            takenLine.setCostPrice(p.getCostPrice());
+            ex.addLine(takenLine);
+            productService.decrementStock(p.getId(), item.size(), item.quantity(),
+                    StockMovementReason.CAMBIO_LLEVADA, ex.getId(), processedByDni);
         }
 
         BigDecimal difference = takenTotal.subtract(returnedTotal);

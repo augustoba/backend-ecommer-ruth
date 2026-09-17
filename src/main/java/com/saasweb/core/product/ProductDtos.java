@@ -37,6 +37,8 @@ public final class ProductDtos {
             String sizeScaleId,
             String supplierId,
             BigDecimal costPrice,
+            /** null = 21% (default). Sólo importa para Factura A/B de ARCA. */
+            BigDecimal ivaRate,
             /** Umbral de stock bajo propio del producto (unidades por talle). null = default global. */
             Integer lowStockThreshold,
             Map<String, List<String>> params,
@@ -45,7 +47,26 @@ public final class ProductDtos {
             @Size(max = 64) String barcode
     ) {}
 
-    public record StockPatch(@NotBlank String size, int stock) {}
+    public record StockPatch(@NotBlank String size, int stock, String note) {}
+
+    public record PurchaseRequest(
+            @NotBlank String size,
+            int quantity,
+            @NotNull @DecimalMin(value = "0.0", inclusive = false) BigDecimal unitCost,
+            String supplierId
+    ) {}
+
+    public record StockMovementResponse(
+            String id, String productId, String productName, String size, int quantityDelta,
+            StockMovementReason reason, String note, String referenceId, BigDecimal unitCost,
+            String createdByName, Instant createdAt
+    ) {
+        public static StockMovementResponse from(StockMovement m) {
+            return new StockMovementResponse(m.getId(), m.getProductId(), m.getProductName(), m.getSize(),
+                    m.getQuantityDelta(), m.getReason(), m.getNote(), m.getReferenceId(), m.getUnitCost(),
+                    m.getCreatedByName(), m.getCreatedAt());
+        }
+    }
 
     public record ActivePatch(@NotNull Boolean active) {}
 
@@ -70,6 +91,8 @@ public final class ProductDtos {
             String sizeScaleId,
             String supplierId,
             BigDecimal costPrice,
+            /** null = 21% (default). Sólo importa para Factura A/B de ARCA. */
+            BigDecimal ivaRate,
             Integer lowStockThreshold,
             Map<String, List<String>> params,
             List<SizeStockDto> sizeStocks,
@@ -87,7 +110,7 @@ public final class ProductDtos {
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
                     p.getImageUrl(), List.copyOf(p.getImages()), p.getVideoUrl(), p.isActive(), p.isDiscontinued(),
                     p.isDeleted(), p.getCreatedAt(), p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(),
-                    p.getLowStockThreshold(), params, stocks, p.getBarcode());
+                    p.getIvaRate(), p.getLowStockThreshold(), params, stocks, p.getBarcode());
         }
     }
 }

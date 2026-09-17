@@ -10,10 +10,13 @@ import com.saasweb.core.product.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -120,7 +123,31 @@ public class ProductController {
 
     @PatchMapping("/api/admin/products/{id}/stock")
     @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
-    public ProductResponse setStock(@PathVariable String id, @Valid @RequestBody StockPatch body) {
-        return ProductResponse.from(service.setStock(id, body.size(), body.stock()));
+    public ProductResponse setStock(@PathVariable String id, @Valid @RequestBody StockPatch body, Authentication auth) {
+        return ProductResponse.from(service.setStock(id, body.size(), body.stock(), body.note(), auth.getName()));
+    }
+
+    @PostMapping("/api/admin/products/{id}/generate-barcode")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
+    public ProductResponse generateBarcode(@PathVariable String id) {
+        return ProductResponse.from(service.generateBarcode(id));
+    }
+
+    @PostMapping("/api/admin/products/{id}/purchases")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
+    public ProductResponse registerPurchase(@PathVariable String id,
+            @Valid @RequestBody com.saasweb.core.product.ProductDtos.PurchaseRequest req, Authentication auth) {
+        return ProductResponse.from(service.registerPurchase(
+                id, req.size(), req.quantity(), req.unitCost(), req.supplierId(), auth.getName()));
+    }
+
+    @GetMapping("/api/admin/stock-movements")
+    @PreAuthorize("hasAuthority('STOCK_MOVEMENTS_VIEW')")
+    public List<com.saasweb.core.product.ProductDtos.StockMovementResponse> movements(
+            @RequestParam(required = false) String productId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return service.listMovements(productId, from, to).stream()
+                .map(com.saasweb.core.product.ProductDtos.StockMovementResponse::from).toList();
     }
 }

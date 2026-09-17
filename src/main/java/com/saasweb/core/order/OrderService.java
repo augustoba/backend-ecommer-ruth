@@ -27,6 +27,8 @@ import com.saasweb.core.product.ProductService;
 import com.saasweb.core.settings.SiteSettings;
 import com.saasweb.core.settings.SiteSettingsService;
 import com.saasweb.config.AppProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +46,8 @@ import java.util.UUID;
 @Transactional
 public class OrderService {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
+
     private final OrderRepository repo;
     private final ProductRepository productRepo;
     private final ProductService productService;
@@ -55,13 +59,14 @@ public class OrderService {
     private final AppProperties appProperties;
     private final OrderMailService orderMailService;
     private final ArcaInvoiceService arcaInvoiceService;
+    private final com.saasweb.core.arca.InvoiceMailService invoiceMailService;
 
     public OrderService(OrderRepository repo, ProductRepository productRepo,
                         ProductService productService, DiscountService discountService,
                         CouponService couponService, AdminUserRepository adminUsers,
                         SiteSettingsService siteSettingsService, MercadoPagoService mercadoPagoService,
                         AppProperties appProperties, OrderMailService orderMailService,
-                        ArcaInvoiceService arcaInvoiceService) {
+                        ArcaInvoiceService arcaInvoiceService, com.saasweb.core.arca.InvoiceMailService invoiceMailService) {
         this.orderMailService = orderMailService;
         this.repo = repo;
         this.productRepo = productRepo;
@@ -73,6 +78,7 @@ public class OrderService {
         this.mercadoPagoService = mercadoPagoService;
         this.appProperties = appProperties;
         this.arcaInvoiceService = arcaInvoiceService;
+        this.invoiceMailService = invoiceMailService;
     }
 
     /** Resuelve el nombre a mostrar de un usuario del panel a partir de su DNI. */
@@ -440,7 +446,14 @@ public class OrderService {
 
         for (OrderLine l : order.getLines()) {
             if (l.isAccepted()) {
-                productService.decrementStock(l.getProductId(), l.getSize(), l.getQuantity());
+                productService.decrementStock(l.getProductId(), l.getSize(), l.getQuantity(),
+                        com.saasweb.core.product.StockMovementReason.VENTA, order.getId(), confirmedByDni);
+                // Congela el costo ACÁ (no en create()): es el momento real en que
+                // el producto sale de stock. Así la ganancia de esta línea no
+                // cambia después si se actualiza el costo del producto (ver
+                // OrderLine.costPrice).
+                productRepo.findByIdAndTenantId(l.getProductId(), order.getTenantId())
+                        .ifPresent(p -> l.setCostPrice(p.getCostPrice()));
             }
         }
         order.setStatus(OrderStatus.PROCESADO);
@@ -468,7 +481,7 @@ public class OrderService {
             return;
         }
         var result = arcaInvoiceService.emitirFactura(
-                order.getTenantId(), order.getTotal(), null, order.getInvoiceBuyerCuit());
+                order.getTenantId(), invoiceLinesFor(order), null, order.getInvoiceBuyerCuit());
         if (result.aprobado()) {
             order.setInvoiceType(result.tipo());
             order.setInvoiceCae(result.cae());
@@ -481,6 +494,43 @@ public class OrderService {
             order.setInvoiceType("TICKET_INTERNO");
             order.setInvoiceError(result.error());
         }
+        try {
+            invoiceMailService.send(order);
+        } catch (Exception e) {
+            log.warn("No se pudo mandar el comprobante por mail del pedido '{}': {}", order.getCode(), e.getMessage());
+        }
+    }
+
+    /**
+     * Arma las líneas que ve ARCA a partir de las líneas del pedido (importe
+     * + alícuota de IVA real del producto, ver {@code Product.ivaRate}).
+     * Si el pedido tiene un descuento aplicado, cada importe se escala
+     * proporcionalmente para que la suma dé exactamente {@code order.getTotal()}
+     * (lo que ARCA tiene que ver facturado), preservando el peso relativo de
+     * cada alícuota — simplificación deliberada: no hay forma de saber en
+     * qué línea "cayó" el descuento, así que se reparte proporcional a todas.
+     */
+    private java.util.List<com.saasweb.core.arca.ArcaInvoiceService.InvoiceLine> invoiceLinesFor(Order order) {
+        java.math.BigDecimal subtotal = java.math.BigDecimal.ZERO;
+        java.util.List<java.math.BigDecimal[]> raw = new java.util.ArrayList<>(); // [amount, ivaRate]
+        for (OrderLine l : order.getLines()) {
+            if (!l.isAccepted()) continue;
+            java.math.BigDecimal amount = l.getUnitPrice().multiply(java.math.BigDecimal.valueOf(l.getQuantity()));
+            subtotal = subtotal.add(amount);
+            java.math.BigDecimal ivaRate = productRepo.findByIdAndTenantId(l.getProductId(), order.getTenantId())
+                    .map(Product::getIvaRate).orElse(null);
+            raw.add(new java.math.BigDecimal[]{amount, ivaRate});
+        }
+        java.math.BigDecimal total = order.getTotal();
+        java.math.BigDecimal ratio = subtotal.signum() == 0 ? java.math.BigDecimal.ONE
+                : total.divide(subtotal, 6, java.math.RoundingMode.HALF_UP);
+
+        java.util.List<com.saasweb.core.arca.ArcaInvoiceService.InvoiceLine> lines = new java.util.ArrayList<>();
+        for (java.math.BigDecimal[] r : raw) {
+            java.math.BigDecimal scaled = r[0].multiply(ratio).setScale(2, java.math.RoundingMode.HALF_UP);
+            lines.add(new com.saasweb.core.arca.ArcaInvoiceService.InvoiceLine(scaled, r[1]));
+        }
+        return lines;
     }
 
     /**

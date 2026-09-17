@@ -34,6 +34,15 @@ public class ExchangeLine {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
 
+    /**
+     * Costo congelado al PROCESAR el cambio — sólo en líneas LLEVADA (lo que
+     * sale de stock); mismo patrón que {@code OrderLine.costPrice}. Las
+     * líneas DEVUELTA no llevan costo: no afectan el margen, sólo reponen
+     * stock.
+     */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal costPrice;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "exchange_id")
     @JsonIgnore
@@ -93,6 +102,14 @@ public class ExchangeLine {
 
     public void setUnitPrice(BigDecimal unitPrice) {
         this.unitPrice = unitPrice;
+    }
+
+    public BigDecimal getCostPrice() {
+        return costPrice;
+    }
+
+    public void setCostPrice(BigDecimal costPrice) {
+        this.costPrice = costPrice;
     }
 
     public Exchange getExchange() {

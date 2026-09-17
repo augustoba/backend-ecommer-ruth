@@ -172,6 +172,7 @@ CREATE TABLE IF NOT EXISTS product (
     size_scale_id VARCHAR(255),
     supplier_id   VARCHAR(255),
     cost_price    DECIMAL(12,2),
+    iva_rate      DECIMAL(4,2),          -- alicuota de IVA (21/10.5/5/2.5/0), null = 21% default
     low_stock_threshold INTEGER,               -- umbral de stock bajo propio (null = default global)
     PRIMARY KEY (id),
     KEY ix_product_active (active),
@@ -321,6 +322,7 @@ CREATE TABLE IF NOT EXISTS exchange_line (
     size_value   VARCHAR(255)  NOT NULL,
     quantity     INTEGER       NOT NULL,
     unit_price   DECIMAL(12,2) NOT NULL,
+    cost_price   DECIMAL(12,2),               -- costo congelado al procesar, sólo líneas LLEVADA
     PRIMARY KEY (id),
     CONSTRAINT fk_exchange_line_exchange FOREIGN KEY (exchange_id) REFERENCES exchange (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
@@ -363,6 +365,44 @@ CREATE TABLE IF NOT EXISTS hero_slide (
 --  del archivo. No usar este script tal cual para un deploy nuevo sin
 --  revisarlo antes contra las entidades JPA.
 -- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS stock_movement (
+    id               VARCHAR(255)  NOT NULL,
+    tenant_id        VARCHAR(255)  NOT NULL,
+    product_id       VARCHAR(255)  NOT NULL,
+    product_name     VARCHAR(255)  NOT NULL,
+    size_value       VARCHAR(255)  NOT NULL,
+    quantity_delta   INTEGER       NOT NULL,
+    reason           VARCHAR(30)   NOT NULL,
+    note             VARCHAR(500),
+    reference_id     VARCHAR(255),
+    unit_cost        DECIMAL(12,2),
+    created_by_dni   VARCHAR(20),
+    created_by_name  VARCHAR(255),
+    created_at       DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id),
+    KEY ix_stock_movement_tenant_product (tenant_id, product_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS credit_note (
+    id                 VARCHAR(255)  NOT NULL,
+    tenant_id          VARCHAR(255)  NOT NULL,
+    order_id           VARCHAR(255)  NOT NULL,
+    amount             DECIMAL(12,2) NOT NULL,
+    reason             VARCHAR(500),
+    type               VARCHAR(20)   NOT NULL,
+    cae                VARCHAR(255),
+    cae_vencimiento    VARCHAR(10),
+    number             BIGINT,
+    punto_venta        INTEGER,
+    qr_url             VARCHAR(500),
+    error              VARCHAR(500),
+    created_by_dni     VARCHAR(20),
+    created_by_name    VARCHAR(255),
+    created_at         DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id),
+    KEY ix_credit_note_order (tenant_id, order_id)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS expense (
     id                  VARCHAR(255)  NOT NULL,
     tenant_id           VARCHAR(255)  NOT NULL,
@@ -376,6 +416,15 @@ CREATE TABLE IF NOT EXISTS expense (
     PRIMARY KEY (id),
     KEY ix_expense_tenant (tenant_id),
     KEY ix_expense_category (category_option_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS expense_budget (
+    id                  VARCHAR(255)  NOT NULL,
+    tenant_id           VARCHAR(255)  NOT NULL,
+    category_option_id VARCHAR(255)  NOT NULL,
+    monthly_amount      DECIMAL(12,2) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY ux_expense_budget_tenant_category (tenant_id, category_option_id)
 ) ENGINE=InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;

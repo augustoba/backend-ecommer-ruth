@@ -24,16 +24,16 @@ import java.util.List;
 /**
  * WSFEv1 (Web Service de Factura Electrónica) de ARCA/AFIP — el servicio de
  * negocio en sí: pide el último número autorizado y solicita el CAE de un
- * comprobante nuevo. Requiere el Token/Sign que da {@link ArcaWsaaClient}.
+ * comprobante nuevo (factura o nota de crédito). Requiere el Token/Sign que
+ * da {@link ArcaWsaaClient}.
  * Documentación: https://www.afip.gob.ar/ws/documentacion/ws-factura-electronica.asp
  *
- * <p>Alcance (ver PLAN_SAAS.md Fase 14): Factura C (tipo 11, sin discriminar
- * IVA — Monotributista/Exento), Factura B (tipo 6, a consumidor final/DNI,
- * con IVA discriminado al 21% general) y Factura A (tipo 1, con CUIT del
- * comprador, misma discriminación de IVA) para Responsable Inscripto. Sin
- * ítems detallados en ningún caso (un solo importe total, no hay
- * `FeDetReq`/líneas) — {@link ArcaInvoiceService} decide el tipo según la
- * condición frente al IVA del tenant y si se cargó CUIT del comprador.</p>
+ * <p>Alcance (ver PLAN_SAAS.md Fase 14/15): Factura/NC C (Monotributista/
+ * Exento, no discrimina IVA), B (consumidor final) y A (con CUIT del
+ * comprador) para Responsable Inscripto, con IVA discriminado por alícuota
+ * real del producto (Fase 15 — antes era siempre 21% fijo). Sin ítems
+ * detallados en ningún caso (WSFEv1 no tiene ese concepto, sólo importes
+ * agregados por alícuota) — {@link ArcaInvoiceService} decide el tipo.</p>
  */
 @Component
 class ArcaWsfeClient {
@@ -41,17 +41,22 @@ class ArcaWsfeClient {
     static final int CBTE_TIPO_FACTURA_A = 1;
     static final int CBTE_TIPO_FACTURA_B = 6;
     static final int CBTE_TIPO_FACTURA_C = 11;
+    static final int CBTE_TIPO_NC_A = 3;
+    static final int CBTE_TIPO_NC_B = 8;
+    static final int CBTE_TIPO_NC_C = 13;
 
     /** Consumidor final sin identificar (no hace falta CUIT/DNI del comprador). */
     static final int DOC_TIPO_CONSUMIDOR_FINAL = 99;
     static final int DOC_TIPO_DNI = 96;
     static final int DOC_TIPO_CUIT = 80;
 
-    /** Único código de alícuota que usa esta integración: 21% (IVA general) — el que corresponde a la inmensa mayoría de la mercadería. */
-    private static final String ALIC_IVA_21_ID = "5";
-    private static final BigDecimal ALICUOTA_21 = new BigDecimal("1.21");
-
     private final RestClient restClient = RestClient.create();
+
+    /** Un grupo de IVA discriminado por alícuota — WSFEv1 pide uno por cada alícuota distinta presente. */
+    record IvaGroup(String alicId, BigDecimal baseImp, BigDecimal importe) {}
+
+    /** Referencia al comprobante original — sólo para notas de crédito. */
+    record CbteAsociado(int cbteTipo, int puntoVenta, long numero) {}
 
     record FacturaRequest(
             int puntoVenta,
@@ -61,22 +66,20 @@ class ArcaWsfeClient {
             String fecha,
             BigDecimal importeTotal,
             int docTipo,
-            long docNro
+            long docNro,
+            /** Vacío = no discrimina IVA (Factura/NC "C"). */
+            List<IvaGroup> ivaGroups,
+            /** null = es una factura; con datos = es una nota de crédito referida a ese comprobante. */
+            CbteAsociado cbteAsociado
     ) {
-        /** true si este tipo de comprobante discrimina IVA (A y B) — C nunca. */
-        boolean discriminaIva() {
-            return cbteTipo == CBTE_TIPO_FACTURA_A || cbteTipo == CBTE_TIPO_FACTURA_B;
-        }
-
-        /** Neto = total / 1.21 (IVA general, único que soporta esta integración), redondeado a 2 decimales. */
         BigDecimal impNeto() {
-            return discriminaIva()
-                    ? importeTotal.divide(ALICUOTA_21, 2, RoundingMode.HALF_UP)
-                    : importeTotal;
+            return ivaGroups.isEmpty() ? importeTotal
+                    : ivaGroups.stream().map(IvaGroup::baseImp).reduce(BigDecimal.ZERO, BigDecimal::add);
         }
 
         BigDecimal impIva() {
-            return discriminaIva() ? importeTotal.subtract(impNeto()) : BigDecimal.ZERO;
+            return ivaGroups.isEmpty() ? BigDecimal.ZERO
+                    : ivaGroups.stream().map(IvaGroup::importe).reduce(BigDecimal.ZERO, BigDecimal::add);
         }
     }
 
@@ -109,16 +112,38 @@ class ArcaWsfeClient {
         String importeTotal = req.importeTotal().setScale(2, RoundingMode.HALF_UP).toPlainString();
         String importeNeto = req.impNeto().setScale(2, RoundingMode.HALF_UP).toPlainString();
         String importeIva = req.impIva().setScale(2, RoundingMode.HALF_UP).toPlainString();
-        // Factura A/B: WSFEv1 exige el array <Iva> con la alícuota discriminada. Factura C no discrimina IVA, no lo lleva.
-        String ivaBlock = req.discriminaIva() ? """
-                <ar:Iva>
-                  <ar:AlicIva>
-                    <ar:Id>%s</ar:Id>
-                    <ar:BaseImp>%s</ar:BaseImp>
-                    <ar:Importe>%s</ar:Importe>
-                  </ar:AlicIva>
-                </ar:Iva>
-                """.formatted(ALIC_IVA_21_ID, importeNeto, importeIva) : "";
+
+        StringBuilder ivaBlock = new StringBuilder();
+        if (!req.ivaGroups().isEmpty()) {
+            ivaBlock.append("<ar:Iva>");
+            for (IvaGroup g : req.ivaGroups()) {
+                ivaBlock.append("""
+                        <ar:AlicIva>
+                          <ar:Id>%s</ar:Id>
+                          <ar:BaseImp>%s</ar:BaseImp>
+                          <ar:Importe>%s</ar:Importe>
+                        </ar:AlicIva>
+                        """.formatted(g.alicId(),
+                        g.baseImp().setScale(2, RoundingMode.HALF_UP).toPlainString(),
+                        g.importe().setScale(2, RoundingMode.HALF_UP).toPlainString()));
+            }
+            ivaBlock.append("</ar:Iva>");
+        }
+
+        String cbtesAsocBlock = "";
+        if (req.cbteAsociado() != null) {
+            cbtesAsocBlock = """
+                    <ar:CbtesAsoc>
+                      <ar:CbteAsoc>
+                        <ar:Tipo>%d</ar:Tipo>
+                        <ar:PtoVta>%d</ar:PtoVta>
+                        <ar:Nro>%d</ar:Nro>
+                      </ar:CbteAsoc>
+                    </ar:CbtesAsoc>
+                    """.formatted(req.cbteAsociado().cbteTipo(), req.cbteAsociado().puntoVenta(),
+                    req.cbteAsociado().numero());
+        }
+
         String body = soapEnvelope("""
                 <ar:FECAESolicitar>
                   <ar:Auth>%s</ar:Auth>
@@ -145,13 +170,14 @@ class ArcaWsfeClient {
                         <ar:MonId>PES</ar:MonId>
                         <ar:MonCotiz>1</ar:MonCotiz>
                         %s
+                        %s
                       </ar:FECAEDetRequest>
                     </ar:FeDetReq>
                   </ar:FeCAEReq>
                 </ar:FECAESolicitar>
                 """.formatted(authXml(ticket, cuit), req.puntoVenta(), req.cbteTipo(),
                 req.docTipo(), req.docNro(), req.numero(), req.numero(), req.fecha(),
-                importeTotal, importeNeto, importeIva, ivaBlock));
+                importeTotal, importeNeto, importeIva, cbtesAsocBlock, ivaBlock));
         Document response = call(body, "FECAESolicitar", modoPrueba);
         checkForErrors(response);
 

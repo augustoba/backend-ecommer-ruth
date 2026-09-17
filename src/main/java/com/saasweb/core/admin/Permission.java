@@ -46,7 +46,9 @@ public enum Permission {
     /** Cargar/editar/borrar gastos del emprendimiento. */
     EXPENSES_MANAGE("Gestionar gastos"),
     /** Ver el balance de ganancias (ventas - costo - gastos) y sus comparativas. */
-    FINANCE_VIEW("Ver balance de ganancias");
+    FINANCE_VIEW("Ver balance de ganancias"),
+    /** Ver el historial de movimientos de stock. */
+    STOCK_MOVEMENTS_VIEW("Historial de movimientos de stock");
 
     private final String label;
 

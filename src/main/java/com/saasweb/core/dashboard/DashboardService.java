@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -64,6 +66,35 @@ public class DashboardService {
                 recent,
                 DEFAULT_LOW_STOCK,
                 lowStock);
+    }
+
+    private static final DateTimeFormatter CAE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    /**
+     * Pedidos con Factura ARCA aprobada cuyo CAE vence dentro de {@code days}
+     * días (informativo — ver ítem 5 de la ronda de mejoras). `caeVencimiento`
+     * viene de ARCA en formato `yyyyMMdd`.
+     */
+    @Transactional(readOnly = true)
+    public List<DashboardDtos.ExpiringCaeItem> expiringCae(int days) {
+        LocalDate today = LocalDate.now();
+        LocalDate limit = today.plusDays(days);
+        List<DashboardDtos.ExpiringCaeItem> out = new ArrayList<>();
+        for (Order o : orderRepo.findByTenantIdAndInvoiceCaeIsNotNull(TenantContext.getTenantId())) {
+            if (o.getInvoiceCaeVencimiento() == null) continue;
+            LocalDate vto;
+            try {
+                vto = LocalDate.parse(o.getInvoiceCaeVencimiento(), CAE_FMT);
+            } catch (DateTimeParseException e) {
+                continue;
+            }
+            if (!vto.isBefore(today) && !vto.isAfter(limit)) {
+                out.add(new DashboardDtos.ExpiringCaeItem(o.getId(), o.getCode(), o.getInvoiceType(),
+                        o.getInvoiceCaeVencimiento(), java.time.temporal.ChronoUnit.DAYS.between(today, vto)));
+            }
+        }
+        out.sort(Comparator.comparingLong(DashboardDtos.ExpiringCaeItem::diasRestantes));
+        return out;
     }
 
     /** Talles de productos activos cuyo stock está en o por debajo de su umbral. */
