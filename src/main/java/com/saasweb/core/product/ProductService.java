@@ -149,6 +149,19 @@ public class ProductService {
         return repo.search(TenantContext.getTenantId(), s, like, sup, active, gid, oid, noStock, pageable);
     }
 
+    /**
+     * Busca un producto por código de barras exacto — para "cargar producto
+     * por código de barras" desde el panel (escanear un ítem que ya trae
+     * EAN del fabricante y, si ya existe, ir directo a editarlo en vez de
+     * cargarlo de nuevo). null si no hay ninguno con ese código.
+     */
+    @Transactional(readOnly = true)
+    public Product findByBarcode(String barcode) {
+        if (barcode == null || barcode.isBlank()) return null;
+        return repo.findByTenantIdAndBarcodeAndDeletedFalse(TenantContext.getTenantId(), barcode.trim())
+                .orElse(null);
+    }
+
     @Transactional(readOnly = true)
     public Product get(String id) {
         return repo.findByIdAndTenantId(id, TenantContext.getTenantId())

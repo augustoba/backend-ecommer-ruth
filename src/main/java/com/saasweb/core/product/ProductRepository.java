@@ -14,6 +14,9 @@ public interface ProductRepository extends JpaRepository<Product, String> {
     Optional<Product> findByIdAndTenantId(String id, String tenantId);
     List<Product> findByTenantId(String tenantId);
 
+    /** Para "cargar producto por código de barras" desde el panel — no depende de qué página esté cargada. */
+    Optional<Product> findByTenantIdAndBarcodeAndDeletedFalse(String tenantId, String barcode);
+
     /** Borra los productos del tenant (y sus colecciones @ElementCollection) — ver TenantDeletionService. */
     void deleteAllByTenantId(String tenantId);
     List<Product> findByTenantIdAndActiveTrueAndDeletedFalseOrderByCreatedAtDesc(String tenantId);

@@ -1,5 +1,6 @@
 package com.saasweb.core.product;
 
+import com.saasweb.common.ResourceNotFoundException;
 import com.saasweb.core.PageResponse;
 import com.saasweb.core.product.ProductDtos.ActivePatch;
 import com.saasweb.core.product.ProductDtos.DiscontinuedPatch;
@@ -82,6 +83,21 @@ public class ProductController {
     @PreAuthorize("hasAuthority('PRODUCTS_VIEW')")
     public ProductResponse get(@PathVariable String id) {
         return ProductResponse.from(service.get(id));
+    }
+
+    /**
+     * Para "cargar producto por código de barras" desde el panel: el admin
+     * escanea un producto y, si ya existe, se lo manda a editar en vez de
+     * cargarlo de nuevo. 404 si no hay ningún producto con ese código.
+     */
+    @GetMapping("/api/admin/products/by-barcode")
+    @PreAuthorize("hasAuthority('PRODUCTS_VIEW')")
+    public ProductResponse byBarcode(@RequestParam String code) {
+        Product product = service.findByBarcode(code);
+        if (product == null) {
+            throw new ResourceNotFoundException("No hay ningún producto con ese código de barras.");
+        }
+        return ProductResponse.from(product);
     }
 
     @PostMapping("/api/admin/products")
