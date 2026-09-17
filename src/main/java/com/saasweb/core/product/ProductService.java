@@ -258,6 +258,7 @@ public class ProductService {
         p.setDiscontinued(req.discontinued() != null && req.discontinued());
         p.setSizeScaleId(blankToNull(req.sizeScaleId()));
         p.setSupplierId(blankToNull(req.supplierId()));
+        p.setBarcode(blankToNull(req.barcode()));
         p.setCostPrice(req.costPrice() != null && req.costPrice().signum() > 0 ? req.costPrice() : null);
         p.setLowStockThreshold(
                 req.lowStockThreshold() != null && req.lowStockThreshold() >= 0 ? req.lowStockThreshold() : null);

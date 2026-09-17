@@ -71,6 +71,72 @@ public class Order {
     @Column(length = 20)
     private PaymentMethod paymentMethod;
 
+    /**
+     * Venta presencial en efectivo: con cuánto pagó el cliente — para calcular
+     * el vuelto en el momento y dejarlo anotado. Sólo tiene sentido con
+     * {@code paymentMethod = CASH}; null en cualquier otro caso o si no se
+     * cargó (es opcional incluso pagando en efectivo).
+     */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal amountTendered;
+
+    /**
+     * Referencia anotada a mano del pago presencial — según el medio significa
+     * una cosa distinta: con {@code TRANSFER}, nombre y apellido de quien
+     * transfirió (para poder cruzarlo con el resumen bancario); con
+     * {@code POSNET}, el número de ticket que imprime la máquina al aprobar.
+     * No hay integración real con el posnet ni con el banco, es sólo una nota
+     * para poder reconciliar después. Opcional siempre.
+     */
+    @Column(length = 200)
+    private String paymentReference;
+
+    /**
+     * Comprobante emitido para esta venta presencial (Fase 14, ver
+     * PLAN_SAAS.md) — sólo tiene sentido para pedidos armados desde el
+     * punto de venta (kiosco). {@code null} = todavía no se emitió nada
+     * (pedidos viejos, o de canal WEB). "TICKET_INTERNO" = comprobante no
+     * fiscal; "FACTURA_C"/"FACTURA_B"/"FACTURA_A" = factura real con CAE
+     * de ARCA (el tipo lo decide `ArcaInvoiceService` según la condición
+     * frente al IVA del tenant y si se cargó CUIT del comprador).
+     */
+    @Column(length = 20)
+    private String invoiceType;
+
+    /**
+     * CUIT del comprador, sólo si se cargó al cobrar (habilita Factura A
+     * en vez de B para un tenant Responsable Inscripto). Opcional siempre
+     * — sin esto, Factura A/B/C se emite igual a consumidor final/DNI.
+     */
+    @Column(length = 20)
+    private String invoiceBuyerCuit;
+
+    /** CAE (Código de Autorización Electrónico) que devolvió ARCA — sólo con invoiceType = FACTURA_A/B/C aprobada. */
+    @Column(length = 20)
+    private String invoiceCae;
+
+    /** Vencimiento del CAE, formato yyyyMMdd (tal cual lo devuelve ARCA). */
+    @Column(length = 10)
+    private String invoiceCaeVencimiento;
+
+    /** Número de comprobante asignado (correlativo del punto de venta en ARCA, no el `number`/código interno del pedido). */
+    private Long invoiceNumber;
+
+    private Integer invoicePuntoVenta;
+
+    /** Link al QR que exige ARCA en todo comprobante (RG 4892) — se arma una sola vez, al aprobarse el CAE. */
+    @Column(length = 500)
+    private String invoiceQrUrl;
+
+    /**
+     * Si se intentó pedir una Factura C y ARCA la rechazó (o falló la
+     * conexión), el detalle queda acá para poder reintentar — la VENTA en
+     * sí no se bloquea por esto: el cliente ya pagó, plantarse esperando a
+     * ARCA no tiene sentido (ver `ArcaInvoiceService`).
+     */
+    @Column(length = 500)
+    private String invoiceError;
+
     /** Sólo para `paymentMethod = MERCADOPAGO` — null para cualquier otro medio. Ver {@link PaymentStatus}. */
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
@@ -87,6 +153,17 @@ public class Order {
     /** Id del pago aprobado en Mercado Pago, una vez confirmado por webhook. */
     @Column(length = 100)
     private String mpPaymentId;
+
+    /**
+     * Mercado Pago aprobó el pago pero {@code OrderService#doConfirm} no
+     * pudo confirmar el pedido solo (ej. se quedó sin stock justo antes de
+     * que se apruebe) — el pedido queda igual en PENDIENTE, sin tocar
+     * stock, pero esto queda como aviso visible en el panel para que
+     * alguien lo revise a mano (antes esto quedaba sólo en un log del
+     * servidor, invisible para la tienda). {@code null} = sin problemas.
+     */
+    @Column(length = 500)
+    private String paymentIssueNote;
 
     /** Si al crear el pedido aplicaba "envío gratis": el texto para mostrarle al cliente. null = no. */
     @Column(length = 300)
@@ -272,6 +349,86 @@ public class Order {
         this.paymentMethod = paymentMethod;
     }
 
+    public BigDecimal getAmountTendered() {
+        return amountTendered;
+    }
+
+    public void setAmountTendered(BigDecimal amountTendered) {
+        this.amountTendered = amountTendered;
+    }
+
+    public String getPaymentReference() {
+        return paymentReference;
+    }
+
+    public void setPaymentReference(String paymentReference) {
+        this.paymentReference = paymentReference;
+    }
+
+    public String getInvoiceType() {
+        return invoiceType;
+    }
+
+    public void setInvoiceType(String invoiceType) {
+        this.invoiceType = invoiceType;
+    }
+
+    public String getInvoiceBuyerCuit() {
+        return invoiceBuyerCuit;
+    }
+
+    public void setInvoiceBuyerCuit(String invoiceBuyerCuit) {
+        this.invoiceBuyerCuit = invoiceBuyerCuit;
+    }
+
+    public String getInvoiceCae() {
+        return invoiceCae;
+    }
+
+    public void setInvoiceCae(String invoiceCae) {
+        this.invoiceCae = invoiceCae;
+    }
+
+    public String getInvoiceCaeVencimiento() {
+        return invoiceCaeVencimiento;
+    }
+
+    public void setInvoiceCaeVencimiento(String invoiceCaeVencimiento) {
+        this.invoiceCaeVencimiento = invoiceCaeVencimiento;
+    }
+
+    public Long getInvoiceNumber() {
+        return invoiceNumber;
+    }
+
+    public void setInvoiceNumber(Long invoiceNumber) {
+        this.invoiceNumber = invoiceNumber;
+    }
+
+    public Integer getInvoicePuntoVenta() {
+        return invoicePuntoVenta;
+    }
+
+    public void setInvoicePuntoVenta(Integer invoicePuntoVenta) {
+        this.invoicePuntoVenta = invoicePuntoVenta;
+    }
+
+    public String getInvoiceQrUrl() {
+        return invoiceQrUrl;
+    }
+
+    public void setInvoiceQrUrl(String invoiceQrUrl) {
+        this.invoiceQrUrl = invoiceQrUrl;
+    }
+
+    public String getInvoiceError() {
+        return invoiceError;
+    }
+
+    public void setInvoiceError(String invoiceError) {
+        this.invoiceError = invoiceError;
+    }
+
     public PaymentStatus getPaymentStatus() {
         return paymentStatus;
     }
@@ -302,6 +459,14 @@ public class Order {
 
     public void setMpPaymentId(String mpPaymentId) {
         this.mpPaymentId = mpPaymentId;
+    }
+
+    public String getPaymentIssueNote() {
+        return paymentIssueNote;
+    }
+
+    public void setPaymentIssueNote(String paymentIssueNote) {
+        this.paymentIssueNote = paymentIssueNote;
     }
 
     public String getFreeShippingNote() {

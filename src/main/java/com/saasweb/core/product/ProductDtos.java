@@ -40,7 +40,9 @@ public final class ProductDtos {
             /** Umbral de stock bajo propio del producto (unidades por talle). null = default global. */
             Integer lowStockThreshold,
             Map<String, List<String>> params,
-            List<SizeStockDto> sizeStocks
+            List<SizeStockDto> sizeStocks,
+            /** Código de barras real (EAN/UPC) — opcional. */
+            @Size(max = 64) String barcode
     ) {}
 
     public record StockPatch(@NotBlank String size, int stock) {}
@@ -70,7 +72,8 @@ public final class ProductDtos {
             BigDecimal costPrice,
             Integer lowStockThreshold,
             Map<String, List<String>> params,
-            List<SizeStockDto> sizeStocks
+            List<SizeStockDto> sizeStocks,
+            String barcode
     ) {
         public static ProductResponse from(Product p) {
             Map<String, List<String>> params = new LinkedHashMap<>();
@@ -84,7 +87,7 @@ public final class ProductDtos {
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
                     p.getImageUrl(), List.copyOf(p.getImages()), p.getVideoUrl(), p.isActive(), p.isDiscontinued(),
                     p.isDeleted(), p.getCreatedAt(), p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(),
-                    p.getLowStockThreshold(), params, stocks);
+                    p.getLowStockThreshold(), params, stocks, p.getBarcode());
         }
     }
 }

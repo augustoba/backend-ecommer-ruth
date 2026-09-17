@@ -41,7 +41,13 @@ public final class OrderDtos {
             Double shippingLng,
             PaymentMethod paymentMethod,
             /** Código de cupón escrito en el carrito (opcional). */
-            @Size(max = 40) String couponCode
+            @Size(max = 40) String couponCode,
+            /** Venta presencial en efectivo: con cuánto pagó el cliente (opcional, sólo con CASH). */
+            BigDecimal amountTendered,
+            /** Referencia anotada a mano (nombre de quien transfirió, o número de ticket del posnet). Opcional. */
+            @Size(max = 200) String paymentReference,
+            /** CUIT del comprador (opcional) — sólo tiene efecto si la tienda es Responsable Inscripto ante ARCA: habilita Factura A en vez de B. */
+            @Size(max = 20) String buyerCuit
     ) {}
 
     public record LineAcceptance(@NotBlank String lineId, @NotNull Boolean accepted) {}
@@ -103,6 +109,23 @@ public final class OrderDtos {
             PaymentStatus paymentStatus,
             /** Link al checkout de Mercado Pago — el frontend redirige acá apenas se crea el pedido. */
             String mpCheckoutUrl,
+            /** Mercado Pago aprobó el pago pero no se pudo confirmar el pedido solo — ver {@link Order#getPaymentIssueNote()}. null = sin problemas. */
+            String paymentIssueNote,
+            /** Venta presencial en efectivo: con cuánto pagó el cliente. null salvo CASH (y aun ahí es opcional). */
+            BigDecimal amountTendered,
+            /** Nombre de quien transfirió, o número de ticket del posnet, según el medio de pago. Opcional. */
+            String paymentReference,
+            /** "TICKET_INTERNO" | "FACTURA_A" | "FACTURA_B" | "FACTURA_C" — sólo se completa al confirmar una venta presencial (canal LOCAL). */
+            String invoiceType,
+            /** CUIT del comprador, si se cargó al cobrar (sólo tiene efecto en tiendas Responsable Inscripto). */
+            String invoiceBuyerCuit,
+            String invoiceCae,
+            String invoiceCaeVencimiento,
+            Long invoiceNumber,
+            Integer invoicePuntoVenta,
+            String invoiceQrUrl,
+            /** ARCA rechazó la Factura C (o falló la conexión) — la venta quedó igual como ticket interno. null = sin problemas. */
+            String invoiceError,
             List<OrderLineResponse> lines
     ) {
         public static OrderResponse from(Order o) {
@@ -115,7 +138,10 @@ public final class OrderDtos {
                     o.getFreeShippingNote(), o.getDiscountNote(),
                     o.getCouponCode(), o.getCouponDiscount(),
                     o.getCreatedByName(), o.getConfirmedByName(),
-                    o.getPaymentStatus(), o.getMpCheckoutUrl(),
+                    o.getPaymentStatus(), o.getMpCheckoutUrl(), o.getPaymentIssueNote(),
+                    o.getAmountTendered(), o.getPaymentReference(),
+                    o.getInvoiceType(), o.getInvoiceBuyerCuit(), o.getInvoiceCae(), o.getInvoiceCaeVencimiento(),
+                    o.getInvoiceNumber(), o.getInvoicePuntoVenta(), o.getInvoiceQrUrl(), o.getInvoiceError(),
                     o.getLines().stream().map(OrderLineResponse::from).toList());
         }
     }

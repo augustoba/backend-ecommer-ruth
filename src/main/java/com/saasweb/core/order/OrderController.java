@@ -99,4 +99,11 @@ public class OrderController {
     public OrderResponse cancel(@PathVariable String id) {
         return OrderResponse.from(service.cancel(id));
     }
+
+    /** Reintenta emitir la Factura de ARCA de una venta presencial que quedó como ticket interno. */
+    @PostMapping("/api/admin/orders/{id}/retry-invoice")
+    @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
+    public OrderResponse retryInvoice(@PathVariable String id) {
+        return OrderResponse.from(service.retryInvoicing(id));
+    }
 }

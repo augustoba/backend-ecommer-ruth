@@ -2,6 +2,7 @@ package com.saasweb.core.auth;
 
 import com.saasweb.config.JwtService;
 import com.saasweb.core.auth.AccountDtos.ForgotPasswordRequest;
+import com.saasweb.core.auth.AccountDtos.ResetPasswordRequest;
 import com.saasweb.core.admin.AdminUserDtos.MeResponse;
 import com.saasweb.core.auth.LoginRequest;
 import com.saasweb.core.auth.TokenResponse;
@@ -34,12 +35,20 @@ public class AuthController {
     }
 
     /**
-     * "Olvidé mi contraseña": le genera una nueva al azar y se la manda por
-     * mail. Siempre responde igual, exista o no ese DNI (no revela nada).
+     * "Olvidé mi contraseña": manda un link de un solo uso por mail para
+     * elegir una contraseña nueva. Siempre responde igual, exista o no ese
+     * DNI (no revela nada).
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req, HttpServletRequest http) {
         authService.forgotPassword(req.dni(), clientIp(http));
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Confirma el link de "olvidé mi contraseña" con la contraseña nueva. Público. */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest req) {
+        authService.resetPassword(req.token(), req.newPassword());
         return ResponseEntity.noContent().build();
     }
 

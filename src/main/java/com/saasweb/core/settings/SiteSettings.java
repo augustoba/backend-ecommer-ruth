@@ -163,6 +163,49 @@ public class SiteSettings {
     @Column(length = 300)
     private String mpPublicKey;
 
+    // --- ARCA/AFIP (Fase 14) — factura electrónica real (CAE) ---
+    // Mismo criterio que Mercado Pago: credenciales POR TENANT (cada tienda
+    // factura con su propia CUIT/certificado), editable por PAYMENTS_MANAGE.
+    // El certificado y la clave privada son secretos de verdad — igual que
+    // `smtpPassword`/`mpAccessToken`, nunca se devuelven en ninguna
+    // respuesta, sólo se pueden pisar (ver `ArcaConfigResponse`).
+
+    /** Módulo del plan habilitado Y el tenant activó la facturación. */
+    @Column(nullable = false)
+    private boolean arcaEnabled = false;
+
+    /** true = entorno de homologación (testing) de ARCA; false = producción. */
+    @Column(nullable = false)
+    private boolean arcaModoPrueba = true;
+
+    /** CUIT del tenant (11 dígitos, sin guiones) — el que factura. No es secreto. */
+    @Column(length = 20)
+    private String arcaCuit;
+
+    /** Punto de venta asignado en ARCA para facturación electrónica (WSFE). */
+    private Integer arcaPuntoVenta;
+
+    /**
+     * Condición frente al IVA — determina el tipo de comprobante por
+     * defecto (Monotributo/Exento → Factura C, sin discriminar IVA;
+     * Responsable Inscripto → Factura A/B, fuera de alcance todavía, ver
+     * PLAN_SAAS.md Fase 14).
+     */
+    @Column(length = 40)
+    private String arcaCondicionIva;
+
+    /** Certificado X.509 (.crt) que ARCA asoció al Access Token del WS, en PEM. Secreto real. */
+    @Column(length = 8000)
+    private String arcaCertificadoPem;
+
+    /** Clave privada del certificado de arriba, en PEM. Secreto real — nunca sale de este campo. */
+    @Column(length = 8000)
+    private String arcaClavePrivadaPem;
+
+    /** TICKET_INTERNO (no fiscal) | FACTURA_ARCA (real, con CAE) — qué emite el punto de venta por defecto. */
+    @Column(length = 20, nullable = false)
+    private String invoiceMode = "TICKET_INTERNO";
+
     // --- Cloudinary (subida de imágenes desde el panel) ---
     // Editable solo por superadmin (ver AdminUser.superAdmin); se leen desde el
     // endpoint público de settings porque cualquier sesión de admin las necesita
@@ -506,5 +549,69 @@ public class SiteSettings {
 
     public void setMpPublicKey(String mpPublicKey) {
         this.mpPublicKey = mpPublicKey;
+    }
+
+    public boolean isArcaEnabled() {
+        return arcaEnabled;
+    }
+
+    public void setArcaEnabled(boolean arcaEnabled) {
+        this.arcaEnabled = arcaEnabled;
+    }
+
+    public boolean isArcaModoPrueba() {
+        return arcaModoPrueba;
+    }
+
+    public void setArcaModoPrueba(boolean arcaModoPrueba) {
+        this.arcaModoPrueba = arcaModoPrueba;
+    }
+
+    public String getArcaCuit() {
+        return arcaCuit;
+    }
+
+    public void setArcaCuit(String arcaCuit) {
+        this.arcaCuit = arcaCuit;
+    }
+
+    public Integer getArcaPuntoVenta() {
+        return arcaPuntoVenta;
+    }
+
+    public void setArcaPuntoVenta(Integer arcaPuntoVenta) {
+        this.arcaPuntoVenta = arcaPuntoVenta;
+    }
+
+    public String getArcaCondicionIva() {
+        return arcaCondicionIva;
+    }
+
+    public void setArcaCondicionIva(String arcaCondicionIva) {
+        this.arcaCondicionIva = arcaCondicionIva;
+    }
+
+    public String getArcaCertificadoPem() {
+        return arcaCertificadoPem;
+    }
+
+    public void setArcaCertificadoPem(String arcaCertificadoPem) {
+        this.arcaCertificadoPem = arcaCertificadoPem;
+    }
+
+    public String getArcaClavePrivadaPem() {
+        return arcaClavePrivadaPem;
+    }
+
+    public void setArcaClavePrivadaPem(String arcaClavePrivadaPem) {
+        this.arcaClavePrivadaPem = arcaClavePrivadaPem;
+    }
+
+    public String getInvoiceMode() {
+        return invoiceMode;
+    }
+
+    public void setInvoiceMode(String invoiceMode) {
+        this.invoiceMode = invoiceMode;
     }
 }

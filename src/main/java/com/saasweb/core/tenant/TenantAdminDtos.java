@@ -38,7 +38,14 @@ public class TenantAdminDtos {
             String facebookUrl,
             @jakarta.validation.constraints.Size(max = 5_000_000) String logoUrl,
             @Pattern(regexp = "^$|^(circle|square|rectangle)$", message = "Forma de logo desconocida")
-            String logoShape) {
+            String logoShape,
+            /**
+             * Plan comercial a asignar (Fase 14) — define qué módulos tiene
+             * esta tienda (sitio web, punto de venta, o ambos). Vacío/null =
+             * el plan por defecto (compat con altas que no pasan por el
+             * paso nuevo del asistente).
+             */
+            String planId) {
     }
 
     public record TenantResponse(String id, String slug, String name, Rubro rubro, String rubroLabel,

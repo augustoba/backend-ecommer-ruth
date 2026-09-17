@@ -14,7 +14,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.UUID;
 
 @Service
@@ -22,7 +28,7 @@ import java.util.UUID;
 public class AuthService {
 
     private static final int MIN_PASSWORD = 4;
-    private static final String TEMP_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    private static final Duration RESET_TOKEN_TTL = Duration.ofHours(1);
     private final SecureRandom random = new SecureRandom();
 
     private final AdminUserRepository users;
@@ -64,8 +70,16 @@ public class AuthService {
     }
 
     /**
-     * Recupera la cuenta: le genera una contraseña nueva al azar, se la manda
-     * por mail (todo usuario tiene email, es obligatorio) y la deja cargada.
+     * Recupera la cuenta: genera un token de un solo uso (vence a la hora) y
+     * manda un LINK por mail para elegir una contraseña nueva — nunca una
+     * contraseña en sí. Antes esto generaba y mandaba una contraseña al azar
+     * directo por mail, lo que además de viajar en texto plano tenía un
+     * problema más serio: como el DNI no es realmente secreto, cualquiera
+     * que lo supiera podía invalidar la contraseña real de otro admin en
+     * cualquier momento con sólo pedir la recuperación (no hacía falta leer
+     * el mail ajeno para causar el daño). Con el link, pedir la recuperación
+     * ya no cambia nada de la cuenta hasta que alguien con acceso al mail
+     * efectivamente lo abre y confirma una contraseña nueva.
      * Público. No revela si el DNI existe o no (siempre responde igual).
      */
     public void forgotPassword(String dni, String clientIp) {
@@ -78,12 +92,32 @@ public class AuthService {
             return;
         }
         loginAttempts.recordSuccess(clientIp, dni);
-        String tempPassword = generateTempPassword();
-        // Manda el mail ANTES de tocar la contraseña: si falla el envío, el
-        // usuario no se queda sin poder entrar con la que ya tenía.
-        accountMailService.sendTempPassword(user.getEmail(), user.getNombre(), tempPassword);
-        user.setPasswordHash(passwordEncoder.encode(tempPassword));
+        String rawToken = generateResetToken();
+        user.setResetTokenHash(hashToken(rawToken));
+        user.setResetTokenExpiresAt(Instant.now().plus(RESET_TOKEN_TTL));
         users.save(user);
+        String link = props.getUrls().getFrontend() + "/admin/restablecer-clave?token=" + rawToken;
+        accountMailService.sendPasswordResetLink(user.getEmail(), user.getNombre(), link);
+    }
+
+    /**
+     * Confirma la recuperación: valida el token (existe, no venció) y deja
+     * la contraseña nueva. De un solo uso — el token se borra apenas se usa,
+     * sea cual sea el resultado, para que no quede reutilizable ni siquiera
+     * si algo falla después.
+     */
+    public void resetPassword(String token, String newPassword) {
+        String tokenHash = hashToken(token == null ? "" : token.trim());
+        AdminUser user = users.findByResetTokenHashForTenant(tokenHash, TenantContext.getTenantId())
+                .orElseThrow(() -> new BadRequestException("El link venció o ya se usó. Pedí uno nuevo."));
+        Instant expiresAt = user.getResetTokenExpiresAt();
+        user.setResetTokenHash(null);
+        user.setResetTokenExpiresAt(null);
+        if (expiresAt == null || expiresAt.isBefore(Instant.now())) {
+            users.save(user);
+            throw new BadRequestException("El link venció o ya se usó. Pedí uno nuevo.");
+        }
+        setPassword(user, newPassword);
     }
 
     /** Cambia la contraseña (requiere la actual). */
@@ -95,12 +129,24 @@ public class AuthService {
         setPassword(user, newPassword);
     }
 
-    private String generateTempPassword() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 10; i++) {
-            sb.append(TEMP_PASSWORD_CHARS.charAt(random.nextInt(TEMP_PASSWORD_CHARS.length())));
+    /** Token de un solo uso, URL-safe, 32 bytes de entropía (no adivinable). */
+    private String generateResetToken() {
+        byte[] bytes = new byte[32];
+        random.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    /**
+     * Sólo se guarda el hash del token (nunca el token en sí) — mismo
+     * criterio que la contraseña, por si alguna vez se filtra la base.
+     */
+    private static String hashToken(String rawToken) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(rawToken.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 no disponible", e);
         }
-        return sb.toString();
     }
 
     @Transactional(readOnly = true)

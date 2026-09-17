@@ -7,12 +7,15 @@ import com.saasweb.core.settings.SiteSettingsDtos.MailConfigRequest;
 import com.saasweb.core.settings.SiteSettingsDtos.MailConfigResponse;
 import com.saasweb.core.settings.SiteSettingsDtos.MercadoPagoConfigRequest;
 import com.saasweb.core.settings.SiteSettingsDtos.MercadoPagoConfigResponse;
+import com.saasweb.core.settings.SiteSettingsDtos.ArcaConfigRequest;
+import com.saasweb.core.settings.SiteSettingsDtos.ArcaConfigResponse;
 import com.saasweb.core.settings.SiteSettingsDtos.PaymentsSettingsRequest;
 import com.saasweb.core.settings.SiteSettingsDtos.PlatformSettingsRequest;
 import com.saasweb.core.settings.SiteSettingsDtos.SettingsResponse;
 import com.saasweb.core.settings.SiteSettingsService;
 import com.saasweb.core.plan.Modules;
 import com.saasweb.core.plan.PlanService;
+import com.saasweb.core.arca.ArcaInvoiceService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -22,10 +25,13 @@ public class SiteSettingsController {
 
     private final SiteSettingsService service;
     private final PlanService planService;
+    private final ArcaInvoiceService arcaInvoiceService;
 
-    public SiteSettingsController(SiteSettingsService service, PlanService planService) {
+    public SiteSettingsController(SiteSettingsService service, PlanService planService,
+                                   ArcaInvoiceService arcaInvoiceService) {
         this.service = service;
         this.planService = planService;
+        this.arcaInvoiceService = arcaInvoiceService;
     }
 
     /** true si el plan del tenant actual habilita ese módulo (ver {@link Modules}). */
@@ -41,8 +47,15 @@ public class SiteSettingsController {
         return moduleOn && s.isMpEnabled() && s.getMpAccessToken() != null && !s.getMpAccessToken().isBlank();
     }
 
+    private boolean moduleEnabled(String moduleKey) {
+        var plan = planService.getCurrent();
+        return plan != null && plan.hasModule(moduleKey);
+    }
+
     private SettingsResponse toResponse(SiteSettings s) {
-        return SettingsResponse.from(s, socialShareEnabled(), mercadoPagoAvailable(s));
+        return SettingsResponse.from(s, socialShareEnabled(), mercadoPagoAvailable(s),
+                moduleEnabled(Modules.POS), moduleEnabled(Modules.ECOMMERCE_SITE),
+                arcaInvoiceService.isAvailable(), s.getInvoiceMode());
     }
 
     /** Público: datos del local para el header, footer y el link de WhatsApp. */
@@ -93,6 +106,23 @@ public class SiteSettingsController {
     @PreAuthorize("hasAuthority('PAYMENTS_MANAGE')")
     public MercadoPagoConfigResponse updateMercadoPagoConfig(@Valid @RequestBody MercadoPagoConfigRequest req) {
         return MercadoPagoConfigResponse.from(service.updateMercadoPago(req));
+    }
+
+    /**
+     * Credenciales de ARCA DEL TENANT (Fase 14) — mismo criterio que
+     * Mercado Pago: la propia cuenta/CUIT del dueño de la tienda, no
+     * requiere SUPERADMIN.
+     */
+    @GetMapping("/api/admin/settings/arca")
+    @PreAuthorize("hasAuthority('PAYMENTS_MANAGE')")
+    public ArcaConfigResponse arcaConfig() {
+        return ArcaConfigResponse.from(service.get());
+    }
+
+    @PutMapping("/api/admin/settings/arca")
+    @PreAuthorize("hasAuthority('PAYMENTS_MANAGE')")
+    public ArcaConfigResponse updateArcaConfig(@Valid @RequestBody ArcaConfigRequest req) {
+        return ArcaConfigResponse.from(service.updateArca(req));
     }
 
     /**

@@ -11,5 +11,11 @@ public enum PaymentMethod {
     /** Efectivo al recibir/retirar. */
     CASH,
     /** Pago online real con Mercado Pago (Fase 13, checkout redirect) — ver `core/payment/`. */
-    MERCADOPAGO
+    MERCADOPAGO,
+    /**
+     * Tarjeta con posnet físico del local (venta presencial) — el sistema no
+     * se integra con el posnet en sí, sólo se anota el número de ticket que
+     * imprime al aprobar (ver {@code Order#getPaymentReference()}).
+     */
+    POSNET
 }

@@ -39,20 +39,29 @@ public class TenantService {
      */
     public Tenant ensureDefault() {
         String slug = props.getTenant().getSlug();
-        return repo.findBySlug(slug).orElseGet(() -> create(props.getTenant().getName(), slug, Rubro.ROPA));
+        return repo.findBySlug(slug).orElseGet(() -> create(props.getTenant().getName(), slug, Rubro.ROPA, null));
     }
 
-    /** Crea un tenant nuevo. No siembra parametrías/productos — eso lo hace TenantProvisioningService. */
-    public Tenant create(String name, String slug, Rubro rubro) {
+    /**
+     * Crea un tenant nuevo. No siembra parametrías/productos — eso lo hace
+     * TenantProvisioningService. {@code planId} en blanco/null = el plan por
+     * defecto (ver PlanService.ensureDefault) — compat con altas que no
+     * pasan por el paso del asistente que elige plan (Fase 14).
+     */
+    public Tenant create(String name, String slug, Rubro rubro, String planId) {
         if (repo.findBySlug(slug).isPresent()) {
             throw new BadRequestException("Ya existe una tienda con ese identificador.");
+        }
+        String resolvedPlanId = planId != null && !planId.isBlank() ? planId : planService.ensureDefault().getId();
+        if (!planService.exists(resolvedPlanId)) {
+            throw new BadRequestException("El plan elegido no existe.");
         }
         Tenant t = new Tenant();
         t.setId(UUID.randomUUID().toString());
         t.setSlug(slug);
         t.setName(name);
         t.setRubro(rubro);
-        t.setPlanId(planService.ensureDefault().getId());
+        t.setPlanId(resolvedPlanId);
         return repo.save(t);
     }
 

@@ -11,6 +11,12 @@ public final class AccountDtos {
     /** POST /api/auth/forgot-password — público. */
     public record ForgotPasswordRequest(@NotBlank String dni) {}
 
+    /** POST /api/auth/reset-password — público. */
+    public record ResetPasswordRequest(
+            @NotBlank String token,
+            @NotBlank @Size(min = 4) String newPassword
+    ) {}
+
     /** PUT /api/admin/account/password */
     public record ChangePasswordRequest(
             @NotBlank String currentPassword,

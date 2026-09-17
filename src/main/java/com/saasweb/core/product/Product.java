@@ -82,6 +82,15 @@ public class Product {
     /** Proveedor (id de Supplier) — info interna del admin. */
     private String supplierId;
 
+    /**
+     * Código de barras real del producto (EAN/UPC de fábrica, no el QR propio
+     * de la tienda que genera `admin-product-qr`) — para cargarlo al vuelo con
+     * un lector en Venta en el local. Opcional: no todos los rubros lo tienen
+     * a mano (ej. ropa hecha a pedido).
+     */
+    @Column(length = 64)
+    private String barcode;
+
     /** Precio de compra al proveedor — info interna del admin. */
     @Column(precision = 12, scale = 2)
     private BigDecimal costPrice;
@@ -217,6 +226,14 @@ public class Product {
 
     public void setSupplierId(String supplierId) {
         this.supplierId = supplierId;
+    }
+
+    public String getBarcode() {
+        return barcode;
+    }
+
+    public void setBarcode(String barcode) {
+        this.barcode = barcode;
     }
 
     public BigDecimal getCostPrice() {

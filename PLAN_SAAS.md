@@ -1533,8 +1533,419 @@ código pendiente:**
 
 ---
 
+### Fase 14 — Modo Kiosco/POS + Facturación ARCA (2026-09-16)
+
+Pedido nuevo del usuario, en la misma sesión de la ronda de mejoras
+post-Fase 13: además de tiendas con vidriera online, la plataforma
+tiene que poder ofrecer un **punto de venta puro** (kiosco, casa de
+repuestos) — negocios que sólo venden presencial, con lector de
+código de barras, control de stock y facturación (interna y AFIP/ARCA
+real, las dos), **en el mismo backend** que el resto — no un producto
+aparte.
+
+**Decisión de arquitectura — discutida con el usuario:** en vez de un
+flag rígido "tienda sí/tienda no" en `Tenant`, se reutiliza el
+mecanismo que ya existe, `Plan.enabledModules` — el sitio público en
+sí pasa a ser un módulo más (`ECOMMERCE_SITE`, todavía no creado) y se
+suma un módulo `POS`. Un tenant puede tener uno, el otro, o los dos —
+mismo backend, misma base, mismo login de admin. Esto además hace útil
+de entrada el panel de Planes (Fase de hoy, más arriba): el día de
+mañana se arman planes tipo "Sólo Web" / "Sólo POS" / "Combo" desde
+ahí, sin tocar código.
+
+**Facturación (Fase D, más grande, todavía sin arrancar):** el usuario
+confirmó que quiere **las dos** — ticket interno (no fiscal) y Factura
+AFIP/ARCA real (A/B/C). Para AFIP se descartó integrar directo con el
+web service (certificado, homologación, manejo de contingencias — un
+proyecto regulatorio en sí mismo) a favor de un proveedor tercero que
+ya envuelve eso en una API REST (candidatos relevados pero sin elegir
+todavía: TusFacturas, iFactura, PyAfipWs). Nota para cuando se retome:
+en 2026 ARCA exige QR + CAE en formato nuevo en cada factura — un
+motivo más para dejarlo del lado del proveedor.
+
+**Lo que se hizo hoy (lo que no dependía de la decisión de
+facturación):**
+- `Product.barcode` (nuevo, opcional, aditivo) — código de barras real
+  (EAN/UPC de fábrica), distinto del QR propio de la tienda que ya
+  generaba `admin-product-qr`. Campo nuevo en el form de producto,
+  sección "Compra/proveedor".
+- Búsqueda por código de barras en **Venta en el local**, sumada a la
+  búsqueda por nombre existente (no la reemplaza). Si lo que se tipeó
+  matchea EXACTO el barcode de un producto con un solo talle, lo suma
+  directo al carrito sin clickear nada (flujo "beep, beep, beep" de un
+  lector USB, que escribe rápido y termina en Enter — no hace falta
+  ningún SDK ni hardware especial). Si el producto tiene varios talles,
+  no hay forma de adivinar cuál — queda filtrado en la grilla para
+  elegirlo a mano, igual que con la búsqueda por nombre.
+- **Medio de pago `POSNET`** nuevo (tarjeta con la máquina física del
+  local — sin integración real con el posnet, sólo se anota el ticket).
+- **Campos nuevos en `Order`**: `amountTendered` (con cuánto pagó el
+  cliente en efectivo — el backend calcula que alcance para el total y
+  rechaza si no) y `paymentReference` (un campo genérico que significa
+  algo distinto según el medio: con `TRANSFER`, nombre y apellido de
+  quien transfirió — para cruzarlo después con el resumen bancario; con
+  `POSNET`, el número de ticket que imprime la máquina al aprobar). Sin
+  integración real con ningún banco ni posnet — son notas a mano, tal
+  como lo pidió el usuario describiendo lo que ya hacen los comercios
+  reales.
+- **Venta en el local**: con Efectivo, un campo "Con cuánto paga"
+  (opcional) que calcula y muestra el vuelto en el momento; con
+  Transferencia, el campo de nombre de quien transfirió; con Posnet, el
+  campo de número de ticket. Vuelto/referencia se muestran también en
+  el recibo imprimible y en el detalle de pedido del panel.
+
+**Verificado en el navegador de punta a punta** (no sólo compilado):
+producto real (`Zapatillas urbanas velcro`) editado con un código de
+barras de prueba; en Venta en el local, escanearlo (tipear + Enter)
+filtró la grilla a ese producto (no lo auto-agregó, porque tiene 6
+talles — comportamiento esperado, confirma que la guarda de "un solo
+talle" funciona); agregado a mano, probado Efectivo con $30.000 contra
+un total de $24.750 → "Vuelto: $5.250" correcto; cambiado a
+Transferencia y a Posnet, confirmando que el campo cambia de nombre y
+de sentido en cada caso; venta registrada con Posnet + ticket "004521"
+→ confirmado en el recibo impreso y en el detalle del pedido del panel
+que ambos datos (medio de pago y N° de ticket) se ven bien. **Nota:**
+el auto-agregado por barcode exacto con un producto de un solo talle
+no se verificó en el navegador (hubiera hecho falta armar un producto
+de prueba nuevo sólo para eso) — la lógica es un condicional simple ya
+tipado, y llama a la misma función `addProduct(...)` ya probada por el
+flujo manual de "tocar un talle".
+
+**Corrección de rumbo, misma sesión:** el usuario marcó que lo de
+arriba (barcode/posnet/vuelto) se metió directo en "Venta en el
+local", la pantalla que ya usa la tienda piloto (ecommerce) — mezclando
+la lógica de un tenant con sitio online con la de un negocio
+puramente presencial, cuando la idea original era que fueran dos
+lógicas/templates separados. Se resolvió así:
+- **Módulos `ECOMMERCE_SITE` y `POS` reales** en `Modules.java`
+  (backfill al plan ya sembrado, como todos los módulos anteriores).
+  `TenantResolutionFilter` ahora bloquea las rutas públicas (mismo
+  criterio y mismo response que una tienda pausada) para un tenant sin
+  `ECOMMERCE_SITE` — un tenant sólo-POS no tiene vidriera, sólo panel.
+  `GET /api/settings` suma `posEnabled`/`ecommerceSiteEnabled`
+  (mismo patrón que `socialShareEnabled`/`mercadoPagoAvailable`) para
+  que el panel sepa qué mostrar.
+- **Pantalla nueva y separada**: `admin-kiosco` (ruta
+  `/admin/kiosco`, "Punto de venta (kiosco)" en el menú, visible sólo
+  si `posEnabled`) — comparte los SERVICIOS de backend
+  (`ProductService`/`OrderService`/`DiscountService`) pero es un
+  componente propio, con su propio layout de "caja registradora": sin
+  cupón, sin email de marketing, sin delivery, y sólo los 3 medios de
+  pago que se cobran parado en un mostrador (Efectivo/Transferencia/
+  Posnet) — nada de QR/Mercado Pago, que son cosas de ecommerce.
+  "Venta en el local" (`admin-pos`) sigue existiendo tal cual para
+  tiendas que SÍ tienen ecommerce y también venden en persona — no se
+  le sacó nada de lo que se le había sumado antes en la misma sesión
+  (barcode, posnet, vuelto le quedan bien puestos igual, porque
+  cualquier venta presencial los puede necesitar tenga o no sitio
+  online).
+- Sumados los 2 módulos nuevos a la pantalla de Planes (Fase de hoy)
+  para poder prenderlos/apagarlos sin SQL — hasta ahora sólo tenía los
+  2 módulos viejos.
+- **Verificado en el navegador**: `/admin/kiosco` funciona de punta a
+  punta con su propio layout (buscador auto-enfocado arriba, sin cupón
+  ni email, sólo 3 medios de pago) — escaneado el mismo barcode de
+  prueba, agregado un talle, probado Efectivo ($30.000 contra
+  $24.750 → vuelto $5.250 correcto) y registrada la venta, confirmado
+  en el recibo. Apagado el módulo `POS` desde Planes → el ítem
+  "Punto de venta (kiosco)" desaparece del menú al instante; vuelto a
+  prender y confirmado por SQL que los 5 módulos del plan real (el
+  único que existe, usado por las 9 tiendas) quedaron exactamente como
+  antes. **No** se probó apagar `ECOMMERCE_SITE` contra la tienda
+  piloto real — hubiera significado bloquear su sitio público en vivo
+  para probarlo; el código es un espejo directo del mismo mecanismo de
+  "tienda pausada" que ya está en producción y probado, así que se
+  aceptó ese riesgo como innecesario de verificar hoy.
+
+**Menú adaptado + paso del asistente para elegir plan, misma sesión.**
+El usuario pidió puntualmente estas dos cosas, con una restricción
+clara para la segunda: el plan se elige entre planes YA CREADOS desde
+"Planes" (no que el asistente arme uno nuevo sobre la marcha) — más
+simple y alcanza de sobra mientras sea el propio usuario el único que
+da de alta tiendas.
+- **Menú**: los items puramente de ecommerce (Venta en el local,
+  Cupones, Campañas, Vista general, Mensaje de WhatsApp, Medios de
+  pago, Mercado Pago, Redes sociales, Sobre nosotros, Cómo comprar+FAQ,
+  Carrusel, Página de inicio) ahora se ocultan cuando el tenant no
+  tiene `ECOMMERCE_SITE`. Lo universal (Pedidos, Cambios, Caja, Turnos,
+  Descuentos, todo Catálogo, Identidad y contacto, Servicio de mail,
+  Usuarios y roles) queda siempre visible — lo necesita cualquier
+  negocio, tenga o no sitio online.
+- **Asistente "Crear tienda"**: nuevo selector de Plan al principio del
+  Paso 1 (sólo se muestra si hay más de uno — hoy con un solo plan no
+  cambia nada visible), con el resumen de módulos de cada plan
+  ("Publicar en redes · Mercado Pago · Sitio web · Punto de venta") para
+  distinguirlos de un vistazo. `TenantService.create` ahora recibe y
+  valida el `planId` elegido (rechaza uno inexistente).
+- **Bug real encontrado y arreglado verificando en el navegador**: al
+  apagar `ECOMMERCE_SITE` para probar el menú, el PROPIO panel de
+  administración se rompió — el listado de Productos tiraba "Esta
+  tienda no tiene sitio online" y la columna Parametrías quedaba vacía.
+  Causa: varias pantallas del panel (ej. ese listado, que resuelve
+  nombres de parametría vía `/api/param-groups`) pegan a endpoints
+  técnicamente "públicos" (`/api/products`, `/api/param-groups`,
+  `/api/settings`, `/api/size-scales`...) reusados también por el sitio
+  real, en vez de duplicarlos bajo `/api/admin/`. El gate de
+  `TenantResolutionFilter` (y el de "tienda pausada", que tenía el
+  mismo problema latente sin que nadie lo hubiera notado) sólo eximía
+  `/api/admin/**`/`/api/auth/**`, así que bloqueaba también esas
+  llamadas legítimas del panel. Arreglado en dos partes: el filtro
+  ahora también exime cualquier request que traiga un
+  `Authorization: Bearer` (no hace falta validarlo ahí, sólo saber que
+  no es un visitante anónimo — `JwtAuthFilter`, que sí valida, corre
+  después); y el interceptor del frontend (`auth.interceptor.ts`), que
+  antes sólo mandaba el token a `/api/admin/**`, ahora lo manda a
+  cualquier request a nuestro propio backend. Verificado de nuevo en el
+  navegador después del fix: apagado `ECOMMERCE_SITE`, el panel navegó
+  sin errores (Parametrías con datos reales, menú adaptado
+  correctamente), reactivado y confirmado por SQL que el plan real (el
+  único, usado por las 9 tiendas) quedó exactamente como estaba.
+- **Selector de plan verificado de punta a punta**: creado un plan de
+  prueba temporal por SQL ("Plan Kiosco (prueba)", sólo módulo `POS`),
+  abierto el asistente, confirmado que aparecen las 2 opciones con su
+  resumen de módulos, elegido el de prueba, creada una tienda
+  descartable, confirmado por SQL que `tenant.plan_id` quedó apuntando
+  al plan elegido (no al default) — borrada la tienda de prueba desde
+  el panel (con confirmación de slug) y el plan de prueba por SQL al
+  terminar.
+
+**Facturación real: ticket interno + Factura C de ARCA, integración
+directa (sin proveedor tercero), misma sesión.** El usuario pidió
+puntualmente "usá la API específica de ARCA" en vez del proveedor
+tercero que había quedado anotado como pendiente de elegir más arriba
+— cambio de rumbo respecto de esa nota. Investigado por WebSearch antes
+de tocar código (con fuentes citadas en el momento):
+- **No existe API REST/JSON de ARCA** — el mecanismo real son dos
+  servicios SOAP/XML viejos pero vigentes: **WSAA** (autenticación:
+  arma un XML "login ticket request", lo firma como CMS/PKCS#7 con el
+  certificado+clave privada del contribuyente, y a cambio devuelve un
+  Token+Sign válido ~12hs) y **WSFEv1** (el de negocio: pide el último
+  comprobante autorizado y pide el CAE del nuevo). No hay SDK oficial
+  en Java moderno — se construyó a mano.
+- **RG 4290 (2021) confirma lo que el usuario preguntó sobre
+  impresoras fiscales**: no son obligatorias si se emite Factura
+  Electrónica en su lugar — es un sustituto legal completo, no hace
+  falta hardware fiscal para vender en el local.
+- **Sí existe entorno de homologación (pruebas)** de ARCA, con sus
+  propias URLs de WSAA/WSFE y CUIT/certificado de prueba — confirmado
+  lo que el usuario intuía.
+- **Alcance deliberadamente acotado para el MVP**: sólo **Factura C**
+  (el usuario es Monotributo/Exento típico — no discrimina IVA) y sólo
+  **consumidor final**, sin detalle de ítems (WSFEv1 sin
+  `FeDetReq`/líneas, sólo importe total) — documentado como decisión
+  explícita en el javadoc de `ArcaWsfeClient`, no como limitación
+  descubierta después. Factura A/B (Responsable Inscripto, con
+  discriminación de IVA e ítems) queda afuera, a propósito.
+- **Backend**: `bcpkix-jdk18on` (Bouncy Castle) sumado por Maven — el
+  JDK no trae soporte para firmar CMS/PKCS#7, que exige WSAA.
+  `ArcaWsaaClient` (arma y firma el TRA, cachea el Token+Sign por
+  tenant con margen de 5 min antes del vencimiento real) y
+  `ArcaWsfeClient` (`FECompUltimoAutorizado` + `FECAESolicitar`, XML
+  armado a mano con text blocks, parseado con XPath) — ambos
+  `package-private`, sólo los usa `ArcaInvoiceService` (público), que
+  orquesta todo y arma también el QR obligatorio (RG 4892, URL
+  `https://www.afip.gob.ar/fe/qr/?p=<json en base64>`). **Nunca tira
+  excepción hacia afuera** — devuelve un resultado con `aprobado`/
+  `error`, para que la venta nunca se caiga por un problema de ARCA.
+  Nueva config por tienda (`SiteSettings`: CUIT, punto de venta,
+  condición IVA, certificado/clave en PEM, modo prueba/producción,
+  `invoiceMode` TICKET_INTERNO/FACTURA_ARCA) con el mismo patrón de
+  campo-secreto ya usado para Mercado Pago (nunca se devuelve el valor
+  guardado, sólo un booleano `xSet`; dejar el campo vacío al editar =
+  no tocarlo). `OrderService.confirm()` llama a `applyInvoicing()` sólo
+  para ventas `LOCAL`: por defecto ticket interno; si el tenant tiene
+  `invoiceMode=FACTURA_ARCA` configurado y disponible, intenta la
+  Factura C — si ARCA la rechaza o falla la conexión, la venta **no se
+  cae** (ya se confirmó y descontó stock), queda como ticket interno
+  con el error anotado en `Order.invoiceError` para reintentar a mano
+  más adelante.
+- **Pantalla de configuración nueva** `/admin/config/arca`
+  ("Facturación (ARCA)", permiso `PAYMENTS_MANAGE`, visible sólo con
+  módulo POS): elegir Ticket interno vs. Factura ARCA, modo prueba,
+  CUIT, punto de venta, condición IVA, certificado y clave privada
+  (textareas, enmascarados una vez guardados). Módulo nuevo
+  `ARCA_INVOICING` sumado a `Modules`/pantalla de Planes, igual que
+  los anteriores. (Nota: en la primera versión de esta pantalla,
+  Responsable Inscripto tenía un aviso de "sólo Factura C, A/B no
+  construido" — dejó de ser cierto con el cambio de más abajo, el
+  texto ya está actualizado.)
+- **Frontend del punto de venta**: no hace falta elegir Ticket/Factura
+  por venta — es una configuración del tenant, no una decisión del
+  cajero en cada cobro (más simple, como pidió el usuario). El kiosco
+  muestra abajo del botón "Cobrar" qué va a emitir cada venta ("🧾
+  Emite Factura C (ARCA)" / "📄 Emite ticket interno"), y el recibo
+  imprimible (`admin-receipt`) y el detalle de pedido
+  (`admin-order-detail`) muestran el resultado real después de cobrar:
+  CAE + vencimiento + N° de comprobante + QR de AFIP si salió Factura,
+  o el aviso de ticket interno (con el motivo del rechazo de ARCA si
+  lo hubo) si no.
+- **Única incertidumbre real, marcada en el código**: WSAA
+  históricamente firmaba con SHA-1; la implementación usa SHA-256
+  (`SHA256withRSA`) siguiendo la documentación vigente, pero queda
+  comentado en `ArcaWsaaClient` como lo primero a revisar si falla un
+  login real, porque es imposible de verificar sin un CUIT y
+  certificado de homologación reales del usuario.
+- **Verificado**: `mvn test` (todos los tests existentes, incluido el
+  nuevo mock de confirmación con Mercado Pago) y `tsc --noEmit` del
+  frontend, ambos limpios. **No verificado en el navegador ni con ARCA
+  real** — no hay certificado/CUIT de homologación disponibles en esta
+  sesión; falta que el usuario cargue sus propios datos de prueba en
+  la pantalla nueva y haga una venta con Factura ARCA activada para
+  confirmar el flujo de punta a punta (mismo criterio ya aplicado a
+  Mercado Pago en su momento: se construye completo, se prueba en
+  cuanto existan credenciales reales).
+
+**Factura A/B + reintento manual, misma sesión (segunda ronda sobre lo
+de arriba).** El usuario pidió puntualmente sumar estas dos cosas que
+habían quedado en "LO QUE FALTA":
+- **Factura A/B para Responsable Inscripto**: `ArcaInvoiceService`
+  ahora elige el tipo de comprobante según `SiteSettings.arcaCondicionIva`
+  — Monotributo/Exento sigue yendo por Factura C (como antes, sin
+  discriminar IVA); Responsable Inscripto pasa a Factura B (consumidor
+  final) o Factura A si se cargó el CUIT del comprador al cobrar.
+  `ArcaWsfeClient` suma los tipos 1 (A) y 6 (B) y arma el array
+  `<Iva>` que exige WSFEv1 para esos dos (Factura C no lo lleva).
+  **Simplificación deliberada, documentada en el código**: una sola
+  alícuota, 21% (IVA general) — `impNeto = total / 1.21`,
+  `impIva = total - impNeto`. No hay forma de manejar productos con
+  otra alícuota (10.5%, exentos puntuales) sin sumar esa info al
+  catálogo, que no existe hoy — igual que antes, sigue siendo un solo
+  importe total, sin ítems detallados (`FeDetReq`).
+- **CUIT del comprador opcional**: campo nuevo en el punto de venta
+  (`admin-kiosco` y también `admin-pos`/"Venta en el local", porque
+  las dos crean ventas canal `LOCAL` y las dos pasan por el mismo
+  `applyInvoicing`) — sólo aparece si la tienda es Responsable
+  Inscripto con Factura ARCA activada. Se guarda en
+  `Order.invoiceBuyerCuit` para que quede registrado en qué factura se
+  usó. Sin CUIT cargado, sale Factura B igual (consumidor final) — el
+  campo nunca bloquea la venta.
+- **Reintento manual**: `POST /api/admin/orders/{id}/retry-invoice`
+  (`ORDERS_MANAGE`) — vuelve a intentar `applyInvoicing()` sobre un
+  pedido `LOCAL`/`PROCESADO` que quedó en ticket interno (por rechazo
+  de ARCA, por falla de conexión, o porque en el momento de la venta
+  la tienda todavía no tenía ARCA configurado). No toca stock ni
+  cobra de nuevo. Botón "🧾 Intentar facturar con ARCA" en el detalle
+  de pedido, visible sólo si `arcaAvailable` y el pedido sigue en
+  ticket interno.
+- **Verificado**: `mvn test` y `tsc --noEmit` limpios otra vez después
+  de este segundo cambio. **Sigue sin poder probarse contra ARCA real**
+  (mismo motivo que arriba: no hay CUIT/certificado de homologación en
+  esta sesión) — el armado del XML con `<Iva>` para A/B es nuevo
+  respecto de lo ya construido y no se verificó contra el servidor
+  real de ARCA, a diferencia de la mecánica de WSAA/Factura C que sí
+  quedó descripta arriba con su propia incertidumbre (SHA-256 vs
+  SHA-1).
+
+**LO QUE FALTA:**
+- Probar con credenciales reales de ARCA (homologación) — confirmar el
+  algoritmo de firma de WSAA (SHA-256 vs SHA-1) y el armado del XML
+  con IVA discriminado para Factura A/B (ver arriba, las dos
+  incertidumbres reales de esta fase).
+- Múltiples alícuotas de IVA (hoy asume 21% general para todo el
+  carrito) — hace falta que el catálogo sepa la alícuota por producto,
+  que no existe todavía.
+- Ítems detallados en el comprobante (`FeDetReq`) — sigue siendo un
+  solo importe total en los tres tipos de factura.
+- Sin test automatizado para nada de esta fase (ni kiosco ni ARCA).
+
+---
+
 ## 5. Historial
 
+- **2026-09-16**: panel para asignar módulos a un plan — tercer ítem de la
+  ronda de mejoras (ver el de recuperación de contraseña, más abajo, para
+  el contexto completo). Reemplaza el `UPDATE` a mano en `plan_module`
+  que era el único mecanismo hasta ahora (ver PLAN_SAAS.md Fase 5/12).
+  `PlanController` nuevo (`/api/admin/plans`, sólo `SUPERADMIN`, mismo
+  criterio que `TenantController`: es un catálogo de plataforma, no algo
+  que edite el admin de una tienda) con listado y edición (nombre,
+  límites de productos/usuarios, módulos habilitados, branding de
+  plataforma). Pantalla nueva `/admin/superadmin/planes`: una tarjeta
+  editable por plan (hoy sólo existe el "default", pero el diseño ya
+  soporta varios) con checkboxes por módulo — no hay ABM para crear
+  planes nuevos todavía, sigue siendo dato (INSERT), no código, porque
+  sólo hace falta uno por ahora.
+  **Dos bugs reales encontrados y arreglados verificando en el
+  navegador** (no sólo compilado):
+  1. El botón "Guardar cambios" quedaba habilitado después de guardar
+     con éxito — `dirty` estaba armado como un `computed()` que leía un
+     campo `touched` plano (no una signal), así que mutar `touched`
+     directo en el callback de éxito no disparaba una recomputación.
+     Arreglado usando una signal de verdad para `touched`.
+  2. El primer intento de guardar "Máx. productos" tiraba
+     `TypeError: raw.trim is not a function` y la request nunca salía:
+     un `<input type="number">` con `ngModelChange` manda el valor ya
+     convertido a `number`, no el string del input — el código asumía
+     siempre string. Arreglado coercionando con `String(...)` tanto al
+     guardar el draft como al parsear el límite.
+  **Verificado de punta a punta contra el plan real** (el único que
+  existe, usado por las 9 tiendas — piloto incluida): cambiado
+  `maxProducts` a 50 y destildado "Publicar en redes", confirmado por
+  SQL que persistió de verdad (no sólo en la UI), y revertido al estado
+  original (`sin límite`, los 3 módulos que ya tenía) al terminar —
+  confirmado por SQL de nuevo que quedó exactamente como estaba antes.
+- **2026-09-16**: segundo ítem de la ronda de mejoras (ver el de
+  recuperación de contraseña, más abajo, para el contexto completo) —
+  los errores del webhook de Mercado Pago (ej. "el cliente pagó pero se
+  quedó sin stock justo antes de que se apruebe") quedaban SÓLO en un log
+  del servidor: nadie del lado de la tienda se enteraba de que había una
+  venta cobrada de verdad sin resolver. `OrderService.confirmFromPayment`
+  ahora atrapa esa falla adentro (en vez de dejarla subir sin más al
+  webhook, que sólo la logueaba) y dos cosas quedan garantizadas incluso
+  cuando `doConfirm` falla: el pago se marca igual como `APPROVED` (el
+  cliente pagó de verdad, eso no se puede perder aunque el pedido no se
+  pudo confirmar solo) y un `Order.paymentIssueNote` nuevo (aditivo, migró
+  solo) queda con el detalle del problema. Visible en dos lugares del
+  panel: un ⚠️ junto al código en el listado de "Pedidos", y un banner
+  ámbar prominente arriba del todo en el detalle del pedido
+  (`admin-order-detail`) con el texto completo. El webhook sigue teniendo
+  su propio try/catch alrededor de la llamada — ahora es de verdad un
+  catch-all para errores inesperados (de red, de la API de Mercado Pago),
+  no para el caso ya cubierto de sin-stock.
+  **Verificado con un test automatizado nuevo**
+  (`OrderMercadoPagoConfirmTest`, primera cobertura automatizada de algo
+  de Mercado Pago en el proyecto) que llama a `confirmFromPayment`
+  directo — sin pasar por el webhook real, que necesitaría credenciales
+  de Mercado Pago — con dos casos: sin stock suficiente (el pago queda
+  `APPROVED`, el pedido sigue `PENDIENTE`, el stock no se toca, y
+  `paymentIssueNote` tiene el mensaje) y con stock suficiente (confirma
+  normal, `paymentIssueNote` queda `null`). Los 2 tests nuevos pasan y el
+  resto de la suite (existente) sigue en verde. También verificado en el
+  navegador pisando un pedido de prueba real por SQL (mismo mecanismo que
+  ya se usó para `paymentStatus`) y revirtiéndolo al terminar: se ve el
+  ⚠️ en el listado y el banner completo en el detalle.
+- **2026-09-16**: recuperación de contraseña, de "manda una contraseña
+  nueva por mail" a "manda un link de un solo uso" — primer ítem de una
+  ronda de mejoras propuestas proactivamente (deuda técnica/seguridad +
+  UX) tras cerrar Fase 12/13, priorizado por el usuario como el más
+  urgente ("dinero real entrando por Mercado Pago"). El mecanismo viejo
+  (`AuthService.forgotPassword` generaba una contraseña al azar y la
+  mandaba directo por mail) tenía dos problemas: viajaba en texto plano,
+  y — más grave — como el DNI no es secreto, cualquiera que lo supiera
+  podía invalidar la contraseña real de otro admin en cualquier momento
+  con sólo pedir la recuperación, sin necesitar leer el mail ajeno para
+  causar el daño (DoS de cuenta). Ahora `forgotPassword` genera un token
+  de 32 bytes al azar, guarda sólo su hash SHA-256 en `AdminUser`
+  (`resetTokenHash`/`resetTokenExpiresAt`, aditivo, migró solo) y manda
+  un link a `/admin/restablecer-clave?token=...` que vence a la hora y
+  sirve una sola vez — pedir la recuperación ya no toca la cuenta hasta
+  que alguien con acceso real al mail abre el link y confirma una
+  contraseña nueva (`AuthService.resetPassword`, endpoint nuevo `POST
+  /api/auth/reset-password`, público). Pantalla nueva
+  `admin-reset-password` (mismo estilo que `admin-recover`, que ya
+  existía para pedir el link). **Verificado de punta a punta**: probado
+  el ciclo completo contra la cuenta real del superadmin (token inyectado
+  a mano por SQL para poder probarlo sin acceso al buzón real, siempre
+  restaurando `augusto123` al terminar cada prueba) — token válido
+  cambia la contraseña y permite loguear con la nueva, el mismo token no
+  se puede reusar, un token vencido se rechaza con mensaje claro, y el
+  flujo real de `POST /api/auth/forgot-password` genera el token/expiry
+  en UTC correctamente (se detectó y evitó un falso bug de zona horaria
+  del entorno de prueba: `NOW()` de MySQL local es hora Argentina, no
+  UTC — el código de la app usa `Instant.now()` de Java, que sí es UTC
+  siempre, así que no le pasa lo mismo). Probado también en la UI real
+  del navegador (no sólo por `curl`): pantalla sin token, con token
+  inválido, y el formulario completo cambiando la contraseña de verdad.
 - **2026-09-16**: bug reportado por el usuario, en dos vueltas — en "Ver en
   grande" de Apariencia y, más importante (lo que realmente había notado el
   usuario), en el asistente **"Crear tienda"**: el pie de página de la vista

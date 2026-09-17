@@ -79,7 +79,7 @@ public class TenantProvisioningService {
 
     public Tenant provision(String name, String slug, Rubro rubro) {
         return provision(new TenantCreateRequest(
-                name, slug, rubro, null, null, null, null, null, null, null, null, null, null, null));
+                name, slug, rubro, null, null, null, null, null, null, null, null, null, null, null, null));
     }
 
     /**
@@ -92,7 +92,7 @@ public class TenantProvisioningService {
      */
     public Tenant provision(TenantCreateRequest req) {
         Rubro rubro = req.rubro();
-        Tenant tenant = tenantService.create(req.name().trim(), req.slug().trim(), rubro);
+        Tenant tenant = tenantService.create(req.name().trim(), req.slug().trim(), rubro, req.planId());
         String tenantId = tenant.getId();
 
         String layout = blankToNull(req.layout()) != null ? req.layout() : rubro.getDefaultLayout();

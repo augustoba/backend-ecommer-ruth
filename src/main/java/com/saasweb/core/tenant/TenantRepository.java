@@ -15,4 +15,7 @@ public interface TenantRepository extends JpaRepository<Tenant, String> {
     List<Tenant> findAllByOrderByCreatedAtAsc();
 
     boolean existsByIdAndActiveTrue(String id);
+
+    /** Cuántas tiendas usan este plan — contexto antes de cambiarle límites/módulos (ver PlanController). */
+    long countByPlanId(String planId);
 }

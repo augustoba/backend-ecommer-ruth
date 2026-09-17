@@ -159,6 +159,25 @@ public class SiteSettingsService {
         return repo.save(s);
     }
 
+    public SiteSettings updateArca(SiteSettingsDtos.ArcaConfigRequest req) {
+        SiteSettings s = get();
+        s.setArcaEnabled(Boolean.TRUE.equals(req.arcaEnabled()));
+        if (req.arcaModoPrueba() != null) s.setArcaModoPrueba(req.arcaModoPrueba());
+        s.setArcaCuit(blankToNull(req.cuit()));
+        s.setArcaPuntoVenta(req.puntoVenta());
+        s.setArcaCondicionIva(blankToNull(req.condicionIva()));
+        if (req.certificadoPem() != null && !req.certificadoPem().isBlank()) {
+            s.setArcaCertificadoPem(req.certificadoPem().trim());
+        }
+        if (req.clavePrivadaPem() != null && !req.clavePrivadaPem().isBlank()) {
+            s.setArcaClavePrivadaPem(req.clavePrivadaPem().trim());
+        }
+        if (req.invoiceMode() != null && !req.invoiceMode().isBlank()) {
+            s.setInvoiceMode(req.invoiceMode());
+        }
+        return repo.save(s);
+    }
+
     private static SiteSettings defaults() {
         SiteSettings s = new SiteSettings();
         s.setTheme("default");

@@ -65,6 +65,18 @@ public class AdminUser {
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
+    /**
+     * Recuperación de contraseña (ver {@code AuthService#forgotPassword}):
+     * hash SHA-256 de un token de un solo uso, nunca el token en sí (igual
+     * criterio que la contraseña). {@code null} = sin ningún pedido de
+     * recuperación pendiente. Vence a la hora — {@code resetTokenExpiresAt}.
+     */
+    @Column(name = "reset_token_hash")
+    private String resetTokenHash;
+
+    @Column(name = "reset_token_expires_at")
+    private Instant resetTokenExpiresAt;
+
     public java.util.Set<Permission> permissions() {
         return role != null ? role.effectivePermissions()
                 : java.util.EnumSet.noneOf(Permission.class);
@@ -160,5 +172,21 @@ public class AdminUser {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getResetTokenHash() {
+        return resetTokenHash;
+    }
+
+    public void setResetTokenHash(String resetTokenHash) {
+        this.resetTokenHash = resetTokenHash;
+    }
+
+    public Instant getResetTokenExpiresAt() {
+        return resetTokenExpiresAt;
+    }
+
+    public void setResetTokenExpiresAt(Instant resetTokenExpiresAt) {
+        this.resetTokenExpiresAt = resetTokenExpiresAt;
     }
 }

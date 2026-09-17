@@ -20,6 +20,10 @@ public interface AdminUserRepository extends JpaRepository<AdminUser, String> {
     @Query("select u from AdminUser u where u.dni = :dni and (u.tenantId = :tenantId or u.tenantId is null)")
     Optional<AdminUser> findByDniForTenant(@Param("dni") String dni, @Param("tenantId") String tenantId);
 
+    /** Resuelve un token de "olvidé mi contraseña" contra el tenant actual — mismo criterio que {@link #findByDniForTenant}. */
+    @Query("select u from AdminUser u where u.resetTokenHash = :tokenHash and (u.tenantId = :tenantId or u.tenantId is null)")
+    Optional<AdminUser> findByResetTokenHashForTenant(@Param("tokenHash") String tokenHash, @Param("tenantId") String tenantId);
+
     Optional<AdminUser> findByDniAndTenantId(String dni, String tenantId);
 
     Optional<AdminUser> findByDniAndTenantIdIsNull(String dni);

@@ -111,9 +111,40 @@ public final class SiteSettingsDtos {
              * Pago" en el carrito. El Access Token en sí NUNCA viaja acá
              * (ver `MercadoPagoConfigResponse`, mismo criterio que SMTP).
              */
-            boolean mercadoPagoAvailable
+            boolean mercadoPagoAvailable,
+            /**
+             * Módulo `POS` habilitado en el plan (Fase 14) — el panel usa
+             * esto para decidir si mostrar "Venta en el local"/el punto de
+             * venta de kiosco en el menú.
+             */
+            boolean posEnabled,
+            /**
+             * Módulo `ECOMMERCE_SITE` habilitado en el plan (Fase 14) — un
+             * tenant sin esto no tiene sitio público (`TenantResolutionFilter`
+             * ya bloquea las rutas públicas del lado del backend); el panel
+             * usa este flag para no mostrar pantallas de ecommerce (Catálogo
+             * online, Apariencia, Carrusel, etc.) que no aplican.
+             */
+            boolean ecommerceSiteEnabled,
+            /**
+             * true sólo si el módulo `ARCA_INVOICING` está habilitado en el
+             * plan Y el tenant cargó CUIT + certificado + punto de venta
+             * (ver `ArcaInvoiceService#isAvailable`). El certificado/clave
+             * NUNCA viajan acá (ver `ArcaConfigResponse`).
+             */
+            boolean arcaAvailable,
+            /** "TICKET_INTERNO" | "FACTURA_ARCA" — qué ofrece por defecto el punto de venta. */
+            String invoiceMode,
+            /**
+             * "MONOTRIBUTO" | "EXENTO" | "RESPONSABLE_INSCRIPTO" — el panel la
+             * usa sólo para decidir si mostrar el campo de CUIT del comprador
+             * en el punto de venta (habilita Factura A en vez de B).
+             */
+            String arcaCondicionIva
     ) {
-        public static SettingsResponse from(SiteSettings s, boolean socialShareEnabled, boolean mercadoPagoAvailable) {
+        public static SettingsResponse from(SiteSettings s, boolean socialShareEnabled, boolean mercadoPagoAvailable,
+                                             boolean posEnabled, boolean ecommerceSiteEnabled,
+                                             boolean arcaAvailable, String invoiceMode) {
             return new SettingsResponse(
                     s.getStoreName(), s.getWhatsappNumber(), s.getAboutText(),
                     s.getInstagram(), s.getFacebookUrl(), s.getLogoUrl(),
@@ -129,7 +160,8 @@ public final class SiteSettingsDtos {
                     s.isPaymentQrCardEnabled(), s.getPaymentQrCardImage(),
                     s.getPaymentCardLink(), s.isPaymentCashEnabled(),
                     s.getCloudinaryCloudName(), s.getCloudinaryUploadPreset(),
-                    socialShareEnabled, mercadoPagoAvailable);
+                    socialShareEnabled, mercadoPagoAvailable, posEnabled, ecommerceSiteEnabled,
+                    arcaAvailable, invoiceMode, s.getArcaCondicionIva());
         }
     }
 
@@ -152,6 +184,39 @@ public final class SiteSettingsDtos {
                     s.isMpEnabled(),
                     s.getMpAccessToken() != null && !s.getMpAccessToken().isBlank(),
                     s.getMpPublicKey());
+        }
+    }
+
+    /**
+     * Credenciales de ARCA del tenant (Fase 14) — editable por
+     * `PAYMENTS_MANAGE` (es SU CUIT, no uno compartido de plataforma).
+     * `certificadoPem`/`clavePrivadaPem` en blanco = no tocar los ya
+     * guardados (mismo criterio que `MercadoPagoConfigRequest.accessToken`).
+     */
+    public record ArcaConfigRequest(
+            Boolean arcaEnabled,
+            Boolean arcaModoPrueba,
+            @Size(max = 20) String cuit,
+            Integer puntoVenta,
+            @Size(max = 40) String condicionIva,
+            @Size(max = 8000) String certificadoPem,
+            @Size(max = 8000) String clavePrivadaPem,
+            @Pattern(regexp = "^(TICKET_INTERNO|FACTURA_ARCA)$", message = "Modo de comprobante desconocido")
+            String invoiceMode
+    ) {}
+
+    /** El certificado/clave nunca se devuelven: sólo si hay uno guardado (ver `*Set`). */
+    public record ArcaConfigResponse(
+            boolean arcaEnabled, boolean arcaModoPrueba, String cuit, Integer puntoVenta,
+            String condicionIva, boolean certificadoSet, boolean clavePrivadaSet, String invoiceMode
+    ) {
+        public static ArcaConfigResponse from(SiteSettings s) {
+            return new ArcaConfigResponse(
+                    s.isArcaEnabled(), s.isArcaModoPrueba(), s.getArcaCuit(), s.getArcaPuntoVenta(),
+                    s.getArcaCondicionIva(),
+                    s.getArcaCertificadoPem() != null && !s.getArcaCertificadoPem().isBlank(),
+                    s.getArcaClavePrivadaPem() != null && !s.getArcaClavePrivadaPem().isBlank(),
+                    s.getInvoiceMode());
         }
     }
 

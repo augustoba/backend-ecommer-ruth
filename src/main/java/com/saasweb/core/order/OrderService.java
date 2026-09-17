@@ -22,7 +22,9 @@ import com.saasweb.core.coupon.CouponService;
 import com.saasweb.core.payment.MercadoPagoService;
 import com.saasweb.core.payment.MercadoPagoService.PreferenceItem;
 import com.saasweb.core.payment.MercadoPagoService.PreferenceResult;
+import com.saasweb.core.arca.ArcaInvoiceService;
 import com.saasweb.core.product.ProductService;
+import com.saasweb.core.settings.SiteSettings;
 import com.saasweb.core.settings.SiteSettingsService;
 import com.saasweb.config.AppProperties;
 import org.springframework.stereotype.Service;
@@ -52,12 +54,14 @@ public class OrderService {
     private final MercadoPagoService mercadoPagoService;
     private final AppProperties appProperties;
     private final OrderMailService orderMailService;
+    private final ArcaInvoiceService arcaInvoiceService;
 
     public OrderService(OrderRepository repo, ProductRepository productRepo,
                         ProductService productService, DiscountService discountService,
                         CouponService couponService, AdminUserRepository adminUsers,
                         SiteSettingsService siteSettingsService, MercadoPagoService mercadoPagoService,
-                        AppProperties appProperties, OrderMailService orderMailService) {
+                        AppProperties appProperties, OrderMailService orderMailService,
+                        ArcaInvoiceService arcaInvoiceService) {
         this.orderMailService = orderMailService;
         this.repo = repo;
         this.productRepo = productRepo;
@@ -68,6 +72,7 @@ public class OrderService {
         this.siteSettingsService = siteSettingsService;
         this.mercadoPagoService = mercadoPagoService;
         this.appProperties = appProperties;
+        this.arcaInvoiceService = arcaInvoiceService;
     }
 
     /** Resuelve el nombre a mostrar de un usuario del panel a partir de su DNI. */
@@ -163,6 +168,8 @@ public class OrderService {
         DeliveryMethod delivery = req.deliveryMethod() != null ? req.deliveryMethod() : DeliveryMethod.PICKUP;
         order.setDeliveryMethod(delivery);
         order.setPaymentMethod(req.paymentMethod());
+        order.setPaymentReference(blankToNull(req.paymentReference()));
+        order.setInvoiceBuyerCuit(blankToNull(req.buyerCuit()));
         if (delivery == DeliveryMethod.SHIPPING) {
             String addr = req.shippingAddress() != null ? req.shippingAddress().trim() : "";
             if (addr.isEmpty()) {
@@ -225,6 +232,17 @@ public class OrderService {
         order.setDiscountAmount(autoDiscount);
         order.setCouponDiscount(couponDiscount.signum() > 0 ? couponDiscount : null);
         order.setTotal(subtotal.subtract(autoDiscount).subtract(couponDiscount));
+
+        if (req.amountTendered() != null) {
+            if (order.getPaymentMethod() != PaymentMethod.CASH) {
+                throw new BadRequestException("El vuelto sólo tiene sentido pagando en efectivo.");
+            }
+            if (req.amountTendered().compareTo(order.getTotal()) < 0) {
+                throw new BadRequestException("Lo que puso el cliente no alcanza para cubrir el total.");
+            }
+            order.setAmountTendered(req.amountTendered());
+        }
+
         String notes = discount.breakdown().stream()
                 .map(com.saasweb.core.discount.DiscountDtos.BreakdownLine::detail)
                 .filter(s -> s != null && !s.isBlank())
@@ -347,14 +365,30 @@ public class OrderService {
      * `MercadoPagoWebhookController`) — mismo descuento de stock que
      * {@link #confirm}, sin DNI de un humano (queda registrado como
      * "Mercado Pago" en vez de un nombre de usuario del panel).
+     *
+     * <p>Si {@code doConfirm} falla (ej. se quedó sin stock justo antes de
+     * que se apruebe el pago), el pedido queda igual en PENDIENTE sin tocar
+     * stock — pero a diferencia de antes, el pago SÍ queda marcado como
+     * aprobado (el cliente pagó de verdad, eso no hay que perderlo) y
+     * {@code paymentIssueNote} deja un aviso visible en el panel para que
+     * alguien lo revise a mano. Antes esto sólo quedaba en un log del
+     * servidor — nadie del lado de la tienda se enteraba de que un cliente
+     * había pagado y su pedido necesitaba atención manual.</p>
      */
     public Order confirmFromPayment(String orderId, String mpPaymentId) {
         Order order = get(orderId);
         order.setMpPaymentId(mpPaymentId);
         order.setPaymentStatus(PaymentStatus.APPROVED);
-        Order confirmed = doConfirm(order, null, "Mercado Pago (pago validado)");
-        orderMailService.sendOrderConfirmation(confirmed);
-        return confirmed;
+        try {
+            Order confirmed = doConfirm(order, null, "Mercado Pago (pago validado)");
+            orderMailService.sendOrderConfirmation(confirmed);
+            return confirmed;
+        } catch (RuntimeException e) {
+            order.setPaymentIssueNote(
+                    "Mercado Pago aprobó el pago pero no se pudo confirmar el pedido solo: "
+                            + e.getMessage() + ". Revisalo y confirmalo a mano.");
+            return repo.save(order);
+        }
     }
 
     /**
@@ -413,6 +447,63 @@ public class OrderService {
         order.setProcessedAt(Instant.now());
         order.setConfirmedByDni(confirmedByDni);
         order.setConfirmedByName(confirmedByName);
+        if (order.getChannel() == SaleChannel.LOCAL) {
+            applyInvoicing(order);
+        }
+        return repo.save(order);
+    }
+
+    /**
+     * Venta presencial (kiosco / Venta en el local): emite el comprobante
+     * según lo que el tenant tenga configurado. Si es "Factura ARCA" y ARCA
+     * la rechaza (o falla la conexión), el pedido NO se cae — ya se
+     * confirmó y descontó stock, y el cliente ya pagó; queda marcado como
+     * ticket interno con el error anotado para reintentar a mano (ver
+     * `Order.invoiceError`, `ArcaInvoiceService`).
+     */
+    private void applyInvoicing(Order order) {
+        SiteSettings settings = siteSettingsService.get();
+        if (!"FACTURA_ARCA".equals(settings.getInvoiceMode()) || !arcaInvoiceService.isAvailable()) {
+            order.setInvoiceType("TICKET_INTERNO");
+            return;
+        }
+        var result = arcaInvoiceService.emitirFactura(
+                order.getTenantId(), order.getTotal(), null, order.getInvoiceBuyerCuit());
+        if (result.aprobado()) {
+            order.setInvoiceType(result.tipo());
+            order.setInvoiceCae(result.cae());
+            order.setInvoiceCaeVencimiento(result.caeVencimiento());
+            order.setInvoiceNumber(result.numero());
+            order.setInvoicePuntoVenta(result.puntoVenta());
+            order.setInvoiceQrUrl(result.qrUrl());
+            order.setInvoiceError(null);
+        } else {
+            order.setInvoiceType("TICKET_INTERNO");
+            order.setInvoiceError(result.error());
+        }
+    }
+
+    /**
+     * Reintenta emitir la factura de ARCA de una venta presencial que quedó
+     * como ticket interno (porque ARCA la rechazó, falló la conexión, o
+     * porque en ese momento la tienda todavía no tenía ARCA configurado) —
+     * sin volver a cobrar ni tocar stock, el pedido ya está PROCESADO.
+     */
+    public Order retryInvoicing(String orderId) {
+        Order order = get(orderId);
+        if (order.getChannel() != SaleChannel.LOCAL || order.getStatus() != OrderStatus.PROCESADO) {
+            throw new BadRequestException("Sólo se puede facturar una venta presencial ya cobrada.");
+        }
+        if (order.getInvoiceType() != null && order.getInvoiceType().startsWith("FACTURA_")) {
+            throw new BadRequestException("Esta venta ya tiene una factura de ARCA aprobada.");
+        }
+        if (!arcaInvoiceService.isAvailable()) {
+            throw new BadRequestException("Esta tienda todavía no configuró la facturación con ARCA.");
+        }
+        if (!"FACTURA_ARCA".equals(siteSettingsService.get().getInvoiceMode())) {
+            throw new BadRequestException("Activá \"Factura C real, con CAE de ARCA\" en Configuración > Facturación (ARCA) para poder facturar.");
+        }
+        applyInvoicing(order);
         return repo.save(order);
     }
 
