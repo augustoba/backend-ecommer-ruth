@@ -1850,8 +1850,418 @@ habían quedado en "LO QUE FALTA":
 
 ---
 
+### Fase 15 — Costo histórico correcto + módulo de Gastos y Balance (2026-09-17)
+
+Pedido del usuario: hoy `Product.costPrice` es mutable y `MetricsService`
+nunca calculaba ganancia — si el costo de compra de un producto se
+actualiza, cualquier cálculo de margen sobre pedidos YA vendidos cambiaría
+retroactivamente (el mismo problema que `OrderLine.productName` ya resuelve
+para el nombre no existía para el costo). Se pidió además un módulo de
+Gastos (carga diaria/mensual) y un Balance (ventas − costo − gastos) con
+comparativas mes a mes / año a año, pensado como base para gráficos de
+rojo/verde en el frontend.
+
+**Decisión de diseño explícita (a pedido del usuario):** estos módulos
+tienen que servir para cualquier tipo de tienda, facture con ARCA, emita
+sólo ticket interno, o ninguna de las dos cosas — no se gatearon por
+`Modules.ARCA_INVOICING`/`ECOMMERCE_SITE`/`POS` (mismo criterio que
+`CASH_REGISTER_VIEW`/`SHIFTS_MANAGE`, sólo por permiso). `BalanceService`
+sólo depende de `MetricsService` (ventas/costo de pedidos `PROCESADO`) y de
+`ExpenseService` — nunca toca `Order.invoiceType`/`ArcaInvoiceService`.
+
+**Parte A — costo congelado en `OrderLine` (el fix del bug real):**
+`OrderLine` sumó `costPrice`/`costEstimated`. `OrderService.doConfirm()`
+ahora snapshotea `Product.costPrice` en cada línea aceptada, en el mismo
+loop donde ya se descuenta el stock (el momento real de la venta, no al
+crear el pedido — un pedido web puede quedar días `PENDIENTE` antes de
+confirmarse). Backfill de pedidos `PROCESADO` de antes de este campo
+(`DataSeeder.backfillOrderLineCosts()`, corre en cada arranque, idempotente
+fila por fila): completa con el `costPrice` ACTUAL del producto, marcado
+`costEstimated=true` (no es el costo real de esa venta — decisión
+confirmada con el usuario). `MetricsService.rangeTotals()`/`compute()`
+suman ahora `cost` (sólo de las líneas con costo cargado) y devuelven
+`costDataComplete` (false = margen parcial del período, no falso) —
+`MetricsDtos.Totals` pasó de 3 a 5 campos.
+
+**Parte B — módulo de Gastos (`core/finance/`):** entidad `Expense`
+(tenant-scoped, clon del molde de `Supplier`: fecha, categoría, monto,
+descripción) + CRUD (`/api/admin/expenses`, permiso nuevo
+`EXPENSES_MANAGE`). Categorías = parametría genérica nueva
+("Categoría de gasto", id fijo `grp-categoria-gasto`, `system=false`,
+editable por tienda) — sembrada en `TenantProvisioningService` para
+tenants nuevos y con backfill (`DataSeeder.backfillExpenseCategoryGroup()`)
+para los que ya existían; mismas 7 categorías genéricas para cualquier
+rubro (a diferencia de las parametrías de producto, que sí varían por
+rubro). **Gastos recurrentes**: `Expense.repeatMonthly` +
+`recurringGroupId` (mismo valor en toda la serie) — `ExpenseRecurrenceScheduler`
+(cron 1° de cada mes 04:00, mismo patrón de loop tenant-por-tenant que
+`MarketingCampaignScheduler`) genera la instancia del mes actual si no
+existe todavía. Simplificación deliberada: si el scheduler se saltea más
+de un mes, sólo genera la instancia del mes actual (no rellena los meses
+intermedios).
+
+**Parte C — Balance (`BalanceService`/`BalanceController`):**
+`GET /api/admin/balance?from&to` (`netResult = revenue - cost - expenses`)
+y `GET /api/admin/balance/comparison?year=` (serie mensual continua, para
+que el frontend arme el gráfico mes a mes / rojo-verde; año a año se
+resuelve llamando el mismo endpoint dos veces). Permiso nuevo
+`FINANCE_VIEW`. Ambos permisos agregados a "Administrador" en
+`DataSeeder` — y como `RoleService.ensureRole()` no retoca roles que ya
+existen (mismo problema documentado con `SHIFTS_MANAGE`, ver
+`PROYECTO.md` §12 #25), se agregó `RoleService.grantPermissionsIfMissing()`
++ un backfill (`DataSeeder.backfillNewPermissions()`) que se los suma a
+cualquier tenant que ya tuviera ese rol — primera vez que este backfill se
+resuelve en código en vez de a mano por SQL.
+
+**Bug real encontrado y arreglado de paso (no planeado, bloqueaba
+verificar en vivo):** al arrancar contra MySQL real, `site_settings` no
+existía en la base local (las otras 28 tablas sí) y no se podía recrear:
+"Row size too large (65535 bytes)". Causa: `arcaCertificadoPem`/
+`arcaClavePrivadaPem` (Fase 14) eran `VARCHAR(8000)` — dos columnas así en
+utf8mb4 ya suman ~64000 bytes contados "en fila" por MySQL al crear la
+tabla, sumado al resto de las ~45 columnas de `site_settings` superaba el
+límite. Arreglado con el mismo patrón ya usado en ese archivo para
+`helpText`/`faqText` (`@Column(length = 100_000)` en vez de un `length`
+chico, para que Hibernate lo mapee a `MEDIUMTEXT`) — no `@Lob` con
+`columnDefinition` explícito, que con `globally_quoted_identifiers: true`
+generaba DDL inválido (Hibernate encomillaba también el tipo de columna).
+
+**Verificado de punta a punta contra MySQL real** (no sólo los 30 tests en
+H2, que también pasan): producto de prueba con `costPrice=500`, vendido y
+confirmado (`cost_price` quedó en 500 en la línea) → subido el costo del
+producto a 700 → confirmada por SQL que la línea YA confirmada **no
+cambió** (sigue en 500) y que un pedido nuevo confirmado después sí
+congela 700 — el bug central, resuelto y confirmado. Gasto recurrente
+creado, `GET /api/admin/balance` verificado a mano
+(`revenue=3000, cost=1700, grossProfit=1300, expenses=300, netResult=1000`
+— coincide exactamente con lo calculado a mano). Comparativa anual y 401
+sin token también probados. Backfills confirmados por SQL (permisos
+nuevos en el rol "Administrador" real, categorías de gasto sembradas).
+Todos los datos de prueba (producto, pedidos, gasto) borrados de la base
+real al terminar.
+
+**LO QUE FALTA:**
+- Frontend (repo separado `frontend-ecommerce---ruth`): pantallas de
+  Gastos y Balance, gráficos rojo/verde y comparativas — nada de esto
+  tiene UI todavía, sólo la API.
+- `Exchange` (cambios de prenda) no participa del costo/ganancia — la
+  diferencia cobrada suma a `revenue` sin costo asociado, gap conocido.
+- Sin test automatizado nuevo para esta fase (verificado a mano contra
+  MySQL real, mismo criterio que Fase 14).
+- `database/schema.sql`: agregadas las columnas de `order_line` y la
+  tabla `expense` nueva (con `tenant_id`, a diferencia del resto del
+  archivo — ver la nota agregada ahí); `site_settings` sigue sin
+  reflejar ninguna columna de ARCA ni las demás agregadas después de
+  Fase 9 — ese archivo ya estaba desactualizado desde antes (ver
+  Pendientes de `PROYECTO.md` §11).
+
+---
+
+### Fase 16 — 15 ítems de la ronda de mejoras: costeo real, ARCA (IVA/NC/PDF), stock, Gastos/Balance, con su frontend (2026-09-17)
+
+Pedido del usuario a partir de una lista de 15 mejoras propuestas antes
+(numeradas 2,3,4,5,6,7,8,9,10,11,16,17,18,20,21), con una regla explícita:
+**todo lo que implique UI se construye también en el frontend** — no
+volver a dejar algo sólo en el backend (pasó con el módulo de Gastos/
+Balance de la Fase 15). Ejecutado en 7 tandas chicas, cada una verificada
+(`mvn test` + contra MySQL real + `ng build`) antes de la siguiente —
+detalle completo del frontend en `../frontend/PROYECTO.md` #58.
+
+**Decisiones de diseño confirmadas con el usuario antes de arrancar** (la
+opción más simple que resuelve el pedido real):
+1. Costeo por **promedio ponderado**, no FIFO real por lote.
+2. Notas de crédito: **acción manual** desde el detalle de pedido, no
+   automática desde un cambio de prenda.
+3. "Ítems detallados en el comprobante": sólo en el **PDF/recibo**, no en
+   el XML de ARCA — WSFEv1 no tiene concepto de líneas de producto, sólo
+   importes agregados por alícuota.
+4. Alertas de stock bajo: **por mail**, WhatsApp server-side queda
+   diferido (no hay integración con ningún proveedor tipo Twilio/Meta
+   Cloud API en este proyecto).
+5. Presupuesto: un monto **mensual fijo** por categoría (no por mes
+   puntual).
+6. Código de barras: **no es un EAN real** (no hay autoridad emisora),
+   es un código interno generable con un botón.
+
+**Tanda 1 — Historial de movimientos de stock + ajuste manual con motivo
+(ítems 7, 8):** entidad `StockMovement` (`core/product/`) — un punto único
+de instrumentación: `ProductService.decrementStock`/`incrementStock`/
+`setStock` ahora registran cada cambio (razón, motivo, referencia, costo
+unitario si aplica, quién). Gap conocido y documentado: editar el stock
+desde el form completo de producto (`PUT /admin/products/{id}`) sigue sin
+loguear movimiento — sólo lo hacen los 3 métodos instrumentados; usar
+"Ajustar stock"/"Registrar compra" para que quede en el historial.
+`GET /api/admin/stock-movements?productId&from&to`, permiso nuevo
+`STOCK_MOVEMENTS_VIEW`.
+
+**Tanda 2 — Compras a proveedor + costeo por promedio ponderado (ítems 9,
+18):** `ProductService.registerPurchase` suma stock y recalcula
+`Product.costPrice` como `(stockActual×costoActual + cantidad×costoCompra)
+/ (stockActual+cantidad)` — sin entidad de lotes nueva, matemáticamente
+equivalente a costeo por promedio ponderado contable.
+`POST /api/admin/products/{id}/purchases`.
+
+**Tanda 3 — Cambios (Exchange) suman costo (ítem 17):** `ExchangeLine`
+sumó `costPrice` (mismo patrón que `OrderLine`, congelado al procesar,
+sólo en líneas LLEVADA).
+
+**Tanda 4 — Alertas: stock bajo por mail, CAE por vencer, reintento
+automático de ARCA (ítems 5, 10):** `LowStockAlertScheduler` (diario,
+mismo patrón tenant-loop que `MarketingCampaignScheduler`) manda un mail
+HTML si hay talles bajos y la tienda cargó `lowStockAlertEmail` (endpoint
+nuevo `/api/admin/settings/stock-alerts`, permiso `PRODUCTS_MANAGE` — no
+`PAYMENTS_MANAGE`, porque es sobre stock, no sobre facturación).
+`DashboardService.expiringCae()` + `GET /api/admin/expiring-cae`.
+`ArcaRetryScheduler` (cada 6hs) reintenta facturar pedidos LOCAL/
+PROCESADO que quedaron en ticket interno por error de ARCA, reusando
+`OrderService.retryInvoicing` (mismo método que el botón manual del
+panel).
+
+**Tanda 5 — ARCA: alícuota de IVA real por producto, Notas de Crédito,
+factura en PDF por mail (ítems 2, 3, 4, 6) — la más grande y técnica:**
+- `Product.ivaRate` (nullable → 21% default). `ArcaWsfeClient`/
+  `ArcaInvoiceService` reescritos para agrupar las líneas del pedido por
+  alícuota real y armar un bloque `<AlicIva>` por cada una (antes: un
+  único bloque fijo al 21%) — esto sí es un cambio real en lo que ARCA
+  recibe. Si hay descuento aplicado, los importes de línea se escalan
+  proporcionalmente para que la suma dé exacto `order.getTotal()`.
+- `CreditNote` (entidad nueva, `core/arca/`, aparte de `Order` porque
+  puede haber más de una NC parcial sobre el mismo pedido) — tipos NC-A/
+  B/C (3/8/13) + bloque `<CbtesAsoc>` referenciando el comprobante
+  original. `POST /api/admin/orders/{id}/credit-notes {amount, reason}`,
+  siempre persiste el intento (apruebe o no ARCA).
+- `InvoicePdfService` (librería nueva **OpenPDF** — no había generación
+  de PDF en el proyecto) arma un PDF simple con las líneas reales del
+  pedido (acá viven los "ítems detallados"). `InvoiceMailService` (clon
+  de `MarketingMailService`: `MimeMessageHelper` + `addAttachment`) lo
+  manda al `customerEmail` del pedido después de `applyInvoicing()`, sin
+  bloquear la venta si falla.
+- **Sigue sin poder probarse contra ARCA real** (mismo motivo que toda
+  la Fase 14: no hay CUIT/certificado de homologación en esta sesión) —
+  el armado del XML con múltiples `<AlicIva>` y `<CbtesAsoc>` es nuevo y
+  no se verificó contra el servidor real.
+
+**Tanda 6 — Código de barras propio para imprimir (ítem 11):**
+`POST /api/admin/products/{id}/generate-barcode` genera un código interno
+(prefijo `IN` + dígitos del id) si el producto no tiene uno cargado.
+
+**Tanda 7 — Presupuesto de gastos (ítem 21, backend — el resto de Gastos/
+Balance ya existía de la Fase 15):** `ExpenseBudget` (una fila por
+categoría, `core/finance/`), `GET /api/admin/expense-budgets/status`
+compara el gasto del mes en curso contra el presupuesto por categoría.
+
+**Verificado de punta a punta contra MySQL real** (arrancado, backfills
+confirmados sin error; producto de prueba con `ivaRate=10.5`, código de
+barras generado, compra registrada con recálculo de costo — `10 u. a
+$500 + 10 u. a $700 → $600` exacto —, movimientos correctos en el
+historial; endpoints de gastos/CAE/presupuesto responden 200; datos de
+prueba borrados al terminar). `mvn test`: 35/35 en verde (2 tests nuevos
+de esta fase: `StockMovementTest` con 3 casos, `ArcaInvoicingTest` con 2).
+
+**Frontend**: hecho en la misma sesión, ver `../frontend/PROYECTO.md`
+#58 — `ng build` de producción sin errores. **No verificado en el
+navegador** (la extensión de Claude in Chrome no estaba conectada en
+esta sesión) — a diferencia del resto de este proyecto, esta fase quedó
+sin el paso de verificación visual real. Recomendado antes de considerar
+el trabajo terminado.
+
+**LO QUE FALTA:**
+- Probar contra ARCA real (homologación) — NC y múltiples alícuotas son
+  código nuevo sin verificar contra el servidor real.
+- Verificación en el navegador de las 4 pantallas nuevas y las 2
+  extendidas (no se pudo hacer en esta sesión).
+- Editar stock desde el form completo de producto sigue sin loguear
+  movimiento (gap documentado en la Tanda 1).
+- `database/schema.sql`: agregadas las tablas `stock_movement`,
+  `credit_note`, `expense_budget` y la columna `product.iva_rate` — el
+  resto del archivo sigue con el mismo drift ya documentado (sin
+  `tenant_id`, sin columnas de ARCA en `site_settings`).
+
+---
+
+### Fase 17 — Ecommerce vs. Punto de venta como planes reales, separados (2026-09-17)
+
+Bug reportado por el usuario abriendo el panel de "Estilos Pequeños" (una
+tienda 100% ecommerce): le aparecía "Punto de venta (kiosco)" en el menú,
+algo que no debería ofrecerse ahí. Causa: sólo existía **un** plan ("Plan
+por defecto") con `ECOMMERCE_SITE` y `POS` prendidos los dos a la vez, y
+es el único plan que usa cualquier tenant nuevo — así que toda tienda,
+sea ecommerce o kiosco, terminaba con ambos módulos habilitados.
+
+El mecanismo para elegir plan al crear una tienda ya existía (Fase 14,
+paso del asistente "Crear tienda") y el editor de planes
+(`/admin/superadmin/planes`) ya deja tildar/destildar libremente
+cualquiera de los 5 módulos por plan — el usuario confirmó que ese es
+justo el diseño que quiere (planes = "qué módulos puede tener cada
+modelo de negocio", configurable a mano porque conviven en el mismo
+backend). Lo que faltaba era que **existiera más de un plan real**.
+
+**Bug de fondo encontrado al investigar (más grave que el síntoma):**
+`PlanService.ensureDefault()` corría en cada arranque y, si el plan
+"default" no tenía TODOS los módulos conocidos, se los agregaba a la
+fuerza (pensado en su momento para que un módulo nuevo no quedara
+"invisible" en el único plan que existía). Con dos planes deliberadamente
+distintos, ese backfill es incompatible: cualquier edición de módulos
+hecha a mano desde el panel se hubiera revertido sola en el próximo
+restart. **Se sacó esa lógica por completo** — un módulo nuevo que se
+sume a `Modules` de acá en más se agrega a mano al plan que corresponda,
+no automático a todos.
+
+**Cambios:**
+- `PlanService.ensureDefault()`: ya no fuerza módulos en cada arranque;
+  el plan se sigue creando una sola vez (`orElseGet`), ahora con nombre
+  "Ecommerce" y sin `POS` en el set inicial (`ropa`, `SOCIAL_SHARE`,
+  `MERCADOPAGO`, `ECOMMERCE_SITE`, `ARCA_INVOICING`).
+- `PlanService.ensurePosPlan()` (nuevo): siembra el plan "Punto de
+  venta" (slug `punto-de-venta`, módulos `POS` + `ARCA_INVOICING`),
+  llamado desde `DataSeeder.run()` junto a `ensureDefault()`.
+- **Dato, no código**: el plan real que ya usaba "Estilos Pequeños"
+  (id existente, sigue siendo el mismo — no se reasignó ningún tenant)
+  se renombró a "Ecommerce" y se le sacó `POS` con un
+  `PUT /api/admin/plans/{id}` contra la app corriendo — el endpoint de
+  edición ya existía, no hizo falta código nuevo para esta corrección
+  puntual.
+
+**Verificado contra MySQL real**: `GET /api/settings` de Estilos
+Pequeños pasó de `posEnabled:true` a `posEnabled:false`
+(`ecommerceSiteEnabled` sigue `true` — sigue pudiendo vender presencial
+por "Venta en el local", que depende de `ecommerce`, no de `pos`).
+**Reiniciado el backend a propósito para confirmar que el fix es
+durable**: los módulos de los dos planes quedaron exactamente igual
+después del restart (antes de sacar el backfill, `POS` hubiera vuelto a
+aparecer en "Ecommerce" solo). `GET /api/admin/plans` devuelve los 2
+planes, listos para el selector del asistente "Crear tienda" (que ya
+existía, ahora por fin tiene más de una opción real para mostrar).
+`mvn test`: 35/35 en verde.
+
+**Ampliación, misma sesión — módulos filtrados por compatibilidad.** El
+usuario pidió ir un paso más allá: en el editor de planes, que no se
+puedan tildar módulos que no tienen sentido para el modelo de negocio del
+plan (ej. "Mercado Pago" no debería ni aparecer como opción en un plan
+de Punto de venta, porque no hay carrito online sin `ECOMMERCE_SITE`).
+
+- `Plan` sumó `businessModel` (`"ECOMMERCE"` | `"POS"`, ver `BusinessModel`
+  nuevo) — fijo una vez creado el plan, no se edita desde
+  `PlanUpdateRequest` (reclasificar un plan con tiendas ya usándolo sería
+  disruptivo). Columna nullable (mismo criterio que otros campos nuevos
+  sobre tablas con filas ya cargadas): filas de antes de este cambio se
+  tratan como `ECOMMERCE` (`Plan.getBusinessModel()`, lo menos
+  restrictivo) hasta que el backfill las completa.
+- `Modules.compatibleWith(businessModel)` (nuevo): la única regla de
+  compatibilidad hoy es que `ARCA_INVOICING` aplica a los dos modelos
+  (una tienda ecommerce también factura sus ventas de "Venta en el
+  local", no sólo el kiosco); el resto es exclusivo de uno u otro.
+- `PlanService.update()` ahora filtra `enabledModules` contra
+  `compatibleWith` antes de guardar — **defensa en profundidad**: el
+  editor del panel ya sólo ofrece tildar los compatibles, esto es por si
+  alguien pega directo a la API. Probado a mano: mandar `MERCADOPAGO` en
+  un `PUT` al plan "Punto de venta" lo devuelve silenciosamente
+  descartado, el plan queda igual que antes.
+- `PlanAdminDtos.PlanResponse` suma `businessModel` y `compatibleModules`
+  (calculado, no se guarda). Frontend: `plan-editor.component` filtra
+  `MODULE_OPTIONS` contra `plan().compatibleModules` — los módulos
+  incompatibles directamente no se renderizan (no sólo se deshabilitan).
+- `PlanService.backfillBusinessModel()` (nuevo, llamado desde
+  `DataSeeder` junto a `ensureDefault()`/`ensurePosPlan()`): completa
+  `businessModel` de los dos planes sembrados por slug conocido —
+  idempotente, mismo valor siempre para ese slug.
+- **Verificado contra MySQL real, con reinicio del backend incluido**:
+  `GET /api/admin/plans` devuelve `businessModel`/`compatibleModules`
+  correctos para los dos planes; intentado colar `MERCADOPAGO` al plan
+  Punto de venta por API directa → queda afuera; reiniciado el backend →
+  `business_model` y los módulos de cada plan quedaron exactamente
+  igual (la columna se completó sola en el primer arranque con el
+  cambio, sin tocarla de nuevo en el segundo). `ng build` sin errores.
+  `mvn test`: 35/35 en verde.
+- `database/schema.sql`: no se tocó — la tabla `plan` (y el resto de la
+  infraestructura de tenant/planes) nunca se agregó a ese archivo, es
+  el mismo drift ya documentado desde la Fase 4.
+
+**LO QUE FALTA:**
+- No se pudo verificar en el navegador (extensión de Claude in Chrome
+  desconectada) ni el arreglo original (el kiosco desaparece del menú
+  de Estilos Pequeños) ni el filtrado de módulos del editor de planes —
+  todo confirmado por API/SQL, falta el vistazo visual real.
+- Sin ABM para crear planes nuevos desde el panel (sigue siendo dato,
+  no código) — si el usuario quiere un tercer plan a futuro (ej.
+  "Combo"), hoy se carga por SQL/API a mano, igual que se hizo acá.
+
+---
+
+### Fase 18 — Cargar producto por código de barras desde el panel (2026-09-17)
+
+El usuario aclaró que el flujo pedido no era el escaneo de venta (ya
+existe en `admin-pos`/`admin-kiosco`) ni el código interno generable
+(Fase 16, ítem 11): es que el **administrador de la tienda** (no quien
+vende) pueda escanear un producto con la pistola desde "Productos" y que
+el sistema decida solo: si ya existe un producto con ese código, lo
+abre para editar; si no existe, abre "Nuevo producto" con el código ya
+cargado para completar el resto (nombre, precio, stock, etc.).
+
+- Backend: `ProductRepository.findByTenantIdAndBarcodeAndDeletedFalse`
+  (nuevo) + `ProductService.findByBarcode()` + endpoint
+  `GET /api/admin/products/by-barcode?code=` (permiso `PRODUCTS_VIEW`),
+  404 con `ResourceNotFoundException` si no hay coincidencia.
+- Frontend: `admin-products` suma un input "📷 Escanear código de
+  barras…" junto al botón "Nuevo producto" (mismo patrón de teclado+Enter
+  que ya usan los lectores USB en el kiosco) — `scanBarcode()` llama al
+  endpoint nuevo y navega a editar (si existe) o a
+  `/admin/productos/nuevo?barcode=XXX` (si no). `admin-product-form` lee
+  ese query param sólo en modo creación (nunca pisa el barcode de un
+  producto que ya se está editando) y precarga el control `barcode` del
+  form.
+- **Verificado end-to-end contra MySQL real** (tenant demo
+  `demo-kiosco`, backend reiniciado para levantar el endpoint nuevo):
+  generado un código interno de prueba para "Candado de seguridad 50mm",
+  `GET .../by-barcode?code=<ese código>` devolvió el producto correcto
+  (200); un código inexistente devolvió 404 con mensaje legible; datos
+  de prueba revertidos al terminar (el producto quedó sin barcode, como
+  estaba). `mvn test`: 35/35 en verde. `ng build`: sin errores, HMR
+  recompiló `admin-products` y `admin-product-form` sin warnings.
+- **LO QUE FALTA:** no se pudo probar en el navegador con una pistola
+  lectora real ni ver el flujo visual completo (extensión de Claude in
+  Chrome desconectada) — sólo verificado por API/curl. Reintentado en
+  una sesión posterior (mismo día): la extensión seguía sin conectar
+  (`tabs_context_mcp` devolvió "Browser extension is not connected"),
+  así que este paso queda pendiente de que el usuario la revise
+  (extensión instalada/habilitada, misma cuenta logueada, Chrome
+  reiniciado tras instalar) y lo pruebe él mismo o pida un tercer
+  intento.
+
+---
+
 ## 5. Historial
 
+- **2026-09-17**: Fase 18 — el admin de una tienda puede escanear el
+  código de barras de un producto desde "Productos": si ya existe, lo
+  abre para editar; si no, abre "Nuevo producto" con el código
+  precargado. Verificado contra MySQL real (encontrado/no-encontrado) y
+  `mvn test` en verde. Ver detalle en la sección Fase 18.
+- **2026-09-17**: Fase 17 — bug reportado por el usuario (el kiosco
+  aparecía en el menú de una tienda 100% ecommerce): sólo había un plan
+  con `ECOMMERCE_SITE`+`POS` prendidos los dos. Separado en dos planes
+  reales ("Ecommerce", "Punto de venta"), y sacado un bug de fondo más
+  grave que el síntoma: `PlanService.ensureDefault()` reforzaba TODOS
+  los módulos conocidos en cada arranque, lo que hubiera revertido solo
+  cualquier edición de módulos hecha a mano desde el panel de planes.
+  Verificado con un restart real que el fix es durable. Ver detalle en
+  la sección Fase 17.
+- **2026-09-17**: Fase 16 — lote grande de 15 mejoras (costeo por promedio
+  ponderado, alícuota de IVA real + Notas de Crédito + factura en PDF por
+  mail de ARCA, historial de movimientos de stock + compras a proveedor,
+  alertas de stock bajo y de CAE por vencer, reintento automático de
+  ARCA, presupuesto de gastos), en 7 tandas verificadas, **con su
+  frontend** (pedido explícito del usuario: nada queda sólo en el
+  backend). `ng build` sin errores; sin verificación en el navegador
+  (extensión no conectada). Ver detalle completo en la sección Fase 16.
+- **2026-09-17**: Fase 15 — costo de venta congelado en `OrderLine` (fix de
+  un bug real: la ganancia histórica cambiaba retroactivamente si se
+  actualizaba `Product.costPrice`) + módulo de Gastos y Balance
+  (`core/finance/`), pensado para servir a cualquier tienda facture o no.
+  De paso, arreglado un bug preexistente no relacionado que impedía
+  arrancar el backend contra MySQL local (`site_settings` no se podía
+  recrear por límite de tamaño de fila). Ver detalle completo en la
+  sección Fase 15.
 - **2026-09-16**: panel para asignar módulos a un plan — tercer ítem de la
   ronda de mejoras (ver el de recuperación de contraseña, más abajo, para
   el contexto completo). Reemplaza el `UPDATE` a mano en `plan_module`
