@@ -4,6 +4,10 @@ import com.saasweb.common.TenantContext;
 import com.saasweb.core.discount.Discount;
 import com.saasweb.core.hero.HeroSlide;
 import com.saasweb.core.hero.HeroSlideRepository;
+import com.saasweb.core.order.Order;
+import com.saasweb.core.order.OrderLine;
+import com.saasweb.core.order.OrderRepository;
+import com.saasweb.core.order.OrderStatus;
 import com.saasweb.core.param.ParamGroup;
 import com.saasweb.core.param.ParamOption;
 import com.saasweb.core.product.Product;
@@ -55,6 +59,7 @@ public class DataSeeder implements CommandLineRunner {
     private final ProductRepository productRepo;
     private final HeroSlideRepository heroSlideRepo;
     private final SiteSettingsRepository siteSettingsRepo;
+    private final OrderRepository orderRepo;
 
     public DataSeeder(AppProperties props,
                       AuthService authService,
@@ -68,7 +73,8 @@ public class DataSeeder implements CommandLineRunner {
                       DiscountRepository discountRepo,
                       ProductRepository productRepo,
                       HeroSlideRepository heroSlideRepo,
-                      SiteSettingsRepository siteSettingsRepo) {
+                      SiteSettingsRepository siteSettingsRepo,
+                      OrderRepository orderRepo) {
         this.props = props;
         this.authService = authService;
         this.roleService = roleService;
@@ -82,6 +88,7 @@ public class DataSeeder implements CommandLineRunner {
         this.productRepo = productRepo;
         this.heroSlideRepo = heroSlideRepo;
         this.siteSettingsRepo = siteSettingsRepo;
+        this.orderRepo = orderRepo;
     }
 
     @Override
@@ -91,8 +98,8 @@ public class DataSeeder implements CommandLineRunner {
         // `TenantService.ensureDefault()` sólo llama a `planService.ensureDefault()`
         // la primera vez que crea el tenant (rama `orElseGet`) — en cualquier
         // arranque posterior, con el tenant ya existente, nunca la vuelve a
-        // llamar. Sin esta línea, un módulo agregado a `Modules` después del
-        // primer arranque nunca se backfillearía al plan ya sembrado.
+        // llamar. Sin esta línea, un deploy nuevo sin tenant piloto (poco
+        // probable, pero posible) se quedaría sin el plan "Ecommerce".
         planService.ensureDefault();
         // Roles, config del sitio y usuarios iniciales: siempre (no son "datos de ejemplo").
         roleService.ensureSystemRole(); // "Superadmin": system=true, siempre todos los permisos, no pertenece a ningún tenant.
@@ -105,7 +112,8 @@ public class DataSeeder implements CommandLineRunner {
                 Permission.SHIFTS_MANAGE,
                 Permission.PARAMS_MANAGE, Permission.SIZE_SCALES_MANAGE, Permission.SUPPLIERS_MANAGE,
                 Permission.DISCOUNTS_MANAGE, Permission.COUPONS_MANAGE, Permission.MARKETING_MANAGE,
-                Permission.METRICS_VIEW, Permission.PAYMENTS_MANAGE, Permission.USERS_MANAGE);
+                Permission.METRICS_VIEW, Permission.PAYMENTS_MANAGE, Permission.USERS_MANAGE,
+                Permission.EXPENSES_MANAGE, Permission.FINANCE_VIEW);
         roleService.ensureRole(tenantId, "Vendedor",
                 Permission.ORDERS_VIEW, Permission.ORDERS_MANAGE,
                 Permission.POS_USE, Permission.EXCHANGES_USE,
@@ -127,6 +135,64 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         backfillHeroSlidesAndLogos();
+        backfillNewPermissions();
+        backfillExpenseCategoryGroup();
+        backfillOrderLineCosts();
+    }
+
+    /**
+     * {@code ensureRole} no retoca roles ya existentes (ver el javadoc de
+     * {@code RoleService.grantPermissionsIfMissing}) — corre en cada
+     * arranque, sin efecto si el tenant no tiene ese rol o ya tiene los
+     * permisos.
+     */
+    private void backfillNewPermissions() {
+        for (Tenant t : tenantService.findAll()) {
+            roleService.grantPermissionsIfMissing(t.getId(), "Administrador",
+                    Permission.EXPENSES_MANAGE, Permission.FINANCE_VIEW);
+        }
+    }
+
+    /**
+     * Completa la parametría "Categoría de gasto" (id fijo {@code
+     * grp-categoria-gasto}) para tenants que ya existían antes de que el
+     * módulo de Gastos empezara a sembrarla en {@code TenantProvisioningService}
+     * — corre en cada arranque, sin efecto si el tenant ya la tiene.
+     */
+    private void backfillExpenseCategoryGroup() {
+        for (Tenant t : tenantService.findAll()) {
+            if (paramRepo.findByIdAndTenantId("grp-categoria-gasto", t.getId()).isPresent()) continue;
+            paramRepo.save(group(t.getId(), "grp-categoria-gasto", "Categoría de gasto", false, false, false, List.of(
+                    opt("gasto-alquiler", "Alquiler"), opt("gasto-sueldos", "Sueldos"),
+                    opt("gasto-servicios", "Servicios"), opt("gasto-mercaderia", "Mercadería / Insumos"),
+                    opt("gasto-impuestos", "Impuestos"), opt("gasto-marketing", "Marketing"),
+                    opt("gasto-otros", "Otros"))));
+            log.info("Seed: categorías de gasto completadas para tenant '{}'.", t.getSlug());
+        }
+    }
+
+    /**
+     * Congela {@code OrderLine.costPrice} en pedidos ya {@code PROCESADO} de
+     * antes de que existiera este campo, con el {@code costPrice} ACTUAL del
+     * producto (marcado {@code costEstimated=true}, no es el costo real de
+     * esa venta). Corre en cada arranque, sólo toca líneas con costo nulo —
+     * no-op una vez completado. Ver PLAN_SAAS.md, módulo de Gastos y Balance.
+     */
+    private void backfillOrderLineCosts() {
+        for (Tenant t : tenantService.findAll()) {
+            for (Order o : orderRepo.findByTenantIdAndStatus(t.getId(), OrderStatus.PROCESADO)) {
+                boolean changed = false;
+                for (OrderLine l : o.getLines()) {
+                    if (l.getCostPrice() != null) continue;
+                    Product p = productRepo.findByIdAndTenantId(l.getProductId(), t.getId()).orElse(null);
+                    if (p == null || p.getCostPrice() == null) continue;
+                    l.setCostPrice(p.getCostPrice());
+                    l.setCostEstimated(true);
+                    changed = true;
+                }
+                if (changed) orderRepo.save(o);
+            }
+        }
     }
 
     /**

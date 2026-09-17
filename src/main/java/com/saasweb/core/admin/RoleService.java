@@ -112,6 +112,23 @@ public class RoleService {
         }
     }
 
+    /**
+     * Backfill: {@link #ensureRole} no retoca un rol que ya existe, así que un
+     * permiso agregado al enum después del primer arranque de un tenant nunca
+     * le llega solo (pasó con {@code SHIFTS_MANAGE}, ver PROYECTO.md). Este
+     * método suma los permisos que falten a un rol ya existente, sin tocar
+     * nada si ya los tiene o si el rol no existe en ese tenant.
+     */
+    public void grantPermissionsIfMissing(String tenantId, String roleName, Permission... perms) {
+        repo.findByTenantIdAndNameIgnoreCase(tenantId, roleName).ifPresent(r -> {
+            boolean changed = false;
+            for (Permission p : perms) {
+                if (r.getPermissions().add(p)) changed = true;
+            }
+            if (changed) repo.save(r);
+        });
+    }
+
     private java.util.Set<Permission> cleanPermissions(RoleRequest req) {
         return req.permissions() == null || req.permissions().isEmpty()
                 ? EnumSet.noneOf(Permission.class)

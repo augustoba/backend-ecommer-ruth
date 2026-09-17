@@ -6,6 +6,7 @@ import com.saasweb.core.admin.RoleRepository;
 import com.saasweb.core.coupon.CouponRepository;
 import com.saasweb.core.discount.DiscountRepository;
 import com.saasweb.core.exchange.ExchangeRepository;
+import com.saasweb.core.finance.ExpenseRepository;
 import com.saasweb.core.hero.HeroSlideRepository;
 import com.saasweb.core.marketing.MarketingConfigRepository;
 import com.saasweb.core.marketing.MarketingSendRepository;
@@ -61,6 +62,7 @@ public class TenantDeletionService {
     private final SizeScaleRepository sizeScaleRepo;
     private final AdminUserRepository adminUserRepo;
     private final RoleRepository roleRepo;
+    private final ExpenseRepository expenseRepo;
 
     public TenantDeletionService(TenantRepository tenantRepo, SiteSettingsRepository siteSettingsRepo,
             MarketingConfigRepository marketingConfigRepo, OrderRepository orderRepo,
@@ -68,7 +70,7 @@ public class TenantDeletionService {
             CouponRepository couponRepo, DiscountRepository discountRepo, HeroSlideRepository heroSlideRepo,
             MarketingSendRepository marketingSendRepo, PageBlockRepository pageBlockRepo,
             ShiftRepository shiftRepo, SupplierRepository supplierRepo, SizeScaleRepository sizeScaleRepo,
-            AdminUserRepository adminUserRepo, RoleRepository roleRepo) {
+            AdminUserRepository adminUserRepo, RoleRepository roleRepo, ExpenseRepository expenseRepo) {
         this.tenantRepo = tenantRepo;
         this.siteSettingsRepo = siteSettingsRepo;
         this.marketingConfigRepo = marketingConfigRepo;
@@ -86,6 +88,7 @@ public class TenantDeletionService {
         this.sizeScaleRepo = sizeScaleRepo;
         this.adminUserRepo = adminUserRepo;
         this.roleRepo = roleRepo;
+        this.expenseRepo = expenseRepo;
     }
 
     /**
@@ -114,6 +117,7 @@ public class TenantDeletionService {
         shiftRepo.deleteAllByTenantId(tenantId);
         supplierRepo.deleteAllByTenantId(tenantId);
         sizeScaleRepo.deleteAllByTenantId(tenantId);
+        expenseRepo.deleteAllByTenantId(tenantId);
 
         // AdminUser antes que Role (ver javadoc de la clase).
         adminUserRepo.deleteAllByTenantId(tenantId);

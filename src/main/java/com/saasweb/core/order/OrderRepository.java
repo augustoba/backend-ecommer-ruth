@@ -58,6 +58,9 @@ public interface OrderRepository extends JpaRepository<Order, String> {
 
     Optional<Order> findByTenantIdAndNumber(String tenantId, long number);
 
+    /** Pedidos procesados de un tenant, sin filtro de fecha — usado por el backfill de costo histórico. */
+    List<Order> findByTenantIdAndStatus(String tenantId, OrderStatus status);
+
     long countByTenantIdAndStatus(String tenantId, OrderStatus status);
 
     /** Pedidos de un estado con `processedAt` dentro del rango [from, to). Para métricas. */

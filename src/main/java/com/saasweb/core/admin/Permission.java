@@ -42,7 +42,11 @@ public enum Permission {
     /** Configuración de plataforma: identidad, logo, WhatsApp, redes, textos, servicio de mail. Sólo superadmin. */
     PLATFORM_SETTINGS_MANAGE("Configuración de plataforma"),
     /** Crear usuarios y roles del panel. */
-    USERS_MANAGE("Usuarios y roles");
+    USERS_MANAGE("Usuarios y roles"),
+    /** Cargar/editar/borrar gastos del emprendimiento. */
+    EXPENSES_MANAGE("Gestionar gastos"),
+    /** Ver el balance de ganancias (ventas - costo - gastos) y sus comparativas. */
+    FINANCE_VIEW("Ver balance de ganancias");
 
     private final String label;
 

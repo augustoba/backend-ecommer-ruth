@@ -334,6 +334,8 @@ CREATE TABLE IF NOT EXISTS order_line (
     size_value   VARCHAR(255)  NOT NULL,
     quantity     INTEGER       NOT NULL,
     unit_price   DECIMAL(12,2) NOT NULL,
+    cost_price     DECIMAL(12,2),               -- costo congelado al CONFIRMAR (no al crear), null = sin costo cargado
+    cost_estimated BIT           NOT NULL DEFAULT 0, -- true = completado por el backfill de pedidos viejos, no es el costo real de esa venta
     accepted     BIT           NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT fk_order_line_order
@@ -350,6 +352,30 @@ CREATE TABLE IF NOT EXISTS hero_slide (
     alt       VARCHAR(255) NOT NULL,
     position  INTEGER      NOT NULL,
     PRIMARY KEY (id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+--  Gastos (módulo de Gastos y Balance)
+--  NOTA: este archivo tiene drift viejo, de antes de multi-tenant (ver
+--  PROYECTO.md/PLAN_SAAS.md "Pendientes") — ninguna tabla de arriba tiene
+--  `tenant_id` aunque las entidades reales sí lo tienen. Esta tabla nueva se
+--  agrega completa (con tenant_id, como la entidad real), no como el resto
+--  del archivo. No usar este script tal cual para un deploy nuevo sin
+--  revisarlo antes contra las entidades JPA.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS expense (
+    id                  VARCHAR(255)  NOT NULL,
+    tenant_id           VARCHAR(255)  NOT NULL,
+    expense_date        DATE          NOT NULL,
+    category_option_id  VARCHAR(255),
+    amount              DECIMAL(12,2) NOT NULL,
+    description         VARCHAR(2000),
+    repeat_monthly      BIT           NOT NULL DEFAULT 0,
+    recurring_group_id  VARCHAR(255),
+    created_at          DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id),
+    KEY ix_expense_tenant (tenant_id),
+    KEY ix_expense_category (category_option_id)
 ) ENGINE=InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;

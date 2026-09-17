@@ -28,6 +28,23 @@ public class OrderLine {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
 
+    /**
+     * Costo del producto congelado al CONFIRMAR el pedido (no al crearlo) —
+     * para que la ganancia histórica no cambie si después se actualiza
+     * {@code Product.costPrice}. {@code null} = el producto no tenía costo
+     * cargado en ese momento (no se puede saber el margen de esta línea).
+     */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal costPrice;
+
+    /**
+     * {@code true} sólo en líneas completadas por el backfill de pedidos
+     * históricos (con el costo ACTUAL del producto, no el real de esa venta)
+     * — ver {@code DataSeeder.backfillOrderLineCosts}.
+     */
+    @Column(nullable = false)
+    private boolean costEstimated = false;
+
     /** El dueño/a lo tilda para confirmar que hay stock y lo va a entregar. */
     @Column(nullable = false)
     private boolean accepted = true;
@@ -83,6 +100,22 @@ public class OrderLine {
 
     public void setUnitPrice(BigDecimal unitPrice) {
         this.unitPrice = unitPrice;
+    }
+
+    public BigDecimal getCostPrice() {
+        return costPrice;
+    }
+
+    public void setCostPrice(BigDecimal costPrice) {
+        this.costPrice = costPrice;
+    }
+
+    public boolean isCostEstimated() {
+        return costEstimated;
+    }
+
+    public void setCostEstimated(boolean costEstimated) {
+        this.costEstimated = costEstimated;
     }
 
     public boolean isAccepted() {

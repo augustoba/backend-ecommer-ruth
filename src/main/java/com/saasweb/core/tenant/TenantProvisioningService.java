@@ -100,6 +100,7 @@ public class TenantProvisioningService {
                 RubroImages.logo(rubro.getLogoEmoji(), rubro.getLogoColor()));
         pageBlockService.ensureDefaultHomeBlocks(tenantId);
         seedHeroSlides(tenantId, rubro);
+        seedExpenseCategories(tenantId);
 
         switch (rubro) {
             case ROPA -> seedRopa(tenantId);
@@ -132,6 +133,31 @@ public class TenantProvisioningService {
             hs.setPosition(i);
             heroSlideRepo.save(hs);
         }
+    }
+
+    /**
+     * "Categoría de gasto" — genérica para cualquier rubro (mismas
+     * categorías para ropa/ferretería/repuestos/etc., a diferencia de las
+     * parametrías de producto que sí varían por rubro). Id fijo
+     * ({@code grp-categoria-gasto}) igual en todos los tenants, para que el
+     * backfill de tenants viejos (ver {@code DataSeeder.backfillExpenseCategoryGroup})
+     * pueda detectar si ya está sembrada. Editable después desde
+     * {@code /admin/param-groups} como cualquier parametría.
+     */
+    private void seedExpenseCategories(String tenantId) {
+        if (paramRepo.findByIdAndTenantId("grp-categoria-gasto", tenantId).isPresent()) return;
+        ParamGroup g = new ParamGroup();
+        g.setId("grp-categoria-gasto");
+        g.setTenantId(tenantId);
+        g.setName("Categoría de gasto");
+        g.setMultiple(false);
+        g.setShowInCatalog(false);
+        g.setSystem(false);
+        for (String label : List.of("Alquiler", "Sueldos", "Servicios", "Mercadería / Insumos",
+                "Impuestos", "Marketing", "Otros")) {
+            g.addOption(opt(label));
+        }
+        paramRepo.save(g);
     }
 
     // --- Ropa (genérica — la tienda piloto tiene su propio seed más grande en DataSeeder) ---

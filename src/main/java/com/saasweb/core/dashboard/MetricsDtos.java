@@ -22,8 +22,14 @@ public class MetricsDtos {
             /** Unidades y facturación por proveedor. */
             List<GroupRow> bySupplier) {}
 
-    /** Totales del período. `revenue` = precio de lista × cantidad de las líneas aceptadas. */
-    public record Totals(BigDecimal revenue, long units, long orders) {}
+    /**
+     * Totales del período. `revenue` = precio de lista × cantidad de las
+     * líneas aceptadas. `cost` = costo congelado (`OrderLine.costPrice`) ×
+     * cantidad, sumado sólo en las líneas que sí lo tienen; `costDataComplete`
+     * = false si alguna línea contabilizada no tenía costo cargado (el
+     * margen de ese período es parcial, no falso — sólo incompleto).
+     */
+    public record Totals(BigDecimal revenue, long units, long orders, BigDecimal cost, boolean costDataComplete) {}
 
     /** Ventas online (checkout) vs en el local (POS). */
     public record ChannelBreakdown(Totals web, Totals local) {}
