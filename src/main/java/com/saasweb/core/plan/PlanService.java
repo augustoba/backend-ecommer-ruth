@@ -13,10 +13,12 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Mientras haya un único plan (ver PLAN_SAAS.md Fase 5), este service sólo
- * garantiza que exista (sembrado permisivo, sin límites reales) y lo
- * resuelve para el tenant actual. Cargar planes de verdad (Básico,
- * Profesional...) el día que se definan límites/precios es dato, no código.
+ * Garantiza que existan los planes base (ver {@link #ensureDefault()} /
+ * {@link #ensurePosPlan()}) y resuelve el plan del tenant actual. Desde la
+ * Fase 17 hay dos: "Ecommerce" (fallback histórico) y "Punto de venta" —
+ * cada uno con su propio set de módulos, editable desde
+ * `/admin/superadmin/planes`. Cargar límites/precios de negocio reales
+ * sigue siendo dato (UPDATE desde ese panel), no código.
  */
 @Service
 @Transactional
@@ -32,35 +34,72 @@ public class PlanService {
         this.tenants = tenants;
     }
 
-    /** Crea el plan único de este deploy si todavía no existe. Idempotente. */
+    public static final String POS_SLUG = "punto-de-venta";
+
+    /**
+     * Crea el plan "Ecommerce" (fallback histórico, ver {@code DEFAULT_SLUG})
+     * si todavía no existe. Idempotente — a diferencia de antes, YA NO
+     * fuerza módulos en cada arranque a un plan que ya existe: desde que
+     * hay más de un plan (ver {@link #ensurePosPlan()}), cada uno tiene
+     * deliberadamente un set de módulos distinto (Fase 17) y un backfill
+     * "agregar todo lo nuevo" pisaría esa diferenciación en el próximo
+     * restart. Un módulo nuevo que sume `Modules` de acá en más se agrega
+     * a mano desde `/admin/superadmin/planes` al plan que corresponda.
+     */
     public Plan ensureDefault() {
-        Plan p = repo.findBySlug(DEFAULT_SLUG).orElseGet(() -> {
+        return repo.findBySlug(DEFAULT_SLUG).orElseGet(() -> {
             Plan created = new Plan();
             created.setId(UUID.randomUUID().toString());
             created.setSlug(DEFAULT_SLUG);
-            created.setName("Plan por defecto");
+            created.setName("Ecommerce");
+            created.setBusinessModel(BusinessModel.ECOMMERCE);
             created.setMaxProducts(null); // sin límite: todavía no hay planes de negocio definidos
             created.setMaxAdminUsers(null);
             created.setEnabledModules(new LinkedHashSet<>(
-                    Set.of("ropa", Modules.SOCIAL_SHARE, Modules.MERCADOPAGO, Modules.ECOMMERCE_SITE, Modules.POS,
+                    Set.of("ropa", Modules.SOCIAL_SHARE, Modules.MERCADOPAGO, Modules.ECOMMERCE_SITE,
                             Modules.ARCA_INVOICING)));
             created.setShowPlatformBranding(false);
             return repo.save(created);
         });
-        // Backfill de módulos agregados después del primer arranque (mismo
-        // criterio que DataSeeder.backfillHeroSlidesAndLogos): un módulo
-        // nuevo no debe quedar desactivado en silencio para el plan que ya
-        // estaba sembrado. Agregar acá cada módulo nuevo que sume `Modules`.
-        Set<String> knownModules = Set.of(
-                Modules.SOCIAL_SHARE, Modules.MERCADOPAGO, Modules.ECOMMERCE_SITE, Modules.POS,
-                Modules.ARCA_INVOICING);
-        if (!p.getEnabledModules().containsAll(knownModules)) {
-            Set<String> next = new LinkedHashSet<>(p.getEnabledModules());
-            next.addAll(knownModules);
-            p.setEnabledModules(next);
-            p = repo.save(p);
-        }
-        return p;
+    }
+
+    /**
+     * Plan "Punto de venta" (Fase 17) — para tenants sin vidriera online
+     * (kiosco, casa de repuestos que sólo vende presencial). Se le puede
+     * sumar/sacar módulos después desde el panel como a cualquier otro plan.
+     */
+    public Plan ensurePosPlan() {
+        return repo.findBySlug(POS_SLUG).orElseGet(() -> {
+            Plan created = new Plan();
+            created.setId(UUID.randomUUID().toString());
+            created.setSlug(POS_SLUG);
+            created.setName("Punto de venta");
+            created.setBusinessModel(BusinessModel.POS);
+            created.setMaxProducts(null);
+            created.setMaxAdminUsers(null);
+            created.setEnabledModules(new LinkedHashSet<>(Set.of(Modules.POS, Modules.ARCA_INVOICING)));
+            created.setShowPlatformBranding(false);
+            return repo.save(created);
+        });
+    }
+
+    /**
+     * Completa `businessModel` de los dos planes que siembra esta clase
+     * para el caso de filas que ya existían de antes de la Fase 17 —
+     * idempotente (siempre el mismo valor para ese slug), corre en cada
+     * arranque. Un plan con slug desconocido (creado a mano por SQL, fuera
+     * de estos dos) queda con `businessModel=null`, tratado como ECOMMERCE
+     * por {@link Plan#getBusinessModel()} — la opción menos restrictiva.
+     */
+    public void backfillBusinessModel() {
+        repo.findBySlug(DEFAULT_SLUG).ifPresent(p -> {
+            p.setBusinessModel(BusinessModel.ECOMMERCE);
+            repo.save(p);
+        });
+        repo.findBySlug(POS_SLUG).ifPresent(p -> {
+            p.setBusinessModel(BusinessModel.POS);
+            repo.save(p);
+        });
     }
 
     @Transactional(readOnly = true)
@@ -81,7 +120,7 @@ public class PlanService {
         return planId != null ? repo.findById(planId).orElse(null) : null;
     }
 
-    /** Todos los planes de la plataforma — hoy sólo el "default" (ver PlanController). */
+    /** Todos los planes de la plataforma (ver PlanController). */
     @Transactional(readOnly = true)
     public List<Plan> findAll() {
         return repo.findAll();
@@ -94,18 +133,25 @@ public class PlanService {
     }
 
     /**
-     * Edita límites/módulos/branding de un plan ya existente — el slug no
-     * se toca (identificador estable). No hay todavía un ABM para crear
-     * planes nuevos desde el panel (sigue siendo un INSERT a mano, ver
-     * PLAN_SAAS.md) — sólo existe uno hoy, así que no hacía falta más.
+     * Edita límites/módulos/branding de un plan ya existente — el slug y el
+     * `businessModel` no se tocan (identificadores estables; reclasificar
+     * un plan de Ecommerce a POS con tiendas ya usándolo sería disruptivo).
+     * `enabledModules` se filtra contra {@link Modules#compatibleWith} —
+     * defensa en profundidad: el editor del panel ya sólo ofrece tildar
+     * los compatibles, esto es por si alguien pega directo a la API.
+     * No hay todavía un ABM para crear planes nuevos desde el panel (sigue
+     * siendo un INSERT a mano, ver PLAN_SAAS.md) — sólo existen dos hoy.
      */
     public Plan update(String id, String name, Integer maxProducts, Integer maxAdminUsers,
                         Set<String> enabledModules, boolean showPlatformBranding) {
         Plan plan = repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Plan", id));
+        Set<String> compatible = Modules.compatibleWith(plan.getBusinessModel());
+        Set<String> filtered = new LinkedHashSet<>(enabledModules);
+        filtered.retainAll(compatible);
         plan.setName(name);
         plan.setMaxProducts(maxProducts);
         plan.setMaxAdminUsers(maxAdminUsers);
-        plan.setEnabledModules(new LinkedHashSet<>(enabledModules));
+        plan.setEnabledModules(filtered);
         plan.setShowPlatformBranding(showPlatformBranding);
         return repo.save(plan);
     }

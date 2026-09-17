@@ -13,15 +13,21 @@ public final class PlanAdminDtos {
 
     public record PlanResponse(
             String id, String slug, String name,
+            /** "ECOMMERCE" | "POS" — ver {@code BusinessModel}. Fijo, no se edita. */
+            String businessModel,
             Integer maxProducts, Integer maxAdminUsers,
-            Set<String> enabledModules, boolean showPlatformBranding,
+            Set<String> enabledModules,
+            /** Los únicos módulos que el editor debería dejar tildar para este plan (ver {@code Modules.compatibleWith}). */
+            Set<String> compatibleModules,
+            boolean showPlatformBranding,
             /** Cuántas tiendas usan este plan hoy — contexto antes de cambiarle límites/módulos. */
             long tenantCount
     ) {
         public static PlanResponse from(Plan p, long tenantCount) {
-            return new PlanResponse(p.getId(), p.getSlug(), p.getName(),
+            return new PlanResponse(p.getId(), p.getSlug(), p.getName(), p.getBusinessModel(),
                     p.getMaxProducts(), p.getMaxAdminUsers(),
-                    p.getEnabledModules(), p.isShowPlatformBranding(), tenantCount);
+                    p.getEnabledModules(), Modules.compatibleWith(p.getBusinessModel()),
+                    p.isShowPlatformBranding(), tenantCount);
         }
     }
 

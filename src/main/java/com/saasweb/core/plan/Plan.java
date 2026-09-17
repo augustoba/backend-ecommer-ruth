@@ -32,6 +32,15 @@ public class Plan {
     @Column(nullable = false)
     private String name;
 
+    /**
+     * "ECOMMERCE" | "POS" (ver {@link BusinessModel}) — determina qué
+     * módulos se le pueden ofrecer (ver {@link Modules#compatibleWith}).
+     * Nullable por compatibilidad con filas de antes de la Fase 17
+     * (tratado como {@code ECOMMERCE} si viene null, ver {@link #getBusinessModel()}).
+     */
+    @Column(name = "business_model", length = 20)
+    private String businessModel;
+
     /** null = sin límite. */
     private Integer maxProducts;
 
@@ -78,6 +87,15 @@ public class Plan {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    /** null (filas de antes de la Fase 17) se trata como {@link BusinessModel#ECOMMERCE}. */
+    public String getBusinessModel() {
+        return businessModel != null ? businessModel : BusinessModel.ECOMMERCE;
+    }
+
+    public void setBusinessModel(String businessModel) {
+        this.businessModel = businessModel;
     }
 
     public Integer getMaxProducts() {

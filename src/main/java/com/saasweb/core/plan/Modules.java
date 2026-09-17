@@ -1,10 +1,12 @@
 package com.saasweb.core.plan;
 
+import java.util.Set;
+
 /**
  * Claves de módulo válidas para {@link Plan#getEnabledModules()} — sólo
- * documentan qué strings existen, no hay validación server-side de que
- * `enabledModules` sólo contenga claves conocidas (mismo criterio laxo que
- * el resto de ese campo, ver el javadoc de {@code Plan}).
+ * documentan qué strings existen. Desde la Fase 17, {@link #compatibleWith}
+ * sí valida server-side que un plan no tenga módulos incompatibles con su
+ * {@link BusinessModel} (antes era laxo del todo).
  */
 public final class Modules {
 
@@ -54,4 +56,17 @@ public final class Modules {
      * ticket interno, no fiscal.
      */
     public static final String ARCA_INVOICING = "ARCA_INVOICING";
+
+    /**
+     * Qué módulos tiene sentido ofrecerle a un plan de este
+     * {@link BusinessModel}. `ARCA_INVOICING` es el único que aplica a los
+     * dos: una tienda ecommerce también factura sus ventas presenciales
+     * ("Venta en el local"), no sólo el kiosco dedicado.
+     */
+    public static Set<String> compatibleWith(String businessModel) {
+        if (BusinessModel.POS.equals(businessModel)) {
+            return Set.of(POS, ARCA_INVOICING);
+        }
+        return Set.of(ECOMMERCE_SITE, SOCIAL_SHARE, MERCADOPAGO, ARCA_INVOICING);
+    }
 }

@@ -49,10 +49,12 @@ public class TenantAdminDtos {
     }
 
     public record TenantResponse(String id, String slug, String name, Rubro rubro, String rubroLabel,
-                                 boolean active, Instant createdAt) {
-        public static TenantResponse from(Tenant t) {
+                                 boolean active, Instant createdAt,
+                                 /** Módulo `ECOMMERCE_SITE` de su plan — si es false, no tiene sitio público (ver Fase 17). */
+                                 boolean ecommerceSiteEnabled) {
+        public static TenantResponse from(Tenant t, boolean ecommerceSiteEnabled) {
             return new TenantResponse(t.getId(), t.getSlug(), t.getName(), t.getRubro(),
-                    t.getRubro().getLabel(), t.isActive(), t.getCreatedAt());
+                    t.getRubro().getLabel(), t.isActive(), t.getCreatedAt(), ecommerceSiteEnabled);
         }
     }
 

@@ -101,6 +101,12 @@ public class DataSeeder implements CommandLineRunner {
         // llamar. Sin esta línea, un deploy nuevo sin tenant piloto (poco
         // probable, pero posible) se quedaría sin el plan "Ecommerce".
         planService.ensureDefault();
+        // Plan "Punto de venta" (Fase 17) — para que el asistente "Crear tienda"
+        // tenga más de un plan entre los que elegir (ecommerce vs. sólo POS).
+        planService.ensurePosPlan();
+        // Completa `businessModel` en los dos planes de arriba si vienen de
+        // antes de la Fase 17 (columna nueva, filas ya existentes).
+        planService.backfillBusinessModel();
         // Roles, config del sitio y usuarios iniciales: siempre (no son "datos de ejemplo").
         roleService.ensureSystemRole(); // "Superadmin": system=true, siempre todos los permisos, no pertenece a ningún tenant.
         // "Administrador": todo lo operativo de la tienda, salvo la config de plataforma
