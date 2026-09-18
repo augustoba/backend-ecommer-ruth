@@ -87,6 +87,9 @@ public class DataSeeder implements CommandLineRunner {
         authService.ensureInitialAdmin();
         authService.ensureInitialSuperadmin();
         siteSettingsService.get();
+        // Corre siempre (no sólo en instalaciones nuevas) para que una base ya
+        // seedeada también reciba esta parametría al actualizar.
+        seedExpenseCategoryParamGroup();
 
         if (!props.getSeed().isEnabled()) return;
         seedParamGroups();
@@ -96,6 +99,24 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     // --- Parametrías ---
+
+    /**
+     * "Categoría de gasto" es una parametría más (como Público/Tipo de
+     * prenda/Estación): system=true así no se puede borrar el grupo entero,
+     * pero el dueño agrega/edita/borra opciones desde {@code /admin/parametrias}
+     * igual que con cualquier otra. Ids sin prefijo (a diferencia de las demás)
+     * porque coinciden con los que ya venía usando el frontend en gastos
+     * existentes antes de que esta parametría existiera.
+     */
+    private void seedExpenseCategoryParamGroup() {
+        if (paramRepo.existsById("grp-categoria-gasto")) return;
+        paramRepo.save(group("grp-categoria-gasto", "Categoría de gasto", false, false, true, List.of(
+                opt("alquiler", "Alquiler"), opt("servicios", "Servicios (luz/agua/internet)"),
+                opt("sueldos", "Sueldos"), opt("mercaderia", "Mercadería / insumos"),
+                opt("impuestos", "Impuestos"), opt("marketing", "Marketing / publicidad"),
+                opt("envios", "Envíos / logística"), opt("otros", "Otros"))));
+        log.info("Seed: parametría de categoría de gasto cargada.");
+    }
 
     private void seedParamGroups() {
         if (paramRepo.count() > 0) return;
