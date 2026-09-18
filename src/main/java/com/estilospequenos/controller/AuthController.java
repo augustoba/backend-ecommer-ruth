@@ -2,6 +2,7 @@ package com.estilospequenos.controller;
 
 import com.estilospequenos.config.JwtService;
 import com.estilospequenos.dto.AccountDtos.ForgotPasswordRequest;
+import com.estilospequenos.dto.AccountDtos.ResetPasswordRequest;
 import com.estilospequenos.dto.AdminUserDtos.MeResponse;
 import com.estilospequenos.dto.LoginRequest;
 import com.estilospequenos.dto.TokenResponse;
@@ -34,12 +35,19 @@ public class AuthController {
     }
 
     /**
-     * "Olvidé mi contraseña": le genera una nueva al azar y se la manda por
-     * mail. Siempre responde igual, exista o no ese DNI (no revela nada).
+     * "Olvidé mi contraseña": le manda un link de un solo uso para elegir una
+     * contraseña nueva. Siempre responde igual, exista o no ese DNI (no revela nada).
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req, HttpServletRequest http) {
         authService.forgotPassword(req.dni(), clientIp(http));
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Confirma la recuperación: token del link + contraseña nueva. 400 si venció o ya se usó. */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest req) {
+        authService.resetPassword(req.token(), req.newPassword());
         return ResponseEntity.noContent().build();
     }
 

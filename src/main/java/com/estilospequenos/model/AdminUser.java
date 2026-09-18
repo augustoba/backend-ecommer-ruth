@@ -54,6 +54,33 @@ public class AdminUser {
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
+    /**
+     * Hash del token de "olvidé mi contraseña" pendiente (nunca se guarda el
+     * token en sí — mismo criterio que la contraseña). null = no hay ninguna
+     * recuperación pendiente. Vence a la hora — {@code resetTokenExpiresAt}.
+     */
+    @Column(name = "reset_token_hash")
+    private String resetTokenHash;
+
+    @Column(name = "reset_token_expires_at")
+    private Instant resetTokenExpiresAt;
+
+    public String getResetTokenHash() {
+        return resetTokenHash;
+    }
+
+    public void setResetTokenHash(String resetTokenHash) {
+        this.resetTokenHash = resetTokenHash;
+    }
+
+    public Instant getResetTokenExpiresAt() {
+        return resetTokenExpiresAt;
+    }
+
+    public void setResetTokenExpiresAt(Instant resetTokenExpiresAt) {
+        this.resetTokenExpiresAt = resetTokenExpiresAt;
+    }
+
     public java.util.Set<Permission> permissions() {
         return role != null ? role.effectivePermissions()
                 : java.util.EnumSet.noneOf(Permission.class);

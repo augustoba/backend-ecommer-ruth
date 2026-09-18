@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS site_settings (
     mp_enabled                   BIT NOT NULL DEFAULT 0,   -- Mercado Pago activado por el dueño
     mp_access_token              VARCHAR(300),             -- secreto: nunca se devuelve en ninguna respuesta
     mp_public_key                VARCHAR(300),
+    low_stock_alert_enabled      BIT NOT NULL DEFAULT 0,   -- mail diario de talles por reponer
+    low_stock_alert_email        VARCHAR(300),
     PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
@@ -85,6 +87,8 @@ CREATE TABLE IF NOT EXISTS admin_user (
     super_admin   BIT          NOT NULL DEFAULT 0, -- acceso a Cloudinary/mail, aparte del rol (ver AdminUser.superAdmin)
     role_id       VARCHAR(255),                -- rol (define los permisos)
     created_at    DATETIME(6)  NOT NULL,
+    reset_token_hash       VARCHAR(255),        -- hash del link de "olvidé mi contraseña" pendiente (null = ninguno)
+    reset_token_expires_at DATETIME(6),
     PRIMARY KEY (id),
     CONSTRAINT uk_admin_user_dni UNIQUE (dni),
     CONSTRAINT uk_admin_user_email UNIQUE (email),
@@ -176,9 +180,11 @@ CREATE TABLE IF NOT EXISTS product (
     supplier_id   VARCHAR(255),
     cost_price    DECIMAL(12,2),
     low_stock_threshold INTEGER,               -- umbral de stock bajo propio (null = default global)
+    barcode       VARCHAR(64),                 -- código de barras interno u original, opcional
     PRIMARY KEY (id),
     KEY ix_product_active (active),
-    KEY ix_product_supplier (supplier_id)
+    KEY ix_product_supplier (supplier_id),
+    UNIQUE KEY uq_product_barcode (barcode)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS product_image (

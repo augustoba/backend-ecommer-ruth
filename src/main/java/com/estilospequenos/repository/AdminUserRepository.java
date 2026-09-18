@@ -13,4 +13,5 @@ public interface AdminUserRepository extends JpaRepository<AdminUser, String> {
     List<AdminUser> findAllByOrderByCreatedAtAsc();
     long countByRoleId(String roleId);
     long countByEnabledTrue();
+    Optional<AdminUser> findByResetTokenHash(String resetTokenHash);
 }
