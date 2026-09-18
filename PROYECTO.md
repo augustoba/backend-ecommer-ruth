@@ -4,7 +4,7 @@
 > está en `../frontend-ecommerce---ruth/PROYECTO.md`. Este archivo entra en el
 > detalle de la API.
 
-Última actualización: 2026-09-11.
+Última actualización: 2026-09-18.
 
 > **Nota de mantenimiento:** las tablas de las secciones 2-6 se actualizan
 > cuando el cambio es grande (como hoy); para el detalle día a día, la
@@ -31,6 +31,28 @@ dueño/a lo gestione desde el panel.
 **Historia:** el proyecto arrancó 100% frontend con datos en `localStorage`.
 El 2026-09-08 se hizo este backend (v1) y se conectó el frontend Angular
 (sus services ahora hablan con `/api/*`).
+
+**Volvimos de una vuelta por el SaaS (2026-09-17):** este mismo código empezó
+a evolucionar hacia una plataforma multi-tenant (varios clientes en una sola
+base, planes, gating por módulo — `saasweb`). Eso frenaba el avance de esta
+tienda, que necesitaba salir andando ya, así que **se revirtió**: este repo
+volvió al estado de antes del SaaS (una sola tienda, sin `Modules`/
+`PlanService`/tenant-scoping — ver el tag `saas-work-snapshot` si hace falta
+recuperar algo). El trabajo del SaaS no se perdió, **se dividió en dos
+proyectos nuevos y separados**, cada uno con su propio repo:
+
+- **`C:\proyectos\saas`** (back `saasweb` + front) — la plataforma
+  multi-tenant, sigue su desarrollo aparte.
+- **`C:\proyectos\punto-de-venta`** (back + front) — módulo de Punto de
+  Venta/Kiosco, también aparte, para no mezclarlo ni con el ecommerce de una
+  sola tienda ni con el SaaS. Por ahora sólo está seedeado con un clone
+  completo de este código; falta recortarlo a sólo lo que hace falta para POS.
+
+Este repo (`backend-ecommer-ruth`) es y sigue siendo el ecommerce de **una
+sola tienda** (la de la dueña). Regla para lo que se agregue de acá en más:
+pensar cada feature nueva para esta tienda sola primero, pero de forma que
+sea razonablemente migrable al SaaS más adelante si hace falta — **sin
+construir multi-tenancy ahora**.
 
 ---
 
@@ -404,6 +426,22 @@ hace falta el mismo paso.
 - ~~Rate-limiting / lockout en el login~~ — hecho (tanda 2026-09-09, §12 #20).
 - ~~Multi-admin~~ — hecho (tanda 2026-09-11, §12 #22): roles + Superadmin/Administrador/Vendedor.
 - ~~Métricas por talle/proveedor~~ — hecho (tanda 3, §12 #21).
+- ~~Frontend de Mercado Pago~~ — hecho (§12 #29).
+- **Mercado Pago: falta probar con credenciales reales.** Lo hecho en #27/#29
+  compiló y se probó en vivo forzando un error real (token inválido a
+  propósito, para confirmar que el pedido no se pierde) — falta un Access
+  Token de prueba/producción real cargado desde el panel, y un túnel (ngrok)
+  en local para que el webhook sea alcanzable.
+- ~~Frontend de Gastos/Balance/movimientos de stock~~ — hecho (§12 #31).
+- **Probar Gastos/Balance/movimientos de stock en el navegador** — sólo se
+  verificó por código + `ng build` (la extensión de Chrome estaba
+  desconectada esa sesión), no en uso real.
+- **`punto-de-venta`** (`C:\proyectos\punto-de-venta`, ver §1): sólo tiene un
+  clone completo de este código como semilla — falta recortarlo a sólo el
+  módulo POS/Kiosco.
+- **No abordado todavía** (evaluar si la dueña lo necesita — existen en el
+  SaaS, no se portaron): ARCA/facturación electrónica, alertas de stock bajo
+  por mail, generación de código de barras interno.
 
 ---
 
@@ -822,3 +860,60 @@ hace falta el mismo paso.
     - **Pendiente:** portar el lado del frontend (pantallas de Gastos,
       Balance, movimientos de stock/registrar compra) — queda para otra
       tanda. No se probó en navegador.
+
+29. **Frontend de Mercado Pago + bug transaccional real encontrado y arreglado
+    (2026-09-17, misma sesión que #27):**
+    - Port del lado del frontend: `PaymentMethod`/`PaymentStatus` nuevos,
+      botón de pago del carrito condicional ("Pagar con Mercado Pago" en vez
+      de "Comprar por WhatsApp" cuando `mercadoPagoAvailable=true`), redirect
+      a `mpCheckoutUrl` tras crear el pedido, botón "Reintentar pago" en Mis
+      Pedidos si quedó `PENDING`, pantalla nueva en Configuración → Pagos
+      (toggle + Access Token + Public Key, mismo patrón "secreto que no se
+      re-muestra" que el resto del panel).
+    - **Probado en vivo**, end-to-end, contra la API real de Mercado Pago (con
+      un Access Token de prueba inválido a propósito, para forzar el 403
+      real). Eso destapó un bug real que nadie había pedido investigar:
+      `createWebCheckout` perdía **el pedido entero** (no sólo el intento de
+      pago) cuando `startMercadoPagoCheckout` fallaba, porque la clase es
+      `@Transactional` y el rollback por defecto de Spring deshacía también
+      el `create()` ya persistido en la misma transacción. Fix:
+      `@Transactional(noRollbackFor = BadRequestException.class)` en
+      `createWebCheckout` — verificado repitiendo la misma prueba: el pedido
+      ahora queda `PENDIENTE` en la base en vez de desaparecer.
+
+30. **POS: cartel grande de vuelto al pagar en efectivo (2026-09-17/18):**
+    - Sin cambios de backend. `AdminPosComponent` (frontend) suma un input
+      "Efectivo recibido" y un cartel grande (verde "Vuelto" / rojo "Falta")
+      debajo del total, visible sólo con medio de pago CASH — para que el
+      vendedor no se confunda al dar el cambio.
+
+31. **Frontend de Costeo/Gastos/Balance + categoría de gasto editable
+    (2026-09-18, continuación de #28):**
+    - Port de las 3 pantallas que faltaban de #28: `admin-expenses`
+      (`/admin/gastos`, alta/edición de gastos + presupuesto mensual por
+      categoría con alerta), `admin-balance` (`/admin/balance`, totales del
+      período + comparativa mensual/anual), `admin-stock-movements`
+      (`/admin/movimientos-stock`, ajuste manual + registrar compra a
+      proveedor con recálculo de costo + historial filtrable). Rutas y menú
+      gateados por los 3 permisos de #28 (mismo patrón que el resto del
+      panel). Verificado con `ng build`; **no probado en navegador**
+      (extensión de Chrome desconectada esa sesión).
+    - **Categoría de gasto, de lista fija a parametría editable:** al portar
+      lo anterior quedó una laguna — el SaaS resolvía "categoría de gasto"
+      con una parametría (`ParamGroup`/`ParamOption`), pero acá nunca se
+      sembró, así que las categorías quedaron hardcodeadas en el frontend
+      (`EXPENSE_CATEGORIES`), sin forma de agregar una nueva sin tocar
+      código. Corregido: en vez de duplicar el motor de parametrías con una
+      entidad `ExpenseCategory` nueva (el motor genérico ya existe en este
+      backend desde antes, para Público/Tipo de prenda/Estación), se siembra
+      "Categoría de gasto" como **un `ParamGroup` más**
+      (`grp-categoria-gasto`, `system=true` así no se borra el grupo entero,
+      `showInCatalog=false` porque no es un filtro de catálogo) —
+      `DataSeeder.seedExpenseCategoryParamGroup()`, corre en cada arranque
+      (no sólo en instalaciones nuevas) con las mismas 8 categorías/ids que
+      ya venía usando el frontend, para no romper `categoryOptionId` de
+      gastos ya cargados. El dueño ya puede agregar/editar/borrar categorías
+      desde `/admin/parametrias`, la misma pantalla de siempre.
+      `admin-expenses` pasó a leer del `ParamService` en vez de la lista fija.
+      Probado en vivo: backend levantado, `/api/param-groups` devolviendo el
+      grupo nuevo con las 8 opciones.
