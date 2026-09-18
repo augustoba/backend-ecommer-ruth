@@ -4,7 +4,7 @@
 > está en `../frontend-ecommerce---ruth/PROYECTO.md`. Este archivo entra en el
 > detalle de la API.
 
-Última actualización: 2026-09-18.
+Última actualización: 2026-09-18 (tanda 2).
 
 > **Nota de mantenimiento:** las tablas de las secciones 2-6 se actualizan
 > cuando el cambio es grande (como hoy); para el detalle día a día, la
@@ -439,9 +439,11 @@ hace falta el mismo paso.
 - **`punto-de-venta`** (`C:\proyectos\punto-de-venta`, ver §1): sólo tiene un
   clone completo de este código como semilla — falta recortarlo a sólo el
   módulo POS/Kiosco.
-- **No abordado todavía** (evaluar si la dueña lo necesita — existen en el
-  SaaS, no se portaron): ARCA/facturación electrónica, alertas de stock bajo
-  por mail, generación de código de barras interno.
+- ~~Alertas de stock bajo por mail~~ — hecho (§12 #32).
+- ~~Código de barras interno por producto~~ — hecho (§12 #33).
+- ~~Recuperación de contraseña con link~~ — hecho (§12 #34).
+- **No abordado todavía** (evaluar si la dueña lo necesita — existe en el
+  SaaS, no se portó): ARCA/facturación electrónica + Notas de Crédito.
 
 ---
 
@@ -917,3 +919,71 @@ hace falta el mismo paso.
       `admin-expenses` pasó a leer del `ParamService` en vez de la lista fija.
       Probado en vivo: backend levantado, `/api/param-groups` devolviendo el
       grupo nuevo con las 8 opciones.
+    - **Fix de paso:** `seedParamGroups()` chequeaba `paramRepo.count() > 0`
+      para no re-seedear — pero como `seedExpenseCategoryParamGroup()` corre
+      antes y sin depender de `SEED_ENABLED`, en una base nueva ese count()
+      ya daba >0 y Público/Tipo de prenda/Estación no se cargaban nunca
+      (lo agarró `CatalogTest`). Cambiado a chequear el id puntual
+      `grp-publico`.
+
+32. **Alertas de stock bajo por mail (2026-09-18, portado del SaaS):**
+    - `SiteSettings` suma `lowStockAlertEnabled`/`lowStockAlertEmail`,
+      editable por `PRODUCTS_MANAGE` en `GET`/`PUT
+      /api/admin/settings/stock-alert`. Pantalla nueva en Configuración.
+    - `LowStockAlertScheduler` (cron `0 0 7 * * *`, antes de que abra el
+      local) no manda nada si no está activada o no tiene mail cargado;
+      reusa `DashboardService.lowStock()`. `LowStockAlertMailService` arma
+      un mail HTML con la tabla de talles. Sin tenant/plan (a diferencia del
+      SaaS, acá es la única tienda, no hay loop de tenants).
+
+33. **Código de barras interno por producto, opcional (2026-09-18, portado
+    del SaaS):**
+    - `Product.barcode` (columna nueva, `unique`, nullable): alternativa/
+      complemento al QR, que sigue existiendo siempre sin cargar nada. Se
+      puede tipear el código real del fabricante o generar uno interno
+      (`"IN" + dígitos del id`) desde la ficha del producto —
+      `POST /api/admin/products/{id}/generate-barcode` (`PRODUCTS_MANAGE`),
+      no pisa uno ya cargado. `GET /api/admin/products/by-barcode?code=`
+      (`PRODUCTS_VIEW`) para buscar por código. `duplicate()` no copia el
+      barcode del original (evitaría chocar contra el `unique`).
+    - Frontend: campo + botón "Generar código interno" + link a una
+      etiqueta imprimible (`jsbarcode`, mismo patrón que el QR con
+      `qrcode`) en la ficha del producto; columna "Código" en el listado
+      cuando el producto tiene uno. El buscador de `admin-pos` también
+      matchea por barcode completo, para que un lector USB (que sólo
+      "tipea" el código en el foco actual) funcione sin cablear nada nuevo
+      — el SaaS nunca llegó a integrar esto último, quedó sólo como
+      plumbing de backend sin consumidor en el frontend.
+
+34. **Recuperación de contraseña con link, en vez de mandar una clave nueva
+    (2026-09-18, portado del SaaS):**
+    - `AdminUser` suma `resetTokenHash` (SHA-256 del token, nunca el token
+      en sí — mismo criterio que la contraseña) + `resetTokenExpiresAt`.
+      `AuthService.forgotPassword` genera un token de 32 bytes, lo guarda
+      hasheado (vence en 1 hora) y arma el link a
+      `{frontend}/admin/restablecer-clave?token=`. `resetPassword` (nuevo,
+      `POST /api/auth/reset-password`, público) valida que exista y no haya
+      vencido, lo borra en el acto (de un solo uso) y recién ahí cambia la
+      contraseña. Se sacó `sendTempPassword`/sigue existiendo
+      `AccountMailService`, ahora con `sendPasswordResetLink`.
+    - **Bug real encontrado probándolo en vivo** (mismo patrón que el de
+      Mercado Pago del §12 #29): el token se guarda ANTES de mandar el
+      mail (tiene que existir para poder armar el link), y como
+      `AuthService` es `@Transactional` a nivel de clase, una falla al
+      mandar el mail deshacía también el guardado del token — y de paso
+      convertía la respuesta en un 500 sólo para DNIs que sí existen,
+      filtrando esa existencia (rompe el "no revela si el DNI existe" que
+      es el punto del endpoint). Solucionado atajando la excepción del mail
+      sender ahí mismo (mismo patrón que `OrderMailService`): el token
+      queda guardado y la respuesta sigue siendo 204 pase lo que pase con
+      el envío.
+    - Probado en vivo end-to-end (sin SMTP real en este entorno): token
+      guardado en la base pese a que el envío del mail falló, reset con el
+      token real funcionó, login con la contraseña nueva funcionó, y
+      reusar el mismo token dio 400 "venció o ya se usó" (de un solo uso
+      confirmado).
+    - Frontend: pantalla nueva `admin-reset-password`
+      (`/admin/restablecer-clave?token=`) para elegir la contraseña;
+      `admin-recover` actualiza su copy ("te mandamos un link" en vez de
+      "te mandamos una contraseña nueva") — el pedido en sí no cambió de
+      forma, sigue siendo sólo el DNI.
