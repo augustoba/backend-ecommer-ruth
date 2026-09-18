@@ -148,6 +148,33 @@ public class ProductService {
         return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Producto", id));
     }
 
+    /** Para buscar/escanear por código de barras en el panel. null si no hay ningún producto con ese código. */
+    @Transactional(readOnly = true)
+    public Product findByBarcode(String barcode) {
+        if (barcode == null || barcode.isBlank()) return null;
+        return repo.findByBarcodeAndDeletedFalse(barcode.trim()).orElse(null);
+    }
+
+    /**
+     * Genera un código interno para imprimir y pegar en la etiqueta — NO es un
+     * EAN real (no hay autoridad emisora), sólo un código propio de esta
+     * tienda para que el lector del POS lo reconozca. Alternativa/complemento
+     * al QR (que siempre existe, no hace falta generarlo). No pisa un barcode
+     * ya cargado.
+     */
+    public Product generateBarcode(String id) {
+        Product p = get(id);
+        if (p.getBarcode() != null && !p.getBarcode().isBlank()) {
+            throw new BadRequestException("Este producto ya tiene un código de barras cargado.");
+        }
+        String digits = p.getId().replaceAll("\\D", "");
+        String suffix = digits.length() >= 10
+                ? digits.substring(0, 10)
+                : String.format("%010d", Math.abs(p.getId().hashCode()));
+        p.setBarcode("IN" + suffix);
+        return repo.save(p);
+    }
+
     public Product create(ProductRequest req) {
         Product p = new Product();
         p.setId(UUID.randomUUID().toString());
@@ -343,6 +370,7 @@ public class ProductService {
         p.setCostPrice(req.costPrice() != null && req.costPrice().signum() > 0 ? req.costPrice() : null);
         p.setLowStockThreshold(
                 req.lowStockThreshold() != null && req.lowStockThreshold() >= 0 ? req.lowStockThreshold() : null);
+        p.setBarcode(blankToNull(req.barcode()));
 
         p.getSizeStocks().clear();
         if (req.sizeStocks() != null) {

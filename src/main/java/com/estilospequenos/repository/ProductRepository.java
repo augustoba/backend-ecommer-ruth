@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, String> {
     List<Product> findByActiveTrueAndDeletedFalseOrderByCreatedAtDesc();
@@ -16,6 +17,7 @@ public interface ProductRepository extends JpaRepository<Product, String> {
     List<Product> findBySupplierId(String supplierId);
     long countByActiveTrueAndDeletedFalse();
     long countByDeletedFalse();
+    Optional<Product> findByBarcodeAndDeletedFalse(String barcode);
 
     /**
      * Listado del panel con filtros opcionales (todos server-side):

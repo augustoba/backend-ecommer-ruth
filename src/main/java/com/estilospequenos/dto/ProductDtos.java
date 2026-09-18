@@ -38,6 +38,8 @@ public final class ProductDtos {
             BigDecimal costPrice,
             /** Umbral de stock bajo propio del producto (unidades por talle). null = default global. */
             Integer lowStockThreshold,
+            /** Código de barras interno u original del fabricante. Opcional. */
+            @Size(max = 64) String barcode,
             Map<String, List<String>> params,
             List<SizeStockDto> sizeStocks
     ) {}
@@ -68,6 +70,7 @@ public final class ProductDtos {
             String supplierId,
             BigDecimal costPrice,
             Integer lowStockThreshold,
+            String barcode,
             Map<String, List<String>> params,
             List<SizeStockDto> sizeStocks
     ) {
@@ -83,7 +86,7 @@ public final class ProductDtos {
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
                     p.getImageUrl(), List.copyOf(p.getImages()), p.getVideoUrl(), p.isActive(), p.isDiscontinued(),
                     p.isDeleted(), p.getCreatedAt(), p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(),
-                    p.getLowStockThreshold(), params, stocks);
+                    p.getLowStockThreshold(), p.getBarcode(), params, stocks);
         }
     }
 }

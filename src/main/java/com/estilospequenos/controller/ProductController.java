@@ -1,5 +1,6 @@
 package com.estilospequenos.controller;
 
+import com.estilospequenos.common.ResourceNotFoundException;
 import com.estilospequenos.dto.PageResponse;
 import com.estilospequenos.dto.ProductDtos.ActivePatch;
 import com.estilospequenos.dto.ProductDtos.DiscontinuedPatch;
@@ -8,6 +9,7 @@ import com.estilospequenos.dto.ProductDtos.ProductResponse;
 import com.estilospequenos.dto.ProductDtos.StockPatch;
 import com.estilospequenos.dto.StockMovementDtos.MovementResponse;
 import com.estilospequenos.dto.StockMovementDtos.PurchaseRequest;
+import com.estilospequenos.model.Product;
 import com.estilospequenos.service.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -86,6 +88,17 @@ public class ProductController {
         return ProductResponse.from(service.get(id));
     }
 
+    /** Para "cargar producto por código de barras" desde el panel/POS: si existe, se lo manda a editar/vender. */
+    @GetMapping("/api/admin/products/by-barcode")
+    @PreAuthorize("hasAuthority('PRODUCTS_VIEW')")
+    public ProductResponse byBarcode(@RequestParam String code) {
+        Product product = service.findByBarcode(code);
+        if (product == null) {
+            throw new ResourceNotFoundException("No hay ningún producto con ese código de barras.");
+        }
+        return ProductResponse.from(product);
+    }
+
     @PostMapping("/api/admin/products")
     @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest req) {
@@ -127,6 +140,12 @@ public class ProductController {
     @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
     public ProductResponse setStock(@PathVariable String id, @Valid @RequestBody StockPatch body, Authentication auth) {
         return ProductResponse.from(service.setStock(id, body.size(), body.stock(), body.note(), auth.getName()));
+    }
+
+    @PostMapping("/api/admin/products/{id}/generate-barcode")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
+    public ProductResponse generateBarcode(@PathVariable String id) {
+        return ProductResponse.from(service.generateBarcode(id));
     }
 
     @PostMapping("/api/admin/products/{id}/purchase")

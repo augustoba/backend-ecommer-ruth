@@ -82,6 +82,15 @@ public class Product {
      */
     private Integer lowStockThreshold;
 
+    /**
+     * Código de barras interno (ej. "IN4821"), opcional — alternativa/complemento
+     * al QR (que siempre existe, no hace falta cargarlo). Útil para productos sin
+     * código de fábrica, buscándolo/escaneándolo en el POS. `unique` para poder
+     * resolverlo por código sin ambigüedad.
+     */
+    @Column(unique = true, length = 64)
+    private String barcode;
+
     @ElementCollection
     @CollectionTable(name = "product_size_stock", joinColumns = @JoinColumn(name = "product_id"))
     @OrderColumn(name = "idx")
@@ -215,6 +224,14 @@ public class Product {
 
     public void setLowStockThreshold(Integer lowStockThreshold) {
         this.lowStockThreshold = lowStockThreshold;
+    }
+
+    public String getBarcode() {
+        return barcode;
+    }
+
+    public void setBarcode(String barcode) {
+        this.barcode = barcode;
     }
 
     public List<SizeStock> getSizeStocks() {
