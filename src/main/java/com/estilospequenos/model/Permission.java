@@ -39,6 +39,12 @@ public enum Permission {
     CAROUSEL_MANAGE("Carrusel"),
     /** Editar medios de pago (alias, QRs, links). */
     PAYMENTS_MANAGE("Medios de pago"),
+    /** Ver el historial de movimientos de stock y registrar compras a proveedor. */
+    STOCK_MOVEMENTS_VIEW("Movimientos de stock"),
+    /** Cargar/editar gastos y presupuestos por categoría. */
+    EXPENSES_MANAGE("Gastos"),
+    /** Ver el balance (ventas - costo - gastos). */
+    FINANCE_VIEW("Balance"),
     /** Configuración de plataforma: identidad, logo, WhatsApp, redes, textos, servicio de mail. Sólo superadmin. */
     PLATFORM_SETTINGS_MANAGE("Configuración de plataforma"),
     /** Crear usuarios y roles del panel. */

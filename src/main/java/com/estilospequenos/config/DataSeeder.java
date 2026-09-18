@@ -73,11 +73,17 @@ public class DataSeeder implements CommandLineRunner {
                 Permission.SHIFTS_MANAGE,
                 Permission.PARAMS_MANAGE, Permission.SIZE_SCALES_MANAGE, Permission.SUPPLIERS_MANAGE,
                 Permission.DISCOUNTS_MANAGE, Permission.COUPONS_MANAGE, Permission.MARKETING_MANAGE,
-                Permission.METRICS_VIEW, Permission.PAYMENTS_MANAGE, Permission.USERS_MANAGE);
+                Permission.METRICS_VIEW, Permission.PAYMENTS_MANAGE, Permission.USERS_MANAGE,
+                Permission.STOCK_MOVEMENTS_VIEW, Permission.EXPENSES_MANAGE, Permission.FINANCE_VIEW);
         roleService.ensureRole("Vendedor",
                 Permission.ORDERS_VIEW, Permission.ORDERS_MANAGE,
                 Permission.POS_USE, Permission.EXCHANGES_USE,
                 Permission.CASH_REGISTER_VIEW, Permission.SHIFTS_MANAGE, Permission.METRICS_VIEW);
+        // Backfill: instalaciones que ya tenían el rol "Administrador" creado
+        // antes de sumar estos 3 permisos (costeo/gastos/balance) los reciben
+        // igual, sin pisar lo que el dueño haya destildado de otros permisos.
+        roleService.grantPermissionsIfMissing("Administrador",
+                Permission.STOCK_MOVEMENTS_VIEW, Permission.EXPENSES_MANAGE, Permission.FINANCE_VIEW);
         authService.ensureInitialAdmin();
         authService.ensureInitialSuperadmin();
         siteSettingsService.get();

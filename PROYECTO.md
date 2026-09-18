@@ -766,3 +766,59 @@ hace falta el mismo paso.
       local para que el webhook sea alcanzable). Pendiente además: portar el
       lado del frontend (pantalla de "Medios de pago" para cargar el Access
       Token, y el checkout redirigiendo a `mpCheckoutUrl`).
+
+28. **Costeo por compras + Gastos y Balance (2026-09-18):** portado desde el
+    proyecto SaaS, sin nada de multi-tenant ni gating por plan. Método de
+    costeo elegido explícitamente: **promedio ponderado**, no lotes/FIFO — el
+    stock viejo y el nuevo se mezclan en un solo `Product.costPrice`, no se
+    mantienen separados.
+    - **Costo histórico congelado:** `OrderLine.costPrice` se llena recién en
+      `doConfirm` (mismo momento en que se descuenta stock), leyendo el
+      `Product.costPrice` de ESE momento. Si más adelante cambia el costo del
+      producto, el margen de pedidos ya confirmados no se recalcula solo.
+      `null` = el producto no tenía costo cargado cuando se vendió.
+    - **`ProductService.registerPurchase`** (nuevo): compra a proveedor, suma
+      stock y recalcula `Product.costPrice` = promedio ponderado entre el
+      stock que ya había (a su costo actual) y lo que entra (a su costo de
+      compra). Si el producto no tenía costo, el costo pasa a ser directo el
+      de esta compra. Endpoint `POST /api/admin/products/{id}/purchase`
+      (`STOCK_MOVEMENTS_VIEW`).
+    - **`StockMovement`** (nuevo, tabla `stock_movement`): una fila por cada
+      cambio de stock (motivo, referencia, costo unitario si es compra),
+      instrumentado en el único punto de entrada real de `ProductService`
+      (`decrementStock`/`incrementStock`/`setStock`, que cambiaron de firma —
+      ver `OrderService.doConfirm` y `ExchangeService.create` para los
+      motivos `VENTA`/`CAMBIO_DEVUELTA`/`CAMBIO_LLEVADA`). Listado con
+      filtros: `GET /api/admin/stock-movements` (`STOCK_MOVEMENTS_VIEW`).
+    - **`MetricsDtos.Totals`** suma `cost`/`costDataComplete` (costo = suma de
+      `OrderLine.costPrice × cantidad` de las líneas que lo tienen cargado;
+      `costDataComplete=false` si alguna línea contabilizada no lo tenía).
+      Se propaga a los 3 `Totals` que arma `MetricsService` (total, web,
+      local) y al nuevo `MetricsService.rangeTotals(from, to)` que usa
+      Balance. **Nota de alcance:** `ExchangeLine` NO congela costo (el SaaS
+      tampoco lo usaba para el cálculo de margen, sólo `OrderLine`) — el
+      margen no contempla la diferencia cobrada en cambios de prenda.
+    - **Módulo de Gastos y Balance** (nuevo, `Expense`/`ExpenseBudget`/
+      `BalanceService`): `Expense` con recurrencia mensual opcional
+      (`ExpenseRecurrenceScheduler`, 1° de cada mes 04:00) genera sola la
+      instancia del mes siguiente de cada serie "repetir cada mes".
+      `ExpenseBudget`: presupuesto fijo por categoría, comparado contra el
+      gasto real del mes (`GET /api/admin/expense-budgets/status`).
+      `BalanceService`: ventas − costo − gastos, con comparativa mensual del
+      año (`GET /api/admin/balance`, `GET /api/admin/balance/comparison`).
+      `BalanceService` en sí no depende de si se factura o no, calcula sobre
+      pedidos `PROCESADO` nomás.
+    - **3 permisos nuevos:** `STOCK_MOVEMENTS_VIEW`, `EXPENSES_MANAGE`,
+      `FINANCE_VIEW`. Se le dan a "Administrador" en `DataSeeder`, con
+      backfill (`RoleService.grantPermissionsIfMissing`) para instalaciones
+      que ya tenían ese rol creado de antes — no le tocan otros permisos que
+      el dueño haya destildado.
+    - `database/schema.sql` suma `order_line.cost_price` y las tablas
+      `stock_movement`/`expense`/`expense_budget`; `database/setup.sql`
+      regenerado (`cat schema.sql seed.sql > setup.sql`) — de paso quedó al
+      día con varias fases anteriores que habían quedado desactualizadas ahí
+      (no afecta nada: `ddl-auto=update` crea el esquema real solo, este
+      archivo es sólo referencia para instalación manual).
+    - **Pendiente:** portar el lado del frontend (pantallas de Gastos,
+      Balance, movimientos de stock/registrar compra) — queda para otra
+      tanda. No se probó en navegador.

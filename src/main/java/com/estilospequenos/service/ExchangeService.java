@@ -83,7 +83,8 @@ public class ExchangeService {
             BigDecimal line = p.getPrice().multiply(BigDecimal.valueOf(item.quantity()));
             returnedTotal = returnedTotal.add(line);
             ex.addLine(line(ExchangeLine.Kind.DEVUELTA, p, item));
-            productService.incrementStock(p.getId(), item.size(), item.quantity());
+            productService.incrementStock(p.getId(), item.size(), item.quantity(),
+                    com.estilospequenos.model.StockMovementReason.CAMBIO_DEVUELTA, ex.getId(), null, processedByDni);
         }
 
         BigDecimal takenTotal = BigDecimal.ZERO;
@@ -92,7 +93,8 @@ public class ExchangeService {
             BigDecimal line = p.getPrice().multiply(BigDecimal.valueOf(item.quantity()));
             takenTotal = takenTotal.add(line);
             ex.addLine(line(ExchangeLine.Kind.LLEVADA, p, item));
-            productService.decrementStock(p.getId(), item.size(), item.quantity());
+            productService.decrementStock(p.getId(), item.size(), item.quantity(),
+                    com.estilospequenos.model.StockMovementReason.CAMBIO_LLEVADA, ex.getId(), processedByDni);
         }
 
         BigDecimal difference = takenTotal.subtract(returnedTotal);

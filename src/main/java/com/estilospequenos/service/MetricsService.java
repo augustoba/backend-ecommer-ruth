@@ -75,15 +75,22 @@ public class MetricsService {
         List<Order> orders = orderRepo
                 .findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(OrderStatus.PROCESADO, fromI, toI);
         BigDecimal revenue = BigDecimal.ZERO;
+        BigDecimal cost = BigDecimal.ZERO;
         long units = 0;
+        boolean costDataComplete = true;
         for (Order o : orders) {
             for (OrderLine l : o.getLines()) {
                 if (!l.isAccepted()) continue;
                 revenue = revenue.add(l.getUnitPrice().multiply(BigDecimal.valueOf(l.getQuantity())));
                 units += l.getQuantity();
+                if (l.getCostPrice() != null) {
+                    cost = cost.add(l.getCostPrice().multiply(BigDecimal.valueOf(l.getQuantity())));
+                } else {
+                    costDataComplete = false;
+                }
             }
         }
-        return new Totals(revenue, units, orders.size());
+        return new Totals(revenue, units, orders.size(), cost, costDataComplete);
     }
 
     @Transactional(readOnly = true)
@@ -103,6 +110,12 @@ public class MetricsService {
         // --- acumuladores ---
         BigDecimal totalRevenue = BigDecimal.ZERO;
         long totalUnits = 0;
+        BigDecimal totalCost = BigDecimal.ZERO;
+        BigDecimal webCost = BigDecimal.ZERO;
+        BigDecimal localCost = BigDecimal.ZERO;
+        boolean totalCostComplete = true;
+        boolean webCostComplete = true;
+        boolean localCostComplete = true;
 
         Map<String, Acc> byMonth = new LinkedHashMap<>();
         Map<String, ProdAcc> byProduct = new LinkedHashMap<>();
@@ -125,6 +138,16 @@ public class MetricsService {
 
                 totalRevenue = totalRevenue.add(lineRevenue);
                 totalUnits += qty;
+
+                boolean isLocal = o.getChannel() == com.estilospequenos.model.SaleChannel.LOCAL;
+                if (l.getCostPrice() != null) {
+                    BigDecimal lineCost = l.getCostPrice().multiply(BigDecimal.valueOf(qty));
+                    totalCost = totalCost.add(lineCost);
+                    if (isLocal) localCost = localCost.add(lineCost); else webCost = webCost.add(lineCost);
+                } else {
+                    totalCostComplete = false;
+                    if (isLocal) localCostComplete = false; else webCostComplete = false;
+                }
 
                 monthAcc.revenue = monthAcc.revenue.add(lineRevenue);
                 monthAcc.units += qty;
@@ -174,10 +197,10 @@ public class MetricsService {
                 from.toString(),
                 to.toString(),
                 "processedAt",
-                new Totals(totalRevenue, totalUnits, orders.size()),
+                new Totals(totalRevenue, totalUnits, orders.size(), totalCost, totalCostComplete),
                 new com.estilospequenos.dto.MetricsDtos.ChannelBreakdown(
-                        new Totals(webAcc.revenue, webAcc.units, webAcc.orders),
-                        new Totals(localAcc.revenue, localAcc.units, localAcc.orders)),
+                        new Totals(webAcc.revenue, webAcc.units, webAcc.orders, webCost, webCostComplete),
+                        new Totals(localAcc.revenue, localAcc.units, localAcc.orders, localCost, localCostComplete)),
                 monthSeries(from, to, byMonth),
                 topProducts(byProduct),
                 bottomProducts(byProduct, productsById),

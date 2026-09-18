@@ -6,14 +6,19 @@ import com.estilospequenos.dto.ProductDtos.DiscontinuedPatch;
 import com.estilospequenos.dto.ProductDtos.ProductRequest;
 import com.estilospequenos.dto.ProductDtos.ProductResponse;
 import com.estilospequenos.dto.ProductDtos.StockPatch;
+import com.estilospequenos.dto.StockMovementDtos.MovementResponse;
+import com.estilospequenos.dto.StockMovementDtos.PurchaseRequest;
 import com.estilospequenos.service.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -120,7 +125,24 @@ public class ProductController {
 
     @PatchMapping("/api/admin/products/{id}/stock")
     @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
-    public ProductResponse setStock(@PathVariable String id, @Valid @RequestBody StockPatch body) {
-        return ProductResponse.from(service.setStock(id, body.size(), body.stock()));
+    public ProductResponse setStock(@PathVariable String id, @Valid @RequestBody StockPatch body, Authentication auth) {
+        return ProductResponse.from(service.setStock(id, body.size(), body.stock(), body.note(), auth.getName()));
+    }
+
+    @PostMapping("/api/admin/products/{id}/purchase")
+    @PreAuthorize("hasAuthority('STOCK_MOVEMENTS_VIEW')")
+    public ProductResponse registerPurchase(@PathVariable String id, @Valid @RequestBody PurchaseRequest body,
+                                            Authentication auth) {
+        return ProductResponse.from(service.registerPurchase(
+                id, body.size(), body.quantity(), body.unitCost(), body.supplierId(), auth.getName()));
+    }
+
+    @GetMapping("/api/admin/stock-movements")
+    @PreAuthorize("hasAuthority('STOCK_MOVEMENTS_VIEW')")
+    public List<MovementResponse> movements(
+            @RequestParam(required = false) String productId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return service.listMovements(productId, from, to).stream().map(MovementResponse::from).toList();
     }
 }

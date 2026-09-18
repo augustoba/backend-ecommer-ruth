@@ -42,7 +42,7 @@ public final class ProductDtos {
             List<SizeStockDto> sizeStocks
     ) {}
 
-    public record StockPatch(@NotBlank String size, int stock) {}
+    public record StockPatch(@NotBlank String size, int stock, String note) {}
 
     public record ActivePatch(@NotNull Boolean active) {}
 

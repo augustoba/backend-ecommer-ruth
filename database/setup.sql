@@ -1,25 +1,4 @@
 -- =============================================================================
---  Estilos Pequeños — instalación completa de la base (MySQL 8)
--- =============================================================================
---  UN SOLO script: crea la base `estilos_pequenos`, todas las tablas y la
---  config base (admin, parametrías, escalas de talle, descuentos). Es lo que se
---  corre en un servidor nuevo al desplegar.
---
---    mysql -u root -p < database/setup.sql
---
---  (o abrirlo en MySQL Workbench y ejecutarlo con el rayo ⚡)
---
---  Admin inicial:  usuario `admin`  /  contraseña `ruth123`
---                  frase de recuperación `frase-de-recuperacion-cambiar`
---                  (todo cambiable desde /admin/cuenta)
---
---  Es la concatenación de `schema.sql` + `seed.sql`. Si editás alguno de esos,
---  regenerá este archivo:
---    cat database/schema.sql database/seed.sql > database/setup.sql
---
---  Después: correr la app con `spring.jpa.hibernate.ddl-auto=validate` (o `none`).
-
--- =============================================================================
 --  Estilos Pequeños — esquema de la base de datos (MySQL 8)
 -- =============================================================================
 --  Genera todas las tablas. Podés correrlo a mano (MySQL Workbench o CLI) para
@@ -60,6 +39,8 @@ CREATE TABLE IF NOT EXISTS site_settings (
     whatsapp_intro   VARCHAR(2000),            -- saludo del mensaje de pedido; null = texto por defecto
     whatsapp_closing VARCHAR(2000),            -- cierre del mensaje de pedido; null = texto por defecto
     store_address    VARCHAR(500),             -- dirección del local (opción "retiro")
+    help_text        MEDIUMTEXT,               -- pagina "como comprar" (texto libre)
+    faq_text         MEDIUMTEXT,               -- preguntas frecuentes (bloques separados por linea en blanco)
     payment_transfer_enabled     BIT NOT NULL DEFAULT 0,
     payment_transfer_alias       VARCHAR(200),
     payment_qr_transfer_enabled  BIT NOT NULL DEFAULT 0,
@@ -77,15 +58,48 @@ CREATE TABLE IF NOT EXISTS site_settings (
 -- ---------------------------------------------------------------------------
 --  Usuario del panel de administración (contraseña hasheada con BCrypt)
 -- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `role` (
+    id         VARCHAR(255) NOT NULL,
+    name       VARCHAR(60)  NOT NULL,
+    `system`   BIT          NOT NULL DEFAULT 0,   -- rol "Superadmin": todos los permisos, no editable
+    created_at DATETIME(6)  NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_role_name UNIQUE (name)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS role_permission (
+    role_id    VARCHAR(255) NOT NULL,
+    permission VARCHAR(40)  NOT NULL,
+    PRIMARY KEY (role_id, permission),
+    CONSTRAINT fk_role_permission_role FOREIGN KEY (role_id) REFERENCES `role` (id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS admin_user (
     id            VARCHAR(255) NOT NULL,
-    username      VARCHAR(255) NOT NULL,
+    dni           VARCHAR(20)  NOT NULL,      -- identificador de login (reemplaza al username viejo)
+    nombre        VARCHAR(255) NOT NULL,
+    apellido      VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    recovery_hash VARCHAR(255),                -- frase de recuperación (BCrypt)
     enabled       BIT          NOT NULL,
+    super_admin   BIT          NOT NULL DEFAULT 0, -- acceso a Cloudinary/mail, aparte del rol (ver AdminUser.superAdmin)
+    role_id       VARCHAR(255),                -- rol (define los permisos)
     created_at    DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
-    CONSTRAINT uk_admin_user_username UNIQUE (username)
+    CONSTRAINT uk_admin_user_dni UNIQUE (dni),
+    CONSTRAINT uk_admin_user_email UNIQUE (email),
+    CONSTRAINT fk_admin_user_role FOREIGN KEY (role_id) REFERENCES `role` (id)
+) ENGINE=InnoDB;
+
+-- Credenciales del servicio de mail (SMTP), fila única. Sólo editable por el superadmin.
+CREATE TABLE IF NOT EXISTS platform_mail_settings (
+    id           VARCHAR(255) NOT NULL,  -- siempre 'config'
+    host         VARCHAR(255) NOT NULL,
+    port         INT          NOT NULL,
+    username     VARCHAR(255) NOT NULL,
+    password     VARCHAR(255) NOT NULL,
+    from_address VARCHAR(255) NOT NULL,
+    PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
@@ -156,6 +170,7 @@ CREATE TABLE IF NOT EXISTS product (
     video_url     VARCHAR(500),                        -- link a un video de la prenda (YouTube), opcional
     active        BIT            NOT NULL,
     discontinued  BIT            NOT NULL DEFAULT 0,   -- "no reponer": sale de las alertas de stock bajo
+    deleted       BIT            NOT NULL DEFAULT 0,   -- soft-delete: archivado, sale de catalogo y listados
     created_at    DATETIME(6)    NOT NULL,
     size_scale_id VARCHAR(255),
     supplier_id   VARCHAR(255),
@@ -202,16 +217,36 @@ CREATE TABLE IF NOT EXISTS discount (
     kind             ENUM('MONTO','PARAMETRO','PAGO','ENVIO_GRATIS') NOT NULL,
     discount_percent INTEGER      NOT NULL,
     enabled          BIT          NOT NULL,
-    stackable        BIT          NOT NULL DEFAULT 0,
+    stackable        BIT          NOT NULL DEFAULT 0,   -- acumulable con otros descuentos
     label            VARCHAR(255),
-    detail           VARCHAR(300),
-    starts_at        DATE,
-    ends_at          DATE,
+    detail           VARCHAR(300),           -- letra chica configurable (ej: "solo microcentro")
+    starts_at        DATE,                   -- vigencia opcional (inclusive)
+    ends_at          DATE,                   -- vigencia opcional (inclusive)
     min_amount       DECIMAL(38,2),          -- kind = MONTO o ENVIO_GRATIS
     group_id         VARCHAR(255),           -- kind = PARAMETRO
     option_id        VARCHAR(255),           -- kind = PARAMETRO
-    payment_methods  VARCHAR(100),           -- kind = PAGO
+    payment_methods  VARCHAR(100),           -- kind = PAGO ("TRANSFER,CASH")
     PRIMARY KEY (id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+--  Cupones (codigos que el cliente escribe en el carrito)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS coupon (
+    id          VARCHAR(255)  NOT NULL,
+    code        VARCHAR(40)   NOT NULL,
+    kind        ENUM('PERCENT','AMOUNT') NOT NULL,
+    value       DECIMAL(12,2) NOT NULL,
+    min_amount  DECIMAL(12,2),
+    max_uses    INTEGER,                    -- null = ilimitado
+    used_count  INTEGER       NOT NULL DEFAULT 0,
+    expires_at  DATE,
+    enabled     BIT           NOT NULL DEFAULT 1,
+    stackable   BIT           NOT NULL DEFAULT 1,   -- combina con los descuentos automaticos
+    label       VARCHAR(200),
+    created_at  DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_coupon_code UNIQUE (code)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
@@ -226,6 +261,7 @@ CREATE TABLE IF NOT EXISTS orders (
     discount_amount  DECIMAL(12,2) NOT NULL,
     total            DECIMAL(12,2) NOT NULL,
     status           ENUM('CANCELADO','PENDIENTE','PROCESADO') NOT NULL,
+    channel          ENUM('WEB','LOCAL') NOT NULL DEFAULT 'WEB',
     delivery_method  ENUM('PICKUP','SHIPPING') NOT NULL DEFAULT 'PICKUP',
     shipping_address    VARCHAR(500),
     shipping_reference  VARCHAR(500),
@@ -233,16 +269,67 @@ CREATE TABLE IF NOT EXISTS orders (
     shipping_lng     DOUBLE,
     payment_method   ENUM('TRANSFER','QR_TRANSFER','QR_CARD','CASH','MERCADOPAGO'),
     payment_status   ENUM('PENDING','APPROVED','REJECTED'),  -- solo para payment_method=MERCADOPAGO
-    mp_preference_id VARCHAR(100),
-    mp_checkout_url  VARCHAR(500),
-    mp_payment_id    VARCHAR(100),
+    mp_preference_id VARCHAR(100),              -- id de la preferencia creada en Mercado Pago
+    mp_checkout_url  VARCHAR(500),              -- init_point devuelto al crear la preferencia
+    mp_payment_id    VARCHAR(100),              -- id del pago aprobado, una vez confirmado por webhook
     free_shipping_note VARCHAR(300),
     discount_note      VARCHAR(500),
+    coupon_code       VARCHAR(40),              -- cupon aplicado (null = ninguno)
+    coupon_discount   DECIMAL(12,2),            -- descuento en pesos del cupon (aparte del automatico)
     created_at       DATETIME(6)   NOT NULL,
     processed_at     DATETIME(6),
+    created_by_dni    VARCHAR(20),   -- quien armo el pedido (null = checkout web)
+    created_by_name   VARCHAR(200),
+    confirmed_by_dni  VARCHAR(20),   -- quien lo confirmo/cobro
+    confirmed_by_name VARCHAR(200),
     PRIMARY KEY (id),
     CONSTRAINT uk_orders_number UNIQUE (number),
     KEY ix_orders_status (status)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+--  Cambios de prenda en el local
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS exchange (
+    id             VARCHAR(255)  NOT NULL,
+    number         BIGINT        NOT NULL,   -- correlativo → code "CAM-0001"
+    customer_name  VARCHAR(255)  NOT NULL,
+    returned_total DECIMAL(12,2) NOT NULL,
+    taken_total    DECIMAL(12,2) NOT NULL,
+    difference     DECIMAL(12,2) NOT NULL,   -- taken - returned (+ cobra el local / - a favor del cliente)
+    payment_method ENUM('TRANSFER','QR_TRANSFER','QR_CARD','CASH'),
+    note           VARCHAR(500),
+    created_at     DATETIME(6)   NOT NULL,
+    processed_by_dni  VARCHAR(20),
+    processed_by_name VARCHAR(200),
+    PRIMARY KEY (id),
+    CONSTRAINT uk_exchange_number UNIQUE (number)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+--  Turnos (abrir/cerrar) de vendedores/cajeros
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS shift (
+    id         VARCHAR(255) NOT NULL,
+    user_dni   VARCHAR(20)  NOT NULL,
+    user_name  VARCHAR(200) NOT NULL,
+    opened_at  DATETIME(6)  NOT NULL,
+    closed_at  DATETIME(6),           -- null = turno abierto
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS exchange_line (
+    id           VARCHAR(255)  NOT NULL,
+    exchange_id  VARCHAR(255)  NOT NULL,
+    idx          INTEGER,
+    kind         ENUM('DEVUELTA','LLEVADA') NOT NULL,
+    product_id   VARCHAR(255)  NOT NULL,
+    product_name VARCHAR(255)  NOT NULL,
+    size_value   VARCHAR(255)  NOT NULL,
+    quantity     INTEGER       NOT NULL,
+    unit_price   DECIMAL(12,2) NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_exchange_line_exchange FOREIGN KEY (exchange_id) REFERENCES exchange (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS order_line (
@@ -254,6 +341,7 @@ CREATE TABLE IF NOT EXISTS order_line (
     size_value   VARCHAR(255)  NOT NULL,
     quantity     INTEGER       NOT NULL,
     unit_price   DECIMAL(12,2) NOT NULL,
+    cost_price   DECIMAL(12,2),            -- costo del producto congelado al confirmar el pedido (null = sin dato)
     accepted     BIT           NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT fk_order_line_order
@@ -272,9 +360,50 @@ CREATE TABLE IF NOT EXISTS hero_slide (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
+-- ---------------------------------------------------------------------------
+--  Costeo: historial de movimientos de stock
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS stock_movement (
+    id               VARCHAR(255)  NOT NULL,
+    product_id       VARCHAR(255)  NOT NULL,
+    product_name     VARCHAR(255)  NOT NULL,
+    size_value       VARCHAR(255)  NOT NULL,
+    quantity_delta   INTEGER       NOT NULL,   -- positivo = entro, negativo = salio
+    reason           VARCHAR(30)   NOT NULL,   -- VENTA/CAMBIO_DEVUELTA/CAMBIO_LLEVADA/AJUSTE_MANUAL/ENTRADA_COMPRA/ALTA_INICIAL
+    note             VARCHAR(500),
+    reference_id     VARCHAR(255),             -- orderId/exchangeId/supplierId segun el motivo
+    unit_cost        DECIMAL(12,2),            -- solo ENTRADA_COMPRA
+    created_by_dni   VARCHAR(20),
+    created_by_name  VARCHAR(200),
+    created_at       DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id),
+    KEY ix_stock_movement_product (product_id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+--  Gastos y presupuesto (Balance)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS expense (
+    id                  VARCHAR(255)  NOT NULL,
+    expense_date        DATE          NOT NULL,
+    category_option_id  VARCHAR(255),
+    amount              DECIMAL(12,2) NOT NULL,
+    description         VARCHAR(2000),
+    repeat_monthly      BIT           NOT NULL DEFAULT 0,
+    recurring_group_id  VARCHAR(255),
+    created_at          DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS expense_budget (
+    id                  VARCHAR(255)  NOT NULL,
+    category_option_id  VARCHAR(255)  NOT NULL,
+    monthly_amount      DECIMAL(12,2) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_expense_budget_category (category_option_id)
+) ENGINE=InnoDB;
+
 SET FOREIGN_KEY_CHECKS = 1;
-
-
 -- =============================================================================
 --  Estilos Pequeños — datos base (config que necesita cualquier entorno)
 -- =============================================================================
@@ -293,29 +422,27 @@ SET FOREIGN_KEY_CHECKS = 1;
 USE estilos_pequenos;
 
 -- ---------------------------------------------------------------------------
---  Datos del local (editables desde /admin/config)
+--  Datos del local (editables desde /admin/ajustes)
 -- ---------------------------------------------------------------------------
-INSERT INTO site_settings
-  (id, store_name, whatsapp_number, about_text, instagram, facebook_url, whatsapp_intro, whatsapp_closing) VALUES
+INSERT INTO site_settings (id, store_name, whatsapp_number, about_text, instagram, facebook_url) VALUES
   ('config', 'Estilos Pequeños', '5491122334455',
    'Somos Estilos Pequeños 🧸 Hace 5 años vestimos a los más chicos con ropa cómoda, de calidad y con onda. Elegimos cada prenda pensando en la comodidad de los peques y la tranquilidad de las familias. ¡Gracias por elegirnos!',
-   'estilospequenos_', 'https://www.facebook.com/share/1NZXdYgick/',
-   '¡Hola! Quiero hacer un pedido en *{tienda}* 🧸',
-   'Quedo atento/a a que me pases el alias o el link de Mercado Pago para coordinar el pago. ¡Gracias!')
+   'estilospequenos_', 'https://www.facebook.com/share/1NZXdYgick/')
 ON DUPLICATE KEY UPDATE id = id;
 
 -- ---------------------------------------------------------------------------
---  Admin inicial
---    usuario: admin
---    contraseña: ruth123
---    frase de recuperación: frase-de-recuperacion-cambiar
---  Los hash son BCrypt (cost 10). Cambiá contraseña y frase desde /admin/cuenta.
+--  Admin inicial (dueña de la tienda)
+--    DNI: 11111111 · contraseña: ruth123
+--  El hash es BCrypt (cost 10). Cambiá la contraseña desde /admin/cuenta (o
+--  recuperala por mail con "Olvidé mi contraseña", ya que el email es obligatorio).
+--  El rol se lo asigna la app en el primer arranque (DataSeeder / ensureInitialAdmin),
+--  no hace falta cargarlo acá — pero necesita haber arrancado la app al menos una
+--  vez antes para que exista el rol "Administrador".
 -- ---------------------------------------------------------------------------
-INSERT INTO admin_user (id, username, password_hash, recovery_hash, enabled, created_at) VALUES
-  ('seed-admin', 'admin',
-   '$2a$10$ZFLQwovN0/tK/ii7RXNC4eM9BIQNgqFdSysjNaSM6pK4CRMXeOL/G',
-   '$2a$10$.eOoZ23Uu4k.1DEj1NpOLekpl.PdGxt9NRMaxGN8J.DPQcIgBdbaW', 1, NOW(6))
-ON DUPLICATE KEY UPDATE username = username;
+INSERT INTO admin_user (id, dni, nombre, apellido, email, password_hash, enabled, created_at) VALUES
+  ('seed-admin', '11111111', 'Ruth', 'Basaury', 'ruth@gmail.com',
+   '$2a$10$ZFLQwovN0/tK/ii7RXNC4eM9BIQNgqFdSysjNaSM6pK4CRMXeOL/G', 1, NOW(6))
+ON DUPLICATE KEY UPDATE dni = dni;
 
 -- ---------------------------------------------------------------------------
 --  Parametrías
@@ -392,7 +519,10 @@ INSERT INTO size_scale_value (scale_id, idx, size_value) VALUES
 -- ---------------------------------------------------------------------------
 --  Descuentos por defecto
 -- ---------------------------------------------------------------------------
-INSERT INTO discount (id, kind, discount_percent, enabled, stackable, min_amount) VALUES
-  ('seed-monto-100k', 'MONTO', 20, 1, 0, 100000.00),
-  ('seed-monto-200k', 'MONTO', 25, 1, 0, 200000.00)
+INSERT INTO discount (id, kind, discount_percent, enabled, label, min_amount, group_id, option_id) VALUES
+  ('seed-monto-100k', 'MONTO', 20, 1, NULL, 100000.00, NULL, NULL),
+  ('seed-monto-200k', 'MONTO', 25, 1, NULL, 200000.00, NULL, NULL)
 ON DUPLICATE KEY UPDATE discount_percent = VALUES(discount_percent);
+
+INSERT INTO discount_config (id, combine_mode) VALUES ('config', 'MEJOR')
+ON DUPLICATE KEY UPDATE combine_mode = combine_mode;

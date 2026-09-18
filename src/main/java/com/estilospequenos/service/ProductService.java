@@ -1,5 +1,6 @@
 package com.estilospequenos.service;
 
+import com.estilospequenos.common.BadRequestException;
 import com.estilospequenos.common.ResourceNotFoundException;
 import com.estilospequenos.dto.ProductDtos.ProductRequest;
 import com.estilospequenos.dto.ProductDtos.SizeStockDto;
@@ -7,13 +8,20 @@ import com.estilospequenos.model.Product;
 import com.estilospequenos.model.ProductParam;
 import com.estilospequenos.model.OrderStatus;
 import com.estilospequenos.model.SizeStock;
+import com.estilospequenos.model.StockMovement;
+import com.estilospequenos.model.StockMovementReason;
+import com.estilospequenos.repository.AdminUserRepository;
 import com.estilospequenos.repository.OrderRepository;
 import com.estilospequenos.repository.ProductRepository;
+import com.estilospequenos.repository.StockMovementRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,10 +37,58 @@ public class ProductService {
 
     private final ProductRepository repo;
     private final OrderRepository orderRepo;
+    private final StockMovementRepository movementRepo;
+    private final AdminUserRepository adminUsers;
+    private final ZoneId zone = ZoneId.systemDefault();
 
-    public ProductService(ProductRepository repo, OrderRepository orderRepo) {
+    public ProductService(ProductRepository repo, OrderRepository orderRepo,
+                          StockMovementRepository movementRepo, AdminUserRepository adminUsers) {
         this.repo = repo;
         this.orderRepo = orderRepo;
+        this.movementRepo = movementRepo;
+        this.adminUsers = adminUsers;
+    }
+
+    /** Resuelve el nombre a mostrar de un usuario del panel a partir de su DNI (mismo patrón que OrderService). */
+    private String nameByDni(String dni) {
+        if (dni == null || dni.isBlank()) return null;
+        return adminUsers.findByDni(dni).map(u -> u.getNombre() + " " + u.getApellido()).orElse(null);
+    }
+
+    private void recordMovement(String productId, String productName, String size, int quantityDelta,
+                                StockMovementReason reason, String note, String referenceId,
+                                BigDecimal unitCost, String createdByDni) {
+        if (quantityDelta == 0) return;
+        StockMovement m = new StockMovement();
+        m.setId(UUID.randomUUID().toString());
+        m.setProductId(productId);
+        m.setProductName(productName);
+        m.setSize(size);
+        m.setQuantityDelta(quantityDelta);
+        m.setReason(reason);
+        m.setNote(note);
+        m.setReferenceId(referenceId);
+        m.setUnitCost(unitCost);
+        m.setCreatedByDni(createdByDni);
+        m.setCreatedByName(nameByDni(createdByDni));
+        movementRepo.save(m);
+    }
+
+    /** Historial de movimientos de un producto (o de todo el catálogo si `productId` es null), más nuevo primero. */
+    @Transactional(readOnly = true)
+    public List<StockMovement> listMovements(String productId, LocalDate from, LocalDate to) {
+        if (from == null && to == null) {
+            return productId != null
+                    ? movementRepo.findByProductIdOrderByCreatedAtDesc(productId)
+                    : movementRepo.findByCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+                            Instant.EPOCH, Instant.now().plus(1, ChronoUnit.DAYS));
+        }
+        Instant fromI = (from != null ? from : LocalDate.of(2000, 1, 1)).atStartOfDay(zone).toInstant();
+        Instant toI = (to != null ? to : LocalDate.now()).plusDays(1).atStartOfDay(zone).toInstant();
+        return productId != null
+                ? movementRepo.findByProductIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+                        productId, fromI, toI)
+                : movementRepo.findByCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(fromI, toI);
     }
 
     /**
@@ -164,9 +220,16 @@ public class ProductService {
         return repo.save(p);
     }
 
-    public Product setStock(String id, String size, int stock) {
+    /**
+     * Ajuste manual absoluto de stock (pisa el número). `note`/`createdByDni`
+     * opcionales — quedan en el historial de movimientos (ver
+     * {@link StockMovement}) como motivo del ajuste.
+     */
+    public Product setStock(String id, String size, int stock, String note, String createdByDni) {
         Product p = get(id);
         int clamped = Math.max(0, stock);
+        int before = p.getSizeStocks().stream()
+                .filter(s -> s.getSize().equals(size)).mapToInt(SizeStock::getStock).findFirst().orElse(0);
         boolean found = false;
         for (SizeStock s : p.getSizeStocks()) {
             if (s.getSize().equals(size)) {
@@ -175,23 +238,32 @@ public class ProductService {
             }
         }
         if (!found) p.getSizeStocks().add(new SizeStock(size, clamped));
-        return repo.save(p);
+        Product saved = repo.save(p);
+        recordMovement(id, p.getName(), size, clamped - before, StockMovementReason.AJUSTE_MANUAL,
+                note, null, null, createdByDni);
+        return saved;
     }
 
-    /** Descuenta unidades del stock de un talle puntual (al confirmar un pedido). */
-    public void decrementStock(String id, String size, int quantity) {
+    /** Descuenta unidades del stock de un talle puntual (venta, cambio que se lleva algo, etc). */
+    public void decrementStock(String id, String size, int quantity, StockMovementReason reason,
+                               String referenceId, String createdByDni) {
         repo.findById(id).ifPresent(p -> {
+            int before = p.getSizeStocks().stream()
+                    .filter(s -> s.getSize().equals(size)).mapToInt(SizeStock::getStock).findFirst().orElse(0);
             for (SizeStock s : p.getSizeStocks()) {
                 if (s.getSize().equals(size)) {
                     s.setStock(Math.max(0, s.getStock() - quantity));
                 }
             }
             repo.save(p);
+            int after = Math.max(0, before - quantity);
+            recordMovement(id, p.getName(), size, after - before, reason, null, referenceId, null, createdByDni);
         });
     }
 
-    /** Suma unidades al stock de un talle (ej: prenda devuelta en un cambio). */
-    public void incrementStock(String id, String size, int quantity) {
+    /** Suma unidades al stock de un talle (cambio que se devuelve, compra a proveedor, etc). */
+    public void incrementStock(String id, String size, int quantity, StockMovementReason reason,
+                               String referenceId, BigDecimal unitCost, String createdByDni) {
         repo.findById(id).ifPresent(p -> {
             boolean found = false;
             for (SizeStock s : p.getSizeStocks()) {
@@ -202,7 +274,41 @@ public class ProductService {
             }
             if (!found && quantity > 0) p.getSizeStocks().add(new SizeStock(size, quantity));
             repo.save(p);
+            if (quantity > 0) {
+                recordMovement(id, p.getName(), size, quantity, reason, null, referenceId, unitCost, createdByDni);
+            }
         });
+    }
+
+    /**
+     * Registra una compra a proveedor: suma stock y recalcula
+     * {@code Product.costPrice} como el promedio ponderado entre el stock que
+     * ya había (a su costo actual) y lo que entra (a su costo de compra) —
+     * costeo por promedio ponderado, no FIFO por lote. Si el producto no
+     * tenía costo cargado, el costo pasa a ser directo el de esta compra.
+     */
+    public Product registerPurchase(String id, String size, int quantity, BigDecimal unitCost,
+                                    String supplierId, String createdByDni) {
+        if (quantity <= 0) throw new BadRequestException("La cantidad tiene que ser mayor a 0.");
+        if (unitCost == null || unitCost.signum() <= 0) {
+            throw new BadRequestException("El costo unitario tiene que ser mayor a 0.");
+        }
+        Product p = get(id);
+        int stockActual = p.getSizeStocks().stream().mapToInt(SizeStock::getStock).sum();
+        BigDecimal costoActual = p.getCostPrice();
+        BigDecimal nuevoCosto;
+        if (costoActual == null || stockActual <= 0) {
+            nuevoCosto = unitCost;
+        } else {
+            BigDecimal valorActual = costoActual.multiply(BigDecimal.valueOf(stockActual));
+            BigDecimal valorCompra = unitCost.multiply(BigDecimal.valueOf(quantity));
+            nuevoCosto = valorActual.add(valorCompra)
+                    .divide(BigDecimal.valueOf(stockActual + quantity), 2, RoundingMode.HALF_UP);
+        }
+        p.setCostPrice(nuevoCosto);
+        repo.save(p);
+        incrementStock(id, size, quantity, StockMovementReason.ENTRADA_COMPRA, supplierId, unitCost, createdByDni);
+        return get(id);
     }
 
     /** Stock actual de un talle puntual (0 si el producto no viene en ese talle). */

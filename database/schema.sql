@@ -341,6 +341,7 @@ CREATE TABLE IF NOT EXISTS order_line (
     size_value   VARCHAR(255)  NOT NULL,
     quantity     INTEGER       NOT NULL,
     unit_price   DECIMAL(12,2) NOT NULL,
+    cost_price   DECIMAL(12,2),            -- costo del producto congelado al confirmar el pedido (null = sin dato)
     accepted     BIT           NOT NULL,
     PRIMARY KEY (id),
     CONSTRAINT fk_order_line_order
@@ -357,6 +358,49 @@ CREATE TABLE IF NOT EXISTS hero_slide (
     alt       VARCHAR(255) NOT NULL,
     position  INTEGER      NOT NULL,
     PRIMARY KEY (id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+--  Costeo: historial de movimientos de stock
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS stock_movement (
+    id               VARCHAR(255)  NOT NULL,
+    product_id       VARCHAR(255)  NOT NULL,
+    product_name     VARCHAR(255)  NOT NULL,
+    size_value       VARCHAR(255)  NOT NULL,
+    quantity_delta   INTEGER       NOT NULL,   -- positivo = entro, negativo = salio
+    reason           VARCHAR(30)   NOT NULL,   -- VENTA/CAMBIO_DEVUELTA/CAMBIO_LLEVADA/AJUSTE_MANUAL/ENTRADA_COMPRA/ALTA_INICIAL
+    note             VARCHAR(500),
+    reference_id     VARCHAR(255),             -- orderId/exchangeId/supplierId segun el motivo
+    unit_cost        DECIMAL(12,2),            -- solo ENTRADA_COMPRA
+    created_by_dni   VARCHAR(20),
+    created_by_name  VARCHAR(200),
+    created_at       DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id),
+    KEY ix_stock_movement_product (product_id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+--  Gastos y presupuesto (Balance)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS expense (
+    id                  VARCHAR(255)  NOT NULL,
+    expense_date        DATE          NOT NULL,
+    category_option_id  VARCHAR(255),
+    amount              DECIMAL(12,2) NOT NULL,
+    description         VARCHAR(2000),
+    repeat_monthly      BIT           NOT NULL DEFAULT 0,
+    recurring_group_id  VARCHAR(255),
+    created_at          DATETIME(6)   NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS expense_budget (
+    id                  VARCHAR(255)  NOT NULL,
+    category_option_id  VARCHAR(255)  NOT NULL,
+    monthly_amount      DECIMAL(12,2) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_expense_budget_category (category_option_id)
 ) ENGINE=InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -107,6 +107,22 @@ public class RoleService {
         }
     }
 
+    /**
+     * Backfill de permisos nuevos a un rol ya existente (ej. tras agregar un
+     * {@link Permission} a una versión ya instalada) — no pisa lo que el
+     * dueño haya destildado a mano de otros permisos, sólo agrega los que
+     * falten. No hace nada si ya los tiene o si el rol no existe.
+     */
+    public void grantPermissionsIfMissing(String roleName, Permission... perms) {
+        repo.findByNameIgnoreCase(roleName).ifPresent(r -> {
+            boolean changed = false;
+            for (Permission p : perms) {
+                if (r.getPermissions().add(p)) changed = true;
+            }
+            if (changed) repo.save(r);
+        });
+    }
+
     private java.util.Set<Permission> cleanPermissions(RoleRequest req) {
         return req.permissions() == null || req.permissions().isEmpty()
                 ? EnumSet.noneOf(Permission.class)

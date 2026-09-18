@@ -423,7 +423,13 @@ public class OrderService {
 
         for (OrderLine l : order.getLines()) {
             if (l.isAccepted()) {
-                productService.decrementStock(l.getProductId(), l.getSize(), l.getQuantity());
+                productService.decrementStock(l.getProductId(), l.getSize(), l.getQuantity(),
+                        com.estilospequenos.model.StockMovementReason.VENTA, order.getId(), confirmedByDni);
+                // Congela el costo ACÁ (no en create()): es el momento real en que
+                // el producto sale de stock. Así la ganancia de esta línea no
+                // cambia después si se actualiza el costo del producto (ver
+                // OrderLine.costPrice).
+                productRepo.findById(l.getProductId()).ifPresent(p -> l.setCostPrice(p.getCostPrice()));
             }
         }
         order.setStatus(OrderStatus.PROCESADO);
