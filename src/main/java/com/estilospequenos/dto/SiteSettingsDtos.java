@@ -1,6 +1,7 @@
 package com.estilospequenos.dto;
 
 import com.estilospequenos.model.SiteSettings;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -38,6 +39,18 @@ public final class SiteSettingsDtos {
             @Size(max = 1000) String paymentCardLink,
             Boolean paymentCashEnabled
     ) {}
+
+    /** Alerta diaria por mail de talles en stock bajo. Editable por PRODUCTS_MANAGE. */
+    public record StockAlertSettingsRequest(
+            Boolean lowStockAlertEnabled,
+            @Email @Size(max = 300) String lowStockAlertEmail
+    ) {}
+
+    public record StockAlertSettingsResponse(boolean lowStockAlertEnabled, String lowStockAlertEmail) {
+        public static StockAlertSettingsResponse from(SiteSettings s) {
+            return new StockAlertSettingsResponse(s.isLowStockAlertEnabled(), s.getLowStockAlertEmail());
+        }
+    }
 
     public record SettingsResponse(
             String storeName,

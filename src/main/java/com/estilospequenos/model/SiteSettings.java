@@ -111,6 +111,32 @@ public class SiteSettings {
     @Column(length = 300)
     private String mpPublicKey;
 
+    // --- Alerta de stock bajo por mail ---
+
+    /** El dueño de la tienda activó el mail diario de "talles por reponer". */
+    @Column(nullable = false)
+    private boolean lowStockAlertEnabled = false;
+
+    /** A qué mail se manda la alerta. null/vacío = no manda nada aunque esté activada. */
+    @Column(length = 300)
+    private String lowStockAlertEmail;
+
+    public boolean isLowStockAlertEnabled() {
+        return lowStockAlertEnabled;
+    }
+
+    public void setLowStockAlertEnabled(boolean lowStockAlertEnabled) {
+        this.lowStockAlertEnabled = lowStockAlertEnabled;
+    }
+
+    public String getLowStockAlertEmail() {
+        return lowStockAlertEmail;
+    }
+
+    public void setLowStockAlertEmail(String lowStockAlertEmail) {
+        this.lowStockAlertEmail = lowStockAlertEmail;
+    }
+
     // --- Cloudinary (subida de imágenes desde el panel) ---
     // Editable solo por superadmin (ver AdminUser.superAdmin); se leen desde el
     // endpoint público de settings porque cualquier sesión de admin las necesita

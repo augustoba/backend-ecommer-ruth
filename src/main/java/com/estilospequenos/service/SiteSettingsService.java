@@ -2,6 +2,7 @@ package com.estilospequenos.service;
 
 import com.estilospequenos.dto.SiteSettingsDtos.PaymentsSettingsRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.PlatformSettingsRequest;
+import com.estilospequenos.dto.SiteSettingsDtos.StockAlertSettingsRequest;
 import com.estilospequenos.model.SiteSettings;
 import com.estilospequenos.repository.SiteSettingsRepository;
 import org.springframework.stereotype.Service;
@@ -53,6 +54,14 @@ public class SiteSettingsService {
         s.setPaymentQrCardImage(blankToNull(req.paymentQrCardImage()));
         s.setPaymentCardLink(blankToNull(req.paymentCardLink()));
         s.setPaymentCashEnabled(Boolean.TRUE.equals(req.paymentCashEnabled()));
+        return repo.save(s);
+    }
+
+    /** Lo puede llamar el controller gateado por PRODUCTS_MANAGE. */
+    public SiteSettings updateStockAlert(StockAlertSettingsRequest req) {
+        SiteSettings s = get();
+        s.setLowStockAlertEnabled(Boolean.TRUE.equals(req.lowStockAlertEnabled()));
+        s.setLowStockAlertEmail(blankToNull(req.lowStockAlertEmail()));
         return repo.save(s);
     }
 

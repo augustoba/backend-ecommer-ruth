@@ -9,6 +9,8 @@ import com.estilospequenos.dto.SiteSettingsDtos.MercadoPagoConfigResponse;
 import com.estilospequenos.dto.SiteSettingsDtos.PaymentsSettingsRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.PlatformSettingsRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.SettingsResponse;
+import com.estilospequenos.dto.SiteSettingsDtos.StockAlertSettingsRequest;
+import com.estilospequenos.dto.SiteSettingsDtos.StockAlertSettingsResponse;
 import com.estilospequenos.service.SiteSettingsService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -60,6 +62,19 @@ public class SiteSettingsController {
     @PreAuthorize("hasAuthority('PAYMENTS_MANAGE')")
     public MercadoPagoConfigResponse updateMercadoPagoConfig(@Valid @RequestBody MercadoPagoConfigRequest req) {
         return MercadoPagoConfigResponse.from(service.updateMercadoPago(req));
+    }
+
+    /** Alerta diaria por mail de talles en stock bajo. La edita el admin normal de la tienda. */
+    @GetMapping("/api/admin/settings/stock-alert")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
+    public StockAlertSettingsResponse stockAlertConfig() {
+        return StockAlertSettingsResponse.from(service.get());
+    }
+
+    @PutMapping("/api/admin/settings/stock-alert")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
+    public StockAlertSettingsResponse updateStockAlertConfig(@Valid @RequestBody StockAlertSettingsRequest req) {
+        return StockAlertSettingsResponse.from(service.updateStockAlert(req));
     }
 
     /**
