@@ -245,7 +245,14 @@ public class OrderService {
      * `paymentMethod = MERCADOPAGO` es sólo una etiqueta ("me pagaron por
      * Mercado Pago en el momento") — no tiene que generar ningún link de
      * pago ni redirigir a nadie.
+     * <p>{@code noRollbackFor}: si falla la preferencia de MP (token
+     * inválido, red caída), el pedido YA creado no se pierde — la clase es
+     * {@code @Transactional} y sin esto, el rollback automático por
+     * {@link BadRequestException} se llevaba puesto el insert del pedido
+     * también (probado a mano: quedaba 403 de MP y el pedido no aparecía en
+     * el panel).</p>
      */
+    @Transactional(noRollbackFor = BadRequestException.class)
     public Order createWebCheckout(CreateOrderRequest req) {
         // Si la tienda activó Mercado Pago, pasa a ser el ÚNICO medio de pago
         // online (no se puede elegir transferencia/QR a la vez) — ver
