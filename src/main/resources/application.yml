@@ -62,6 +62,13 @@ app:
     username: ${BREVO_SMTP_USER:changeme@smtp-brevo.com}
     password: ${BREVO_SMTP_KEY:changeme}
     from-address: ${MARKETING_FROM_EMAIL:no-responder@estilospequenos.com}
+  # URLs públicas de este deploy (Mercado Pago): BACKEND_PUBLIC_URL tiene que
+  # ser alcanzable desde internet para que Mercado Pago pueda avisar al
+  # webhook — en desarrollo local hace falta un túnel (ngrok o similar),
+  # "localhost" no sirve para probar un pago real.
+  urls:
+    backend: ${BACKEND_PUBLIC_URL:http://localhost:8080}
+    frontend: ${FRONTEND_URL:http://localhost:4200}
 
 logging:
   level:

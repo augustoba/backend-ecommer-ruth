@@ -101,6 +101,21 @@ public class SiteSettingsService {
         return repo.save(s);
     }
 
+    /**
+     * Sólo lo puede llamar el controller gateado por la authority
+     * PAYMENTS_MANAGE. {@code accessToken} en blanco = no tocar el que ya
+     * está guardado.
+     */
+    public SiteSettings updateMercadoPago(com.estilospequenos.dto.SiteSettingsDtos.MercadoPagoConfigRequest req) {
+        SiteSettings s = get();
+        s.setMpEnabled(Boolean.TRUE.equals(req.mpEnabled()));
+        if (req.accessToken() != null && !req.accessToken().isBlank()) {
+            s.setMpAccessToken(req.accessToken().trim());
+        }
+        s.setMpPublicKey(blankToNull(req.publicKey()));
+        return repo.save(s);
+    }
+
     private static String blankToNull(String v) {
         return (v == null || v.isBlank()) ? null : v.trim();
     }

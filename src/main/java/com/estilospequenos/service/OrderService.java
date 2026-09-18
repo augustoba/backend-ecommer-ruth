@@ -6,10 +6,13 @@ import com.estilospequenos.dto.DiscountDtos.CartDiscountResult;
 import com.estilospequenos.dto.OrderDtos.CartItem;
 import com.estilospequenos.dto.OrderDtos.CreateOrderRequest;
 import com.estilospequenos.dto.OrderDtos.LineAcceptance;
+import com.estilospequenos.config.AppProperties;
 import com.estilospequenos.model.DeliveryMethod;
 import com.estilospequenos.model.Order;
 import com.estilospequenos.model.OrderLine;
 import com.estilospequenos.model.OrderStatus;
+import com.estilospequenos.model.PaymentMethod;
+import com.estilospequenos.model.PaymentStatus;
 import com.estilospequenos.model.Product;
 import com.estilospequenos.model.ProductParam;
 import com.estilospequenos.repository.AdminUserRepository;
@@ -17,6 +20,8 @@ import com.estilospequenos.repository.OrderRepository;
 import com.estilospequenos.repository.ProductRepository;
 import com.estilospequenos.service.DiscountService.CartLineInput;
 import com.estilospequenos.service.DiscountService;
+import com.estilospequenos.service.MercadoPagoService.PreferenceItem;
+import com.estilospequenos.service.MercadoPagoService.PreferenceResult;
 import com.estilospequenos.service.ProductService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,16 +46,26 @@ public class OrderService {
     private final DiscountService discountService;
     private final CouponService couponService;
     private final AdminUserRepository adminUsers;
+    private final SiteSettingsService siteSettingsService;
+    private final MercadoPagoService mercadoPagoService;
+    private final AppProperties appProperties;
+    private final OrderMailService orderMailService;
 
     public OrderService(OrderRepository repo, ProductRepository productRepo,
                         ProductService productService, DiscountService discountService,
-                        CouponService couponService, AdminUserRepository adminUsers) {
+                        CouponService couponService, AdminUserRepository adminUsers,
+                        SiteSettingsService siteSettingsService, MercadoPagoService mercadoPagoService,
+                        AppProperties appProperties, OrderMailService orderMailService) {
         this.repo = repo;
         this.productRepo = productRepo;
         this.productService = productService;
         this.discountService = discountService;
         this.couponService = couponService;
         this.adminUsers = adminUsers;
+        this.siteSettingsService = siteSettingsService;
+        this.mercadoPagoService = mercadoPagoService;
+        this.appProperties = appProperties;
+        this.orderMailService = orderMailService;
     }
 
     /** Resuelve el nombre a mostrar de un usuario del panel a partir de su DNI. */
@@ -223,6 +238,65 @@ public class OrderService {
     }
 
     /**
+     * Crea el pedido desde el checkout público (carrito online) — a
+     * diferencia de {@link #create}, si el medio de pago es Mercado Pago
+     * arranca el checkout online de verdad (crea la preferencia). NO la usa
+     * {@link #createPos}: una venta armada en el local con
+     * `paymentMethod = MERCADOPAGO` es sólo una etiqueta ("me pagaron por
+     * Mercado Pago en el momento") — no tiene que generar ningún link de
+     * pago ni redirigir a nadie.
+     */
+    public Order createWebCheckout(CreateOrderRequest req) {
+        // Un pedido pagado por Mercado Pago no deja ningún registro fuera del
+        // sitio (a diferencia de los coordinados por WhatsApp, que le quedan
+        // al cliente en su propio chat) — sin mail no hay forma de mandarle
+        // el comprobante ni que pueda reclamar algo después.
+        if (req.paymentMethod() == PaymentMethod.MERCADOPAGO
+                && (req.customerEmail() == null || req.customerEmail().isBlank())) {
+            throw new BadRequestException("Para pagar con Mercado Pago necesitamos tu mail (te mandamos el comprobante ahí).");
+        }
+        Order order = create(req);
+        if (order.getPaymentMethod() == PaymentMethod.MERCADOPAGO) {
+            startMercadoPagoCheckout(order);
+        }
+        return order;
+    }
+
+    /**
+     * Crea la preferencia de pago en Mercado Pago para este pedido y guarda
+     * el link de checkout — se llama recién con el pedido ya guardado (hace
+     * falta el id para `external_reference`/`back_urls`). Si algo falla acá
+     * (token inválido, red caída), no se pierde el pedido: queda creado
+     * igual, `paymentStatus = PENDING` sin `mpCheckoutUrl`, y el error sube
+     * al caller para que el checkout le avise al cliente que reintente.
+     */
+    private void startMercadoPagoCheckout(Order order) {
+        var settings = siteSettingsService.get();
+        String accessToken = settings.getMpAccessToken();
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new BadRequestException("Esta tienda todavía no configuró Mercado Pago.");
+        }
+
+        List<PreferenceItem> items = order.getLines().stream()
+                .map(l -> new PreferenceItem(l.getProductName(), l.getQuantity(), l.getUnitPrice()))
+                .toList();
+
+        String backend = appProperties.getUrls().getBackend();
+        String frontend = appProperties.getUrls().getFrontend();
+        String notificationUrl = backend + "/api/webhooks/mercadopago";
+        String returnBase = frontend + "/mis-pedidos?code=" + order.getCode();
+
+        PreferenceResult pref = mercadoPagoService.createPreference(
+                accessToken, order.getId(), items, notificationUrl,
+                returnBase + "&pago=aprobado", returnBase + "&pago=pendiente", returnBase + "&pago=rechazado");
+
+        order.setPaymentStatus(PaymentStatus.PENDING);
+        order.setMpPreferenceId(pref.preferenceId());
+        order.setMpCheckoutUrl(pref.initPoint());
+        repo.save(order);
+    }
+
+    /**
      * Venta armada en el local (POS): crea el pedido como canal LOCAL, queda
      * PENDIENTE ("armado, pendiente de cobro"). Registra quién lo armó.
      * El cobro es un paso aparte ({@link #confirm}) — puede hacerlo la misma
@@ -259,6 +333,47 @@ public class OrderService {
      */
     public Order confirm(String orderId, String confirmedByDni) {
         Order order = get(orderId);
+        return doConfirm(order, confirmedByDni, nameByDni(confirmedByDni));
+    }
+
+    /**
+     * Confirma automáticamente un pedido cuyo pago online fue aprobado (ver
+     * MercadoPagoWebhookController) — mismo descuento de stock que
+     * {@link #confirm}, sin DNI de un humano (queda registrado como
+     * "Mercado Pago" en vez de un nombre de usuario del panel).
+     */
+    public Order confirmFromPayment(String orderId, String mpPaymentId) {
+        Order order = get(orderId);
+        order.setMpPaymentId(mpPaymentId);
+        order.setPaymentStatus(PaymentStatus.APPROVED);
+        Order confirmed = doConfirm(order, null, "Mercado Pago (pago validado)");
+        orderMailService.sendOrderConfirmation(confirmed);
+        return confirmed;
+    }
+
+    /**
+     * El pago online fue rechazado/cancelado — el pedido nunca llegó a
+     * tocar stock (recién se descuenta al confirmar), así que cancelarlo es
+     * seguro. No hace nada si ya estaba en otro estado (ej. el cliente pagó
+     * en un segundo intento y ya se confirmó antes de que llegue esta
+     * notificación vieja).
+     */
+    public void markPaymentRejected(String orderId) {
+        Order order = get(orderId);
+        order.setPaymentStatus(PaymentStatus.REJECTED);
+        if (order.getStatus() == OrderStatus.PENDIENTE) {
+            order.setStatus(OrderStatus.CANCELADO);
+            order.setProcessedAt(Instant.now());
+        }
+        repo.save(order);
+    }
+
+    /**
+     * Confirma: descuenta stock de las líneas aceptadas y marca PROCESADO.
+     * <b>Estricto</b>: si alguna línea aceptada no tiene stock suficiente, no
+     * confirma nada y devuelve 400 con el detalle de lo que falta.
+     */
+    private Order doConfirm(Order order, String confirmedByDni, String confirmedByName) {
         if (order.getStatus() != OrderStatus.PENDIENTE) {
             throw new BadRequestException("El pedido ya fue procesado o cancelado.");
         }
@@ -291,7 +406,7 @@ public class OrderService {
         order.setStatus(OrderStatus.PROCESADO);
         order.setProcessedAt(Instant.now());
         order.setConfirmedByDni(confirmedByDni);
-        order.setConfirmedByName(nameByDni(confirmedByDni));
+        order.setConfirmedByName(confirmedByName);
         return repo.save(order);
     }
 

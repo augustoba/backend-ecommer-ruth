@@ -28,10 +28,10 @@ public class OrderController {
         this.service = service;
     }
 
-    /** Público: crea el pedido desde el carrito. */
+    /** Público: crea el pedido desde el carrito (si el medio es Mercado Pago, arranca el checkout online). */
     @PostMapping("/api/orders")
     public ResponseEntity<OrderResponse> create(@Valid @RequestBody CreateOrderRequest req) {
-        return ResponseEntity.status(201).body(OrderResponse.from(service.create(req)));
+        return ResponseEntity.status(201).body(OrderResponse.from(service.createWebCheckout(req)));
     }
 
     /** Público: consulta el estado de un pedido con el código + el nombre del cliente. */

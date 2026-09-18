@@ -5,6 +5,7 @@ import com.estilospequenos.model.Order;
 import com.estilospequenos.model.OrderLine;
 import com.estilospequenos.model.OrderStatus;
 import com.estilospequenos.model.PaymentMethod;
+import com.estilospequenos.model.PaymentStatus;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -66,6 +67,9 @@ public final class OrderDtos {
             Instant createdAt, Instant processedAt,
             DeliveryMethod deliveryMethod, BigDecimal subtotal, int discountPercent,
             BigDecimal discountAmount, BigDecimal total,
+            PaymentMethod paymentMethod, PaymentStatus paymentStatus,
+            /** Sólo si el pago todavía está PENDING — para poder reintentar. */
+            String mpCheckoutUrl,
             List<PublicOrderLine> items
     ) {
         public record PublicOrderLine(String productName, String size, int quantity, BigDecimal unitPrice) {}
@@ -74,11 +78,15 @@ public final class OrderDtos {
             List<PublicOrderLine> items = o.getLines().stream()
                     .map(l -> new PublicOrderLine(l.getProductName(), l.getSize(), l.getQuantity(), l.getUnitPrice()))
                     .toList();
+            boolean canRetry = o.getPaymentStatus() == PaymentStatus.PENDING;
             return new PublicOrderResponse(
                     o.getCode(), o.getCustomerName(), o.getStatus(),
                     o.getCreatedAt(), o.getProcessedAt(),
                     o.getDeliveryMethod(), o.getSubtotal(), o.getDiscountPercent(),
-                    o.getDiscountAmount(), o.getTotal(), items);
+                    o.getDiscountAmount(), o.getTotal(),
+                    o.getPaymentMethod(), o.getPaymentStatus(),
+                    canRetry ? o.getMpCheckoutUrl() : null,
+                    items);
         }
     }
 
@@ -92,6 +100,10 @@ public final class OrderDtos {
             String freeShippingNote, String discountNote,
             String couponCode, BigDecimal couponDiscount,
             String createdByName, String confirmedByName,
+            /** Sólo `paymentMethod = MERCADOPAGO`. */
+            PaymentStatus paymentStatus,
+            /** Link al checkout de Mercado Pago — el frontend redirige acá apenas se crea el pedido. */
+            String mpCheckoutUrl,
             List<OrderLineResponse> lines
     ) {
         public static OrderResponse from(Order o) {
@@ -104,6 +116,7 @@ public final class OrderDtos {
                     o.getFreeShippingNote(), o.getDiscountNote(),
                     o.getCouponCode(), o.getCouponDiscount(),
                     o.getCreatedByName(), o.getConfirmedByName(),
+                    o.getPaymentStatus(), o.getMpCheckoutUrl(),
                     o.getLines().stream().map(OrderLineResponse::from).toList());
         }
     }

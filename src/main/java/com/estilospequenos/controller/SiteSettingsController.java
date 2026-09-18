@@ -4,6 +4,8 @@ import com.estilospequenos.dto.SiteSettingsDtos.CloudinaryConfigRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.CloudinaryConfigResponse;
 import com.estilospequenos.dto.SiteSettingsDtos.MailConfigRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.MailConfigResponse;
+import com.estilospequenos.dto.SiteSettingsDtos.MercadoPagoConfigRequest;
+import com.estilospequenos.dto.SiteSettingsDtos.MercadoPagoConfigResponse;
 import com.estilospequenos.dto.SiteSettingsDtos.PaymentsSettingsRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.PlatformSettingsRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.SettingsResponse;
@@ -45,6 +47,19 @@ public class SiteSettingsController {
     @PreAuthorize("hasAuthority('PAYMENTS_MANAGE')")
     public SettingsResponse updatePayments(@Valid @RequestBody PaymentsSettingsRequest req) {
         return SettingsResponse.from(service.updatePayments(req));
+    }
+
+    /** Credenciales de Mercado Pago: es la cuenta del propio dueño de la tienda, mismo nivel que el resto de medios de pago. */
+    @GetMapping("/api/admin/settings/mercadopago")
+    @PreAuthorize("hasAuthority('PAYMENTS_MANAGE')")
+    public MercadoPagoConfigResponse mercadoPagoConfig() {
+        return MercadoPagoConfigResponse.from(service.get());
+    }
+
+    @PutMapping("/api/admin/settings/mercadopago")
+    @PreAuthorize("hasAuthority('PAYMENTS_MANAGE')")
+    public MercadoPagoConfigResponse updateMercadoPagoConfig(@Valid @RequestBody MercadoPagoConfigRequest req) {
+        return MercadoPagoConfigResponse.from(service.updateMercadoPago(req));
     }
 
     /**

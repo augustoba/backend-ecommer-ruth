@@ -707,3 +707,51 @@ hace falta el mismo paso.
       (faltaba). Los campos `cloudinary*`/`smtp*` de `site_settings` siguen
       sin reflejarse en `schema.sql` (existían así desde antes del merge, se
       crean solos con `ddl-auto=update`).
+
+27. **Checkout online con Mercado Pago (2026-09-17):** el carrito ahora puede
+    pagar de verdad con Mercado Pago (Checkout Pro), sin nada de multi-tenant
+    ni gating por plan — este proyecto volvió a ser el ecommerce de una sola
+    tienda antes de que arrancara el desvío hacia el SaaS (ver el tag
+    `saas-work-snapshot` si hace falta recuperar algo de esa rama, que ahora
+    vive aparte en otro repo).
+    - `PaymentMethod` suma `MERCADOPAGO`. `Order` suma `paymentStatus`
+      (`PaymentStatus`: PENDING/APPROVED/REJECTED — sólo tiene sentido para
+      `MERCADOPAGO`, el resto de los medios de pago sigue sin ningún estado de
+      pago online), `mpPreferenceId`, `mpCheckoutUrl`, `mpPaymentId`.
+    - `MercadoPagoService` (nuevo, en `service/`): cliente de la API de MP —
+      crea la preferencia de Checkout Pro y consulta un pago por id.
+    - `OrderService.createWebCheckout` reemplaza a `create` como entrada del
+      checkout público (`OrderController.create` la usa): si el medio es
+      `MERCADOPAGO`, crea la preferencia (`startMercadoPagoCheckout`) y guarda
+      `mpCheckoutUrl`. `confirm`/`confirmFromPayment` ahora comparten la lógica
+      de descuento de stock vía un `doConfirm` privado — `confirmFromPayment`
+      la dispara el webhook cuando MP aprueba el pago (sin DNI de un humano) y
+      manda el mail de confirmación (`OrderMailService`, nuevo, mismo patrón
+      que `AccountMailService`: usa el SMTP de `PlatformMailSettingsService`).
+      `markPaymentRejected` cancela el pedido si MP lo rechaza — nunca se tocó
+      stock hasta confirmar, así que cancelar es siempre seguro.
+    - `MercadoPagoWebhookController` (nuevo, público, sin JWT): recibe la
+      notificación de MP, pero **nunca confía en su body** — vuelve a
+      consultar el pago real a la API con el Access Token guardado, y sólo
+      ahí decide confirmar o rechazar. Siempre responde 200 (MP reintenta
+      agresivo si no; los casos que fallan quedan sólo logueados).
+    - Credenciales en `SiteSettings`: `mpEnabled`, `mpAccessToken` (secreto,
+      nunca se devuelve en ninguna respuesta — mismo criterio que
+      `smtpPassword`), `mpPublicKey`. Nuevo endpoint
+      `GET/PUT /api/admin/settings/mercadopago`, gateado por `PAYMENTS_MANAGE`
+      (es la cuenta del propio dueño de la tienda, no algo de superadmin).
+      `SettingsResponse` suma `mercadoPagoAvailable` (true sólo si está
+      habilitado y ya tiene Access Token cargado).
+    - `AppProperties`/`application.yml` suman `app.urls.backend`/`frontend`
+      (`BACKEND_PUBLIC_URL`/`FRONTEND_URL`) — hacen falta para armar
+      `notification_url`/`back_urls` de la preferencia de MP.
+    - `SecurityConfig`: `POST /api/webhooks/mercadopago` público (MP no manda
+      ninguna sesión nuestra).
+    - `database/schema.sql` y `database/setup.sql` actualizados con las
+      columnas nuevas de `orders` y `site_settings`.
+    - **Falta probar con token real:** todo esto compiló pero no se probó
+      contra la API real de Mercado Pago (hace falta un Access Token de
+      prueba/producción cargado desde el panel, y un túnel tipo ngrok en
+      local para que el webhook sea alcanzable). Pendiente además: portar el
+      lado del frontend (pantalla de "Medios de pago" para cargar el Access
+      Token, y el checkout redirigiendo a `mpCheckoutUrl`).

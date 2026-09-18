@@ -68,6 +68,9 @@ CREATE TABLE IF NOT EXISTS site_settings (
     payment_qr_card_image        MEDIUMTEXT,
     payment_card_link            VARCHAR(1000),
     payment_cash_enabled         BIT NOT NULL DEFAULT 0,
+    mp_enabled                   BIT NOT NULL DEFAULT 0,   -- Mercado Pago activado por el dueño
+    mp_access_token              VARCHAR(300),             -- secreto: nunca se devuelve en ninguna respuesta
+    mp_public_key                VARCHAR(300),
     PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
@@ -228,7 +231,11 @@ CREATE TABLE IF NOT EXISTS orders (
     shipping_reference  VARCHAR(500),
     shipping_lat     DOUBLE,
     shipping_lng     DOUBLE,
-    payment_method   ENUM('TRANSFER','QR_TRANSFER','QR_CARD','CASH'),
+    payment_method   ENUM('TRANSFER','QR_TRANSFER','QR_CARD','CASH','MERCADOPAGO'),
+    payment_status   ENUM('PENDING','APPROVED','REJECTED'),  -- solo para payment_method=MERCADOPAGO
+    mp_preference_id VARCHAR(100),
+    mp_checkout_url  VARCHAR(500),
+    mp_payment_id    VARCHAR(100),
     free_shipping_note VARCHAR(300),
     discount_note      VARCHAR(500),
     created_at       DATETIME(6)   NOT NULL,

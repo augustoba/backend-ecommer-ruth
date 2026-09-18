@@ -15,6 +15,7 @@ public class AppProperties {
     private Seed seed = new Seed();
     private LoginThrottle loginThrottle = new LoginThrottle();
     private Mail mail = new Mail();
+    private Urls urls = new Urls();
 
     public Jwt getJwt() {
         return jwt;
@@ -70,6 +71,14 @@ public class AppProperties {
 
     public void setMail(Mail mail) {
         this.mail = mail;
+    }
+
+    public Urls getUrls() {
+        return urls;
+    }
+
+    public void setUrls(Urls urls) {
+        this.urls = urls;
     }
 
     public static class Jwt {
@@ -320,6 +329,35 @@ public class AppProperties {
 
         public void setFromAddress(String fromAddress) {
             this.fromAddress = fromAddress;
+        }
+    }
+
+    /**
+     * URLs públicas de este deploy — hacen falta para Mercado Pago: el
+     * webhook necesita saber a qué URL de este backend Mercado Pago tiene
+     * que avisarle (`backend`, tiene que ser alcanzable desde internet — en
+     * desarrollo local hace falta un túnel tipo ngrok, `localhost` no
+     * sirve), y a qué página del frontend volver después de pagar
+     * (`frontend`).
+     */
+    public static class Urls {
+        private String backend = "http://localhost:8080";
+        private String frontend = "http://localhost:4200";
+
+        public String getBackend() {
+            return backend;
+        }
+
+        public void setBackend(String backend) {
+            this.backend = backend;
+        }
+
+        public String getFrontend() {
+            return frontend;
+        }
+
+        public void setFrontend(String frontend) {
+            this.frontend = frontend;
         }
     }
 }

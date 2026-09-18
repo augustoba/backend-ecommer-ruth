@@ -55,6 +55,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/orders").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/orders/lookup").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/webhooks/mercadopago").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

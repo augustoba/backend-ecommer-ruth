@@ -65,9 +65,18 @@ public final class SiteSettingsDtos {
              * editan aparte, en `/api/admin/settings/cloudinary` (sólo superadmin).
              */
             String cloudinaryCloudName,
-            String cloudinaryUploadPreset
+            String cloudinaryUploadPreset,
+            /**
+             * true sólo si el dueño activó el checkout Y ya cargó su Access
+             * Token — recién ahí tiene sentido ofrecer "Pagar con Mercado
+             * Pago" en el carrito. El Access Token en sí NUNCA viaja acá
+             * (ver MercadoPagoConfigResponse, mismo criterio que SMTP).
+             */
+            boolean mercadoPagoAvailable
     ) {
         public static SettingsResponse from(SiteSettings s) {
+            boolean mercadoPagoAvailable = s.isMpEnabled()
+                    && s.getMpAccessToken() != null && !s.getMpAccessToken().isBlank();
             return new SettingsResponse(
                     s.getStoreName(), s.getWhatsappNumber(), s.getAboutText(),
                     s.getInstagram(), s.getFacebookUrl(), s.getLogoUrl(),
@@ -77,7 +86,30 @@ public final class SiteSettingsDtos {
                     s.isPaymentQrTransferEnabled(), s.getPaymentQrTransferImage(),
                     s.isPaymentQrCardEnabled(), s.getPaymentQrCardImage(),
                     s.getPaymentCardLink(), s.isPaymentCashEnabled(),
-                    s.getCloudinaryCloudName(), s.getCloudinaryUploadPreset());
+                    s.getCloudinaryCloudName(), s.getCloudinaryUploadPreset(),
+                    mercadoPagoAvailable);
+        }
+    }
+
+    /**
+     * Credenciales de Mercado Pago — editable por PAYMENTS_MANAGE (es la
+     * cuenta del propio dueño de la tienda, mismo nivel que el resto de
+     * medios de pago). {@code accessToken} en blanco = no tocar el que ya
+     * está guardado (mismo criterio que MailConfigRequest.password).
+     */
+    public record MercadoPagoConfigRequest(
+            Boolean mpEnabled,
+            @Size(max = 300) String accessToken,
+            @Size(max = 300) String publicKey
+    ) {}
+
+    /** {@code accessToken} nunca se devuelve: sólo si hay uno guardado (accessTokenSet). */
+    public record MercadoPagoConfigResponse(boolean mpEnabled, boolean accessTokenSet, String publicKey) {
+        public static MercadoPagoConfigResponse from(SiteSettings s) {
+            return new MercadoPagoConfigResponse(
+                    s.isMpEnabled(),
+                    s.getMpAccessToken() != null && !s.getMpAccessToken().isBlank(),
+                    s.getMpPublicKey());
         }
     }
 
