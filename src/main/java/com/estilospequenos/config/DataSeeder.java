@@ -119,7 +119,11 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedParamGroups() {
-        if (paramRepo.count() > 0) return;
+        // Por id puntual, no por count(): seedExpenseCategoryParamGroup() ya
+        // pudo haber insertado su propio grupo antes de llegar acá (corre
+        // siempre, sin depender de SEED_ENABLED) y un count()>0 lo confundiría
+        // con "ya está todo seedeado".
+        if (paramRepo.existsById("grp-publico")) return;
         paramRepo.save(group("grp-publico", "Público", false, true, true, List.of(
                 opt("publico-bebe", "Bebé"), opt("publico-nena", "Nena"),
                 opt("publico-nene", "Nene"), opt("publico-unisex", "Unisex"))));
