@@ -247,6 +247,17 @@ public class OrderService {
      * pago ni redirigir a nadie.
      */
     public Order createWebCheckout(CreateOrderRequest req) {
+        // Si la tienda activó Mercado Pago, pasa a ser el ÚNICO medio de pago
+        // online (no se puede elegir transferencia/QR a la vez) — ver
+        // PROYECTO.md. Si no lo activó, tampoco se puede elegir (todavía no
+        // hay token cargado).
+        boolean mpEnabled = siteSettingsService.get().isMpEnabled();
+        if (mpEnabled && req.paymentMethod() != PaymentMethod.MERCADOPAGO) {
+            throw new BadRequestException("Esta tienda solo acepta Mercado Pago como medio de pago online.");
+        }
+        if (!mpEnabled && req.paymentMethod() == PaymentMethod.MERCADOPAGO) {
+            throw new BadRequestException("Esta tienda todavía no configuró Mercado Pago.");
+        }
         // Un pedido pagado por Mercado Pago no deja ningún registro fuera del
         // sitio (a diferencia de los coordinados por WhatsApp, que le quedan
         // al cliente en su propio chat) — sin mail no hay forma de mandarle
@@ -303,6 +314,11 @@ public class OrderService {
      * persona (encadenado desde el frontend) u otra (cajero).
      */
     public Order createPos(CreateOrderRequest req, String createdByDni) {
+        // La venta en el local no usa Mercado Pago (efectivo/transferencia/
+        // posnet nomás) — Checkout Pro es solo para el carrito online.
+        if (req.paymentMethod() == PaymentMethod.MERCADOPAGO) {
+            throw new BadRequestException("Mercado Pago no es un medio de pago válido para la venta en el local.");
+        }
         Order order = create(req);
         order.setChannel(com.estilospequenos.model.SaleChannel.LOCAL);
         order.setDeliveryMethod(DeliveryMethod.PICKUP);

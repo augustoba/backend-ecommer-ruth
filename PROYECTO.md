@@ -749,6 +749,17 @@ hace falta el mismo paso.
       ninguna sesión nuestra).
     - `database/schema.sql` y `database/setup.sql` actualizados con las
       columnas nuevas de `orders` y `site_settings`.
+    - **Mercado Pago es excluyente en la venta online:** si `mpEnabled=true`,
+      `createWebCheckout` rechaza cualquier `paymentMethod` que no sea
+      `MERCADOPAGO` ("Esta tienda solo acepta Mercado Pago como medio de pago
+      online") — no tiene sentido ofrecer transferencia/QR a la vez que
+      Checkout Pro real. Si `mpEnabled=false`, rechaza `MERCADOPAGO` (todavía
+      no está configurado). El frontend tiene que reflejar esto: si
+      `mercadoPagoAvailable=true`, mostrar sólo "Pagar con Mercado Pago" en el
+      carrito y ocultar transferencia/QR/efectivo para la venta online.
+    - **Mercado Pago NO existe en la venta del local:** `createPos` rechaza
+      `MERCADOPAGO` siempre — ahí se sigue cobrando en efectivo, transferencia
+      o posnet, nunca con el checkout online.
     - **Falta probar con token real:** todo esto compiló pero no se probó
       contra la API real de Mercado Pago (hace falta un Access Token de
       prueba/producción cargado desde el panel, y un túnel tipo ngrok en
