@@ -33,12 +33,14 @@ CREATE TABLE IF NOT EXISTS site_settings (
     store_name       VARCHAR(255)  NOT NULL,
     whatsapp_number  VARCHAR(255)  NOT NULL,
     about_text       VARCHAR(2000),
+    about_page_enabled BIT NOT NULL DEFAULT 0,  -- página "Quiénes somos" publicada
     instagram        VARCHAR(255),
     facebook_url     VARCHAR(255),
     logo_url         MEDIUMTEXT,               -- logo del negocio (URL o data URI); null = logo.jpeg
     whatsapp_intro   VARCHAR(2000),            -- saludo del mensaje de pedido; null = texto por defecto
     whatsapp_closing VARCHAR(2000),            -- cierre del mensaje de pedido; null = texto por defecto
     store_address    VARCHAR(500),             -- dirección del local (opción "retiro")
+    store_photo_url  MEDIUMTEXT,               -- foto del local (URL o data URI)
     help_text        MEDIUMTEXT,               -- pagina "como comprar" (texto libre)
     faq_text         MEDIUMTEXT,               -- preguntas frecuentes (bloques separados por linea en blanco)
     payment_transfer_enabled     BIT NOT NULL DEFAULT 0,
@@ -54,6 +56,16 @@ CREATE TABLE IF NOT EXISTS site_settings (
     mp_public_key                VARCHAR(300),
     low_stock_alert_enabled      BIT NOT NULL DEFAULT 0,   -- mail diario de talles por reponer
     low_stock_alert_email        VARCHAR(300),
+    cloudinary_cloud_name        VARCHAR(200),             -- cuenta de Cloudinary (subida de fotos)
+    cloudinary_upload_preset     VARCHAR(200),
+    -- Scaffolding de SMTP del panel /admin/superadmin/mail. OJO: NO es la config que
+    -- manda mail de verdad — la real vive en platform_mail_settings (ver PROYECTO.md #51).
+    smtp_host                    VARCHAR(300),
+    smtp_port                    INTEGER,
+    smtp_username                VARCHAR(300),
+    smtp_password                VARCHAR(500),             -- secreto: nunca se devuelve
+    smtp_from_email              VARCHAR(300),
+    smtp_from_name               VARCHAR(200),
     PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
@@ -71,7 +83,13 @@ CREATE TABLE IF NOT EXISTS `role` (
 
 CREATE TABLE IF NOT EXISTS role_permission (
     role_id    VARCHAR(255) NOT NULL,
-    permission VARCHAR(40)  NOT NULL,
+    permission ENUM(
+        'CAROUSEL_MANAGE','CASH_REGISTER_VIEW','COUPONS_MANAGE','DISCOUNTS_MANAGE','EXCHANGES_USE',
+        'EXPENSES_MANAGE','FINANCE_VIEW','MARKETING_MANAGE','METRICS_VIEW','ORDERS_MANAGE','ORDERS_VIEW',
+        'PARAMS_MANAGE','PAYMENTS_MANAGE','PLATFORM_SETTINGS_MANAGE','POS_USE','PRODUCTS_MANAGE',
+        'PRODUCTS_VIEW','SHIFTS_MANAGE','SIZE_SCALES_MANAGE','STOCK_MOVEMENTS_VIEW','SUPPLIERS_MANAGE',
+        'USERS_MANAGE'
+    ) NOT NULL,
     PRIMARY KEY (role_id, permission),
     CONSTRAINT fk_role_permission_role FOREIGN KEY (role_id) REFERENCES `role` (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
@@ -220,7 +238,7 @@ CREATE TABLE IF NOT EXISTS product_size_stock (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS discount (
     id               VARCHAR(255) NOT NULL,
-    kind             ENUM('MONTO','PARAMETRO','PAGO','ENVIO_GRATIS') NOT NULL,
+    kind             ENUM('ENVIO_GRATIS','MONTO','PAGO','PARAMETRO') NOT NULL,
     discount_percent INTEGER      NOT NULL,
     enabled          BIT          NOT NULL,
     stackable        BIT          NOT NULL DEFAULT 0,   -- acumulable con otros descuentos
@@ -241,7 +259,7 @@ CREATE TABLE IF NOT EXISTS discount (
 CREATE TABLE IF NOT EXISTS coupon (
     id          VARCHAR(255)  NOT NULL,
     code        VARCHAR(40)   NOT NULL,
-    kind        ENUM('PERCENT','AMOUNT') NOT NULL,
+    kind        ENUM('AMOUNT','PERCENT') NOT NULL,
     value       DECIMAL(12,2) NOT NULL,
     min_amount  DECIMAL(12,2),
     max_uses    INTEGER,                    -- null = ilimitado
@@ -262,19 +280,20 @@ CREATE TABLE IF NOT EXISTS orders (
     id               VARCHAR(255)  NOT NULL,
     number           BIGINT        NOT NULL,   -- correlativo → code "PED-0001"
     customer_name    VARCHAR(255)  NOT NULL,
+    customer_email   VARCHAR(200),             -- opcional, no bloquea la venta (campañas / base de clientes)
     subtotal         DECIMAL(12,2) NOT NULL,
     discount_percent INTEGER       NOT NULL,
     discount_amount  DECIMAL(12,2) NOT NULL,
     total            DECIMAL(12,2) NOT NULL,
     status           ENUM('CANCELADO','PENDIENTE','PROCESADO') NOT NULL,
-    channel          ENUM('WEB','LOCAL') NOT NULL DEFAULT 'WEB',
+    channel          ENUM('LOCAL','WEB') NOT NULL DEFAULT 'WEB',
     delivery_method  ENUM('PICKUP','SHIPPING') NOT NULL DEFAULT 'PICKUP',
     shipping_address    VARCHAR(500),
     shipping_reference  VARCHAR(500),
     shipping_lat     DOUBLE,
     shipping_lng     DOUBLE,
-    payment_method   ENUM('TRANSFER','QR_TRANSFER','QR_CARD','CASH','MERCADOPAGO'),
-    payment_status   ENUM('PENDING','APPROVED','REJECTED'),  -- solo para payment_method=MERCADOPAGO
+    payment_method   ENUM('CASH','MERCADOPAGO','QR_CARD','QR_TRANSFER','TRANSFER'),
+    payment_status   ENUM('APPROVED','PENDING','REJECTED'),  -- solo para payment_method=MERCADOPAGO
     mp_preference_id VARCHAR(100),              -- id de la preferencia creada en Mercado Pago
     mp_checkout_url  VARCHAR(500),              -- init_point devuelto al crear la preferencia
     mp_payment_id    VARCHAR(100),              -- id del pago aprobado, una vez confirmado por webhook
@@ -303,7 +322,7 @@ CREATE TABLE IF NOT EXISTS exchange (
     returned_total DECIMAL(12,2) NOT NULL,
     taken_total    DECIMAL(12,2) NOT NULL,
     difference     DECIMAL(12,2) NOT NULL,   -- taken - returned (+ cobra el local / - a favor del cliente)
-    payment_method ENUM('TRANSFER','QR_TRANSFER','QR_CARD','CASH'),
+    payment_method ENUM('CASH','MERCADOPAGO','QR_CARD','QR_TRANSFER','TRANSFER'),
     note           VARCHAR(500),
     created_at     DATETIME(6)   NOT NULL,
     processed_by_dni  VARCHAR(20),
@@ -375,12 +394,12 @@ CREATE TABLE IF NOT EXISTS stock_movement (
     product_name     VARCHAR(255)  NOT NULL,
     size_value       VARCHAR(255)  NOT NULL,
     quantity_delta   INTEGER       NOT NULL,   -- positivo = entro, negativo = salio
-    reason           VARCHAR(30)   NOT NULL,   -- VENTA/CAMBIO_DEVUELTA/CAMBIO_LLEVADA/AJUSTE_MANUAL/ENTRADA_COMPRA/ALTA_INICIAL
+    reason           ENUM('AJUSTE_MANUAL','ALTA_INICIAL','CAMBIO_DEVUELTA','CAMBIO_LLEVADA','ENTRADA_COMPRA','VENTA') NOT NULL,
     note             VARCHAR(500),
     reference_id     VARCHAR(255),             -- orderId/exchangeId/supplierId segun el motivo
     unit_cost        DECIMAL(12,2),            -- solo ENTRADA_COMPRA
-    created_by_dni   VARCHAR(20),
-    created_by_name  VARCHAR(200),
+    created_by_dni   VARCHAR(255),
+    created_by_name  VARCHAR(255),
     created_at       DATETIME(6)   NOT NULL,
     PRIMARY KEY (id),
     KEY ix_stock_movement_product (product_id)
@@ -407,6 +426,38 @@ CREATE TABLE IF NOT EXISTS expense_budget (
     monthly_amount      DECIMAL(12,2) NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uq_expense_budget_category (category_option_id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+--  Campañas de marketing por email (cupón automático a inactivos / VIP)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS marketing_config (
+    id                   VARCHAR(255)  NOT NULL,   -- siempre 'config'
+    enabled              BIT           NOT NULL DEFAULT 0,  -- false = el job corre pero no manda nada
+    discount_percent     INTEGER       NOT NULL,   -- % del cupón que se manda
+    inactivity_days      INTEGER       NOT NULL,   -- días sin comprar para ser "inactivo"
+    spend_threshold      DECIMAL(12,2) NOT NULL,   -- gasto acumulado para ser "VIP"
+    daily_email_cap      INTEGER       NOT NULL,   -- tope de mails de campaña por día
+    coupon_validity_days INTEGER       NOT NULL,   -- vigencia del cupón generado
+    cooldown_days        INTEGER       NOT NULL,   -- no repetirle al mismo email antes de N días
+    email_subject        VARCHAR(300),             -- admiten tokens {tienda}/{codigo}/{porcentaje}/{vencimiento}
+    email_body           VARCHAR(4000),
+    email_image_url      MEDIUMTEXT,               -- imagen arriba del mail (URL o data URI)
+    PRIMARY KEY (id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS marketing_send (
+    id                      VARCHAR(255)  NOT NULL,
+    email                   VARCHAR(200)  NOT NULL,
+    reason                  ENUM('INACTIVE','VIP') NOT NULL,
+    coupon_code             VARCHAR(40),             -- null = falló antes de crear el cupón
+    sent_at                 DATETIME(6)   NOT NULL,
+    status                  ENUM('FAILED','SENT') NOT NULL,
+    error_message           VARCHAR(500),
+    lifetime_spend_snapshot DECIMAL(12,2),           -- snapshot al momento del envío
+    last_order_at_snapshot  DATETIME(6),
+    PRIMARY KEY (id),
+    KEY ix_marketing_send_sent_at (sent_at)          -- historial (orden), tope diario y cooldown
 ) ENGINE=InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;

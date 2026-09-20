@@ -4,7 +4,7 @@
 > está en `../frontend-ecommerce---ruth/PROYECTO.md`. Este archivo entra en el
 > detalle de la API.
 
-Última actualización: 2026-09-18 (tanda 2).
+Última actualización: 2026-09-20 (arreglo del esquema de deploy).
 
 > **Nota de mantenimiento:** las tablas de las secciones 2-6 se actualizan
 > cuando el cambio es grande (como hoy); para el detalle día a día, la
@@ -366,16 +366,19 @@ app no genera duplicados.
 
 | Archivo | Qué hace |
 |---|---|
-| `setup.sql` | **todo junto**: crea la base + las 16 tablas + la config base (admin, `site_settings`, parametrías, escalas, descuentos). Es el de deploy. |
+| `setup.sql` | **todo junto**: crea la base + las 27 tablas + la config base (admin, `site_settings`, parametrías, escalas, descuentos). Es el de deploy. |
 | `schema.sql` | solo las tablas |
 | `seed.sql` | solo la config base (idempotente, `INSERT ... ON DUPLICATE KEY UPDATE`) |
 | `reset.sql` | drop + create de la base vacía |
 
 `setup.sql` = `schema.sql` + `seed.sql` concatenados (hay una nota de cómo
-regenerarlo). **`setup.sql` tiene drift viejo** (le faltan columnas/tablas de
-varias tandas anteriores a esta) — no se tocó en esta tanda, sólo `schema.sql`
-y `seed.sql`. Si se necesita provisionar un server nuevo desde cero, revisar
-`setup.sql` contra las entidades actuales antes de confiar en él.
+regenerarlo). **Verificado el 2026-09-20** (ver §12 #36): el esquema coincide
+ahora con las entidades — correr `mysql < database/setup.sql` y arrancar la app
+con `ddl-auto=validate` funciona. Antes NO: faltaban las tablas
+`marketing_config`/`marketing_send`, 11 columnas (entre ellas
+`orders.customer_email`) y había 5 columnas con el tipo mal
+(`exchange.payment_method` no podía guardar `MERCADOPAGO`), más un
+`INSERT INTO discount_config` sobre una tabla que ya no existía.
 
 **Cambio de esquema grande 2026-09-11** (login por DNI): `admin_user` perdió
 `username`/`recovery_hash` y ganó `dni`/`nombre`/`apellido`/`email` (NOT NULL).
@@ -424,8 +427,9 @@ hace falta el mismo paso.
   `platform_mail_settings` (vía `/admin/config/servicios` o insertadas a mano),
   no dependen de las env vars `BREVO_SMTP_*` salvo la primera vez. Si se
   resetea esa tabla, hay que volver a cargarlas.
-- `setup.sql` desactualizado respecto a las entidades actuales (ver §9) —
-  arreglar antes de usarlo para un deploy nuevo.
+- ~~`setup.sql` desactualizado respecto a las entidades actuales (ver §9)~~ —
+  arreglado el 2026-09-20 (§12 #36), verificado corriendo el script y arrancando
+  la app con `ddl-auto=validate`.
 - ~~Rate-limiting / lockout en el login~~ — hecho (tanda 2026-09-09, §12 #20).
 - ~~Multi-admin~~ — hecho (tanda 2026-09-11, §12 #22): roles + Superadmin/Administrador/Vendedor.
 - ~~Métricas por talle/proveedor~~ — hecho (tanda 3, §12 #21).
@@ -1049,6 +1053,54 @@ hace falta el mismo paso.
       sin proyecciones — esta tanda resolvió puntualmente el listado
       público, no el resto de los endpoints con colecciones lazy.
 
+36. **El esquema de deploy estaba roto — arreglado y verificado (2026-09-20).**
+    Salió de una auditoría del proyecto, no de un bug reportado: el script que
+    §13 dice correr en un server nuevo **no funcionaba**, por tres motivos
+    distintos acumulados.
+    - **El script cortaba a la mitad:** `seed.sql` tenía un
+      `INSERT INTO discount_config` (y por lo tanto también en `setup.sql`)
+      sobre una tabla que dejó de crearse cuando se eliminó `DiscountConfig`
+      (#19). `mysql < setup.sql` fallaba con *"Table doesn't exist"*. La nota
+      de #19 — *"la tabla `discount_config` queda huérfana (inocua),
+      `schema.sql`/`setup.sql` actualizados"* — era **incorrecta**: el INSERT
+      nunca se sacó. Borrado.
+    - **Faltaban tablas y columnas:** las tablas `marketing_config` y
+      `marketing_send` (de #23/#24) no estaban en `schema.sql`, y en total
+      faltaban **11 columnas**: `orders.customer_email` (#23),
+      `site_settings.about_page_enabled` y `store_photo_url`, los
+      `cloudinary_cloud_name`/`cloudinary_upload_preset` (#26) y los 6
+      `smtp_*` (#50/#51). Agregadas. (`about_page_enabled` y `store_photo_url`
+      son de la página "Quiénes somos" opcional — commit `2a6791d` —, que
+      tampoco había bajado al script.)
+    - **5 columnas con el tipo mal:** `stock_movement.reason` y
+      `role_permission.permission` eran `VARCHAR` donde Hibernate espera
+      `ENUM`; `stock_movement.created_by_dni`/`created_by_name` eran más
+      cortas de lo que declara la entidad; y **`exchange.payment_method` no
+      incluía `MERCADOPAGO`** — o sea que un cambio de prenda no podía
+      guardar un pago por Mercado Pago. Corregidas. También se alineó el
+      orden de los valores dentro de cada `ENUM` al que genera Hibernate
+      (mismo conjunto, distinto orden) para que `schema.sql` coincida con lo
+      que `ddl-auto=update` crea en el dev DB.
+    - **Cómo se verificó** (no se dio por bueno mirando el archivo): se
+      generó `database/schema.gen.sql` con la property
+      `jakarta.persistence.schema-generation` que ya documenta
+      `database/README.md`; se levantaron dos bases descartables
+      (`estilos_pequenos_verify` desde `setup.sql` y `estilos_pequenos_gen`
+      desde el generado); se comparó `information_schema.columns` **columna
+      por columna** entre las dos; y al final se arrancó la app contra la base
+      de prueba con `SPRING_JPA_HIBERNATE_DDL_AUTO=validate` — que es
+      exactamente el paso de §13 — **arrancando limpio**. Las bases
+      descartables y el `schema.gen.sql` se borraron después.
+    - **Diferencias que se dejaron a propósito** (el validador las tolera y
+      son más estrictas que lo que genera Hibernate): la PK compuesta y el
+      `NOT NULL` de `role_permission`, y los `DEFAULT 0` de los booleanos.
+    - `setup.sql` regenerado (`cat schema.sql seed.sql > setup.sql`, 582
+      líneas). `database/README.md` no necesitó cambios: el método que
+      documenta es el que se usó.
+    - **Para que no vuelva a pasar:** correr la app con `ddl-auto=validate`
+      contra una base creada con `setup.sql` antes de un deploy — canta
+      cualquier columna que falte. Es barato y es lo que destapó todo esto.
+
 ---
 
 ## 13. Despliegue a producción — Hetzner (guía paso a paso)
@@ -1129,11 +1181,11 @@ directo desde Git Bash o PowerShell.
 
 ### 13.7 Base de datos
 
-`mysql < database/setup.sql` — **pero ojo**: §9 avisa que este script tiene
-drift viejo (le faltan columnas/tablas de tandas más recientes). Revisarlo
-contra las entidades actuales del código **antes** de correrlo en un deploy
-nuevo, si no el arranque con `ddl-auto=validate` va a fallar por columnas
-faltantes.
+`mysql < database/setup.sql` — verificado el 2026-09-20 (§12 #36): crea las 27
+tablas y carga la config base, y la app arranca con `ddl-auto=validate` sin
+errores de esquema. Si en el futuro se toca una entidad y no se baja el cambio a
+`schema.sql`, `validate` lo va a cantar al arrancar (que es lo que se quiere) —
+para eso está ese modo.
 
 ### 13.8 Dominio + HTTPS
 

@@ -117,6 +117,3 @@ INSERT INTO discount (id, kind, discount_percent, enabled, label, min_amount, gr
   ('seed-monto-100k', 'MONTO', 20, 1, NULL, 100000.00, NULL, NULL),
   ('seed-monto-200k', 'MONTO', 25, 1, NULL, 200000.00, NULL, NULL)
 ON DUPLICATE KEY UPDATE discount_percent = VALUES(discount_percent);
-
-INSERT INTO discount_config (id, combine_mode) VALUES ('config', 'MEJOR')
-ON DUPLICATE KEY UPDATE combine_mode = combine_mode;
