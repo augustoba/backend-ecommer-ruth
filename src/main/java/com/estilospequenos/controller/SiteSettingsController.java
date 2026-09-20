@@ -13,8 +13,12 @@ import com.estilospequenos.dto.SiteSettingsDtos.StockAlertSettingsRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.StockAlertSettingsResponse;
 import com.estilospequenos.service.SiteSettingsService;
 import jakarta.validation.Valid;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.concurrent.TimeUnit;
 
 @RestController
 public class SiteSettingsController {
@@ -25,10 +29,12 @@ public class SiteSettingsController {
         this.service = service;
     }
 
-    /** Público: datos del local para el header, footer y el link de WhatsApp. */
+    /** Público: datos del local para el header, footer y el link de WhatsApp. Cambia poco: cacheable 5 min. */
     @GetMapping("/api/settings")
-    public SettingsResponse publicSettings() {
-        return SettingsResponse.from(service.get());
+    public ResponseEntity<SettingsResponse> publicSettings() {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+                .body(SettingsResponse.from(service.get()));
     }
 
     @GetMapping("/api/admin/settings")

@@ -3,6 +3,7 @@ package com.estilospequenos.repository;
 import com.estilospequenos.model.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +12,15 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, String> {
+    /**
+     * Trae `sizeStocks`/`params` en la misma consulta (en vez de lazy fila por
+     * fila) — la usan tanto el listado público (necesita ambas: `sizeStocks`
+     * para el stock y `params` para los filtros del catálogo) como
+     * `DashboardService.lowStock()`. No trae `images` (ninguno de los dos la
+     * usa; el listado público resuelve la portada aparte, ver
+     * {@link #findCoverImages}).
+     */
+    @EntityGraph(attributePaths = {"sizeStocks", "params"})
     List<Product> findByActiveTrueAndDeletedFalseOrderByCreatedAtDesc();
     List<Product> findByDeletedFalseOrderByCreatedAtDesc();
     List<Product> findByDeletedTrueOrderByCreatedAtDesc();
@@ -18,6 +28,20 @@ public interface ProductRepository extends JpaRepository<Product, String> {
     long countByActiveTrueAndDeletedFalse();
     long countByDeletedFalse();
     Optional<Product> findByBarcodeAndDeletedFalse(String barcode);
+
+    /**
+     * Portada (`idx = 0`) de cada producto de la lista de ids, en una sola
+     * consulta — evita traer `Product.images` completo (lazy) sólo para
+     * calcular `imageUrl` en el listado público (ver
+     * `ProductDtos.PublicProductListResponse`).
+     */
+    @Query("select p.id as productId, img as url from Product p join p.images img where index(img) = 0 and p.id in :ids")
+    List<ProductCoverRow> findCoverImages(@Param("ids") List<String> ids);
+
+    interface ProductCoverRow {
+        String getProductId();
+        String getUrl();
+    }
 
     /**
      * Listado del panel con filtros opcionales (todos server-side):

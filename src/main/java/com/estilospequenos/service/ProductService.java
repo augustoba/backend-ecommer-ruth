@@ -117,6 +117,23 @@ public class ProductService {
         return repo.findByActiveTrueAndDeletedFalseOrderByCreatedAtDesc();
     }
 
+    /**
+     * Portada (primera foto) de cada producto, resuelta en una sola consulta —
+     * evita disparar el `@ElementCollection` lazy de `images` fila por fila
+     * al armar el listado público (que sólo necesita `imageUrl`, no la
+     * galería completa).
+     */
+    @Transactional(readOnly = true)
+    public Map<String, String> coverImages(List<Product> products) {
+        List<String> ids = products.stream().map(Product::getId).toList();
+        if (ids.isEmpty()) return Map.of();
+        Map<String, String> covers = new LinkedHashMap<>();
+        for (com.estilospequenos.repository.ProductRepository.ProductCoverRow row : repo.findCoverImages(ids)) {
+            covers.put(row.getProductId(), row.getUrl());
+        }
+        return covers;
+    }
+
     @Transactional(readOnly = true)
     public List<Product> findAll() {
         return repo.findByDeletedFalseOrderByCreatedAtDesc();

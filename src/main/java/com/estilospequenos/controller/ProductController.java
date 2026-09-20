@@ -6,6 +6,8 @@ import com.estilospequenos.dto.ProductDtos.ActivePatch;
 import com.estilospequenos.dto.ProductDtos.DiscontinuedPatch;
 import com.estilospequenos.dto.ProductDtos.ProductRequest;
 import com.estilospequenos.dto.ProductDtos.ProductResponse;
+import com.estilospequenos.dto.ProductDtos.PublicProductListResponse;
+import com.estilospequenos.dto.ProductDtos.PublicProductResponse;
 import com.estilospequenos.dto.ProductDtos.StockPatch;
 import com.estilospequenos.dto.StockMovementDtos.MovementResponse;
 import com.estilospequenos.dto.StockMovementDtos.PurchaseRequest;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 public class ProductController {
@@ -33,21 +36,27 @@ public class ProductController {
     }
 
     // --- Público (catálogo) ---
+    // Sin auth: nunca devuelven costPrice/supplierId (info interna del admin,
+    // PROYECTO.md §5). El listado tampoco trae `images[]` completo — sólo
+    // `imageUrl` (portada); la galería completa sólo la necesita el detalle.
 
     @GetMapping("/api/products")
-    public List<ProductResponse> publicList() {
-        return service.findActive().stream().map(ProductResponse::from).toList();
+    public List<PublicProductListResponse> publicList() {
+        List<Product> products = service.findActive();
+        Map<String, String> covers = service.coverImages(products);
+        return products.stream().map(p -> PublicProductListResponse.from(p, covers.get(p.getId()))).toList();
     }
 
     @GetMapping("/api/products/best-sellers")
-    public List<ProductResponse> bestSellers(@RequestParam(defaultValue = "8") int limit) {
-        return service.bestSellers(Math.min(Math.max(limit, 1), 20)).stream()
-                .map(ProductResponse::from).toList();
+    public List<PublicProductListResponse> bestSellers(@RequestParam(defaultValue = "8") int limit) {
+        List<Product> products = service.bestSellers(Math.min(Math.max(limit, 1), 20));
+        Map<String, String> covers = service.coverImages(products);
+        return products.stream().map(p -> PublicProductListResponse.from(p, covers.get(p.getId()))).toList();
     }
 
     @GetMapping("/api/products/{id}")
-    public ProductResponse publicGet(@PathVariable String id) {
-        return ProductResponse.from(service.get(id));
+    public PublicProductResponse publicGet(@PathVariable String id) {
+        return PublicProductResponse.from(service.get(id));
     }
 
     // --- Admin ---

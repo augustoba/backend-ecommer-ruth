@@ -165,8 +165,8 @@ DTO en el service y desactivarlo.
 | **MarketingConfig** | fila única `id='config'`, `enabled, discountPercent, inactivityDays, spendThreshold, dailyEmailCap, couponValidityDays, cooldownDays, emailSubject?, emailBody?, emailImageUrl?` | Config de la campaña automática de cupón por email (ver §12 #23/#24). `email*` admiten los tokens `{tienda}`/`{codigo}`/`{porcentaje}`/`{vencimiento}`; null/vacío = texto por defecto. `emailImageUrl` = data URI (imagen arriba del mail). |
 | **MarketingSend** | `id, email, reason (INACTIVE\|VIP), couponCode?, sentAt, status (SENT\|FAILED), errorMessage?, lifetimeSpendSnapshot?, lastOrderAtSnapshot?` | Log de cada envío (o intento) de campaña — historial en `/admin/campanias` + export CSV. Sólo cuenta para el **cooldown** (no repetirle a un mismo cliente) si `status=SENT`; un `FAILED` no bloquea el reintento al otro día. Los que quedan afuera por el **tope diario** ni siquiera generan fila acá, así que al otro día vuelven a entrar en la cuenta (no se pierden). |
 | **SiteSettings** | fila única `id='config'`, `storeName, whatsappNumber, aboutText?, instagram?, facebookUrl?, logoUrl?, whatsappIntro?, whatsappClosing?, storeAddress?, payment{Transfer,QrTransfer,QrCard}Enabled, paymentTransferAlias?, paymentQr{Transfer,Card}Image?, paymentCardLink?, paymentCashEnabled` | Datos del local editables desde el panel. `whatsappNumber` valida `\d{8,15}`. `instagram` sin `@`. `logoUrl`/`paymentQr*Image` = data URI (MEDIUMTEXT). `whatsappIntro`/`whatsappClosing` = saludo/cierre (tokens `{tienda}`/`{codigo}`; el mensaje se arma en el front). `storeAddress` = dirección para el retiro. Cada medio de pago tiene su `*Enabled` (bool) aparte del dato → se ofrece si está habilitado **y** tiene el dato (efectivo sólo el bool). |
-| **Product** | `id, name, description, price, ageRange, active, discontinued, createdAt, sizeScaleId?, supplierId?, costPrice?, lowStockThreshold?` | `supplierId`/`costPrice` = info interna, **no** se exponen en el catálogo público. `lowStockThreshold` (unidades por talle) = umbral propio para la alerta de reposición; null = default global (`DashboardService.DEFAULT_LOW_STOCK` = 3). `discontinued` = "no reponer": sigue publicado/vendible pero `DashboardService.lowStock()` lo excluye. |
-| — `images` | `List<String>` ordenada (`@ElementCollection` → `product_image`) | fotos, URL o data URI. `idx 0` = portada. En el DTO va como `images[]` + `imageUrl` (la portada, getter `@Transient`, por compat con tarjetas/carrito). El request pide `images` (`@NotEmpty`). |
+| **Product** | `id, name, description, price, ageRange, active, discontinued, createdAt, sizeScaleId?, supplierId?, costPrice?, lowStockThreshold?` | `supplierId`/`costPrice` = info interna, **no** se exponen en el catálogo público — desde §12 #35, `ProductDtos` tiene un DTO separado para admin (`ProductResponse`, con todo) y dos públicos (`PublicProductResponse`/`PublicProductListResponse`, sin estos dos campos). `lowStockThreshold` (unidades por talle) = umbral propio para la alerta de reposición; null = default global (`DashboardService.DEFAULT_LOW_STOCK` = 3). `discontinued` = "no reponer": sigue publicado/vendible pero `DashboardService.lowStock()` lo excluye. |
+| — `images` | `List<String>` ordenada (`@ElementCollection` → `product_image`) | fotos, URL o data URI. `idx 0` = portada. En el DTO de admin y en el detalle público va como `images[]` + `imageUrl`; el **listado** público (`GET /api/products`) sólo trae `imageUrl` (§12 #35 — el array completo no se usa en las tarjetas). El request pide `images` (`@NotEmpty`). |
 | — `sizeStocks` | `List<SizeStock{size, stock}>` (`@ElementCollection` → `product_size_stock`) | stock por talle |
 | — `params` | `Set<ProductParam{groupId, optionId}>` (`@ElementCollection` → `product_param`) | en el DTO se expone como `Map<String,List<String>>` |
 | **ParamGroup** | `id, name, multiple, showInCatalog, system` + `@OneToMany options` | grupos de clasificación (Público / Tipo / Estación). `system` = no se puede borrar. |
@@ -414,7 +414,10 @@ hace falta el mismo paso.
 
 - **Flyway** para migraciones versionadas (hoy `ddl-auto=update` + scripts a mano
   — esto mordió en la tanda del 2026-09-11, ver §9).
-- Proyecciones DTO en el service y desactivar OSIV.
+- Proyecciones DTO en el service y desactivar OSIV. (Parcial: el listado
+  público de productos ya no dispara el N+1 de `images`/`sizeStocks`/`params`
+  — §12 #35 — pero el resto de los endpoints con colecciones lazy sigue
+  dependiendo de OSIV igual que antes.)
 - Perfil `prod` (`application-prod.yml`) + pipeline de deploy.
 - Subida de imágenes a storage en vez de data-URI en la base.
 - **Credenciales de Brevo reales**: hoy están cargadas directo en
@@ -987,3 +990,168 @@ hace falta el mismo paso.
       `admin-recover` actualiza su copy ("te mandamos un link" en vez de
       "te mandamos una contraseña nueva") — el pedido en sí no cambió de
       forma, sigue siendo sólo el DNI.
+
+35. **Auditoría de over-fetching/N+1 en el catálogo público (2026-09-20):**
+    - **Filtración de datos internos (seguridad, no sólo performance):**
+      `GET /api/products` y `GET /api/products/{id}` (sin auth) devolvían el
+      mismo DTO que el admin, exponiendo `costPrice`/`supplierId` — que
+      §5 dice explícitamente que no se exponen en el catálogo público.
+      `ProductDtos` ahora separa tres respuestas: `ProductResponse` (admin,
+      igual que antes), `PublicProductResponse` (detalle público: sin
+      `costPrice`/`supplierId`, con la galería completa) y
+      `PublicProductListResponse` (listado público: además sin `images[]`
+      completo). `ProductController` usa cada una donde corresponde;
+      `/api/products/best-sellers` (también público) se corrigió igual.
+    - **`images[]` fuera del listado:** medido con curl, el array `images[]`
+      era ~45% del payload de `GET /api/products` (21.2 KB → 11.6 KB con 11
+      productos de prueba) y no se usa ahí (`product-card.component.html`
+      sólo lee `imageUrl`). Se sacó del DTO de listado; el de detalle
+      (`GET /api/products/{id}`) lo sigue trayendo completo (la ficha de
+      producto sí muestra la galería). `sizeStocks`/`params` se mantuvieron
+      en el listado — el catálogo los usa client-side para filtrar por talle
+      y por parametría (`catalog-page.component.ts`), y `product-card`
+      calcula el stock total con `sizeStocks`.
+    - **Frontend (parity):** `product-detail-page` armaba la galería leyendo
+      `product().images` de la lista pública cacheada — nunca llamaba al
+      detalle. Al sacar `images[]` del listado eso hubiera roto la galería
+      de la ficha de producto. Se agregó `ProductService.fetchOnePublic(id)`
+      (`GET /api/products/{id}`) y `product-detail-page` ahora pide la
+      galería completa aparte cuando cambia el `:id` de la ruta
+      (`detailImages`, ver constructor del componente).
+    - **N+1 al listar:** `Product.images/sizeStocks/params` son
+      `@ElementCollection` lazy; con `open-in-view` se resolvían fila por
+      fila. Para `findByActiveTrueAndDeletedFalseOrderByCreatedAtDesc`
+      (listado público + `DashboardService.lowStock()`) se agregó
+      `@EntityGraph(attributePaths = {"sizeStocks", "params"})` — las trae
+      en la misma consulta en vez de una por producto. `images` no entra en
+      ese entity graph (ninguno de los dos casos la necesita); la portada
+      del listado se resuelve aparte con `ProductRepository.findCoverImages`
+      (una sola consulta JPQL con `index(img) = 0` para todos los ids de la
+      página, en vez de disparar la colección completa por producto sólo
+      para leer `images.get(0)`). No se tocó el detalle ni los endpoints de
+      admin (siguen trayendo todo, sin restricción de columnas).
+    - **Gzip** (`server.compression`, umbral 1 KB) y **`Cache-Control:
+      public, max-age=300`** en `GET /api/param-groups`, `/api/size-scales`
+      y `/api/settings` (datos casi estáticos) — se cambió su firma de
+      `List<...>`/DTO plano a `ResponseEntity<...>` para poder setear el
+      header sin tocar el JSON de respuesta.
+    - **Pool de Hikari** acotado a `maximum-pool-size: 5` (antes sin límite
+      explícito = default de 10) — este backend es de un solo comercio, no
+      necesita más.
+    - Verificado con curl: catálogo público sin `costPrice`/`supplierId` ni
+      `images[]`, detalle con todo salvo los dos campos internos, admin sin
+      cambios, `Content-Encoding: gzip` presente, `Cache-Control` presente
+      en los 3 endpoints casi-estáticos, y `hikaricp.connections.max=5` vía
+      `/actuator/metrics`. 29 tests en verde (los 28 existentes + uno nuevo
+      que cubre el detalle público).
+    - **Pendiente** (no abordado en esta tanda, ver §11): `open-in-view`
+      sigue activado y el resto del service sigue mapeando entidades a DTO
+      sin proyecciones — esta tanda resolvió puntualmente el listado
+      público, no el resto de los endpoints con colecciones lazy.
+
+---
+
+## 13. Despliegue a producción — Hetzner (guía paso a paso)
+
+Checklist para el día que se pague y active el server real (hoy: local +
+Cloudinary de prueba, sin pagar nada de Hetzner todavía — ver §11 "Perfil
+prod" y "Subida de imágenes"). Pensado para retomarlo con SSH/PuTTY
+oxidado — no da nada por sabido.
+
+### 13.1 Variables de entorno que SÍ O SÍ hay que cambiar (no dejar el default de dev)
+
+| Var | Default dev (no usar en prod) | Qué poner |
+|---|---|---|
+| `DB_USER`/`DB_PASSWORD` | `root`/`root` | usuario MySQL dedicado, no root |
+| `JWT_SECRET` | placeholder de dev | random ≥32 chars, ej. `openssl rand -base64 32` |
+| `ADMIN_NOMBRE`/`_APELLIDO`/`_DNI`/`_EMAIL`/`_PASSWORD` | Ruth/.../`ruth123` | datos reales de la dueña, contraseña fuerte |
+| `SUPERADMIN_NOMBRE`/`_APELLIDO`/`_DNI`/`_EMAIL`/`_PASSWORD` | Augusto/.../`augusto123` | contraseña fuerte propia |
+| `BREVO_SMTP_HOST`/`_PORT`/`_USER`/`_KEY`, `MARKETING_FROM_EMAIL` | placeholders `changeme@...` | credenciales reales de Brevo (o el proveedor SMTP que se use) |
+| `CORS_ORIGINS` | `localhost:4200,4300` | dominio real del frontend, `https://...` |
+| `SEED_ENABLED` | `true` | **`false`** — no cargar datos de ejemplo en prod |
+| `SPRING_JPA_HIBERNATE_DDL_AUTO` | `update` (implícito) | `validate` o `none` (ver §9) |
+| `SERVER_PORT` | `8080` | dejar así, nginx hace de proxy hacia afuera |
+
+Falta crear `application-prod.yml` (pendiente, §11) para no tener que pasar
+todo por env var a mano cada vez.
+
+### 13.2 Storage de imágenes (Cloudinary / Hetzner Object Storage)
+
+**Pendiente — feature todavía en diseño** (brainstorming en curso: Cloudinary
+activo ahora, Hetzner Object Storage listo pero apagado hasta pagarlo). Acá
+van a ir, cuando se cierre el diseño: credenciales de Cloudinary (API
+key/secret, no solo el preset unsigned que tiene el SaaS — para poder borrar
+imágenes también), y las de Hetzner S3 (endpoint, bucket, access key, secret
+key) + el flag que elige cuál de las dos implementaciones está activa.
+
+### 13.3 Crear el servidor en Hetzner
+
+1. Cuenta en hetzner.com + tarjeta cargada.
+2. Cloud Console → **New Server**.
+3. Ubicación: Falkenstein/Nuremberg (Alemania, las más baratas) o Ashburn
+   (EEUU) — probar ping a cada una antes de elegir, por la latencia a
+   Argentina.
+4. Imagen: **Debian 12** (mismo sistema que ya conocés del server de la
+   empresa).
+5. Tipo: **CX22** (2 vCPU / 4GB) para arrancar — se puede resizear después
+   sin redeploy (ver conversación arriba).
+6. SSH key: pegar la pública. Si no tenés una a mano, generarla con
+   `ssh-keygen -t ed25519` (Git Bash o PowerShell, Windows ya trae el
+   cliente SSH — no hace falta instalar PuTTY de nuevo). Con esto entrás sin
+   contraseña.
+7. Crear → te da una IP pública fija.
+
+### 13.4 Conectarse
+
+```
+ssh root@<ip>
+```
+directo desde Git Bash o PowerShell.
+
+### 13.5 Instalar lo necesario en el server
+
+- `apt update && apt upgrade`
+- Java 21: `apt install openjdk-21-jre-headless`
+- MySQL: `apt install mysql-server` + `mysql_secure_installation` + crear DB
+  y usuario dedicado (no root, ver 13.1)
+- nginx: `apt install nginx`
+- Firewall (`ufw`): permitir 22/80/443 nada más — el 8080 del backend queda
+  **solo accesible desde localhost**, nginx es el único que le habla afuera.
+
+### 13.6 Subir el código y correrlo
+
+- Buildear el jar en tu máquina (`./mvnw package`) y subirlo por `scp` — más
+  simple que clonar el repo entero y buildear en el server.
+- Crear un `systemd` service (`/etc/systemd/system/backend-ruth.service`)
+  que arranque el jar con las env vars de 13.1 y `Restart=on-failure`, para
+  que sobreviva a un crash o a un reboot del server sin que haya que
+  entrar a mano cada vez.
+
+### 13.7 Base de datos
+
+`mysql < database/setup.sql` — **pero ojo**: §9 avisa que este script tiene
+drift viejo (le faltan columnas/tablas de tandas más recientes). Revisarlo
+contra las entidades actuales del código **antes** de correrlo en un deploy
+nuevo, si no el arranque con `ddl-auto=validate` va a fallar por columnas
+faltantes.
+
+### 13.8 Dominio + HTTPS
+
+- El dominio lo paga y gestiona cada cliente (ya decidido).
+- Apuntar el registro DNS tipo `A` del dominio (y del subdominio del admin,
+  si va aparte, ej. `admin.dominio.com`) a la IP del server.
+- nginx como reverse proxy: escucha 80/443 y redirige a `localhost:8080`.
+- HTTPS gratis con Let's Encrypt: `apt install certbot python3-certbot-nginx`
+  → `certbot --nginx -d dominio.com -d www.dominio.com`. Se autorenueva solo.
+
+### 13.9 Checklist final antes de dar el deploy por terminado
+
+- [ ] Login admin con las credenciales reales, no las de dev
+- [ ] `SEED_ENABLED=false` confirmado (catálogo público sin productos de ejemplo)
+- [ ] `/api/admin/**` rechaza requests sin token
+- [ ] Mail de recuperación de contraseña probado con las credenciales SMTP reales
+- [ ] Puerto 8080 bloqueado desde afuera por el firewall (solo nginx lo ve)
+- [ ] Backup automático de la base (cron con `mysqldump` a un storage aparte de este mismo server)
+
+Este resumen es para no perder nada en el medio — la primera vez lo hacemos
+acompañado, paso a paso, no como reemplazo de eso.

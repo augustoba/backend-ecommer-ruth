@@ -19,14 +19,33 @@ class CatalogTest {
 
     @Test
     void publicCatalogIsSeeded() throws Exception {
+        // Listado público: sin `images[]` completo (sólo `imageUrl`, la portada — ver
+        // ProductDtos.PublicProductListResponse) y sin datos internos del admin.
         mvc.perform(get("/api/products"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()", greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$[0].params").exists())
                 .andExpect(jsonPath("$[0].sizeStocks").isArray())
-                .andExpect(jsonPath("$[0].images").isArray())
-                .andExpect(jsonPath("$[0].images.length()", greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$[0].images").doesNotExist())
+                .andExpect(jsonPath("$[0].costPrice").doesNotExist())
+                .andExpect(jsonPath("$[0].supplierId").doesNotExist())
                 .andExpect(jsonPath("$[0].imageUrl").isNotEmpty());
+    }
+
+    @Test
+    void publicProductDetailHasGalleryButNoInternalFields() throws Exception {
+        // Detalle público: sí trae la galería completa (la ficha de producto la muestra),
+        // pero tampoco expone costPrice/supplierId (info interna del admin — PROYECTO.md §5).
+        String products = mvc.perform(get("/api/products")).andReturn().getResponse().getContentAsString();
+        String id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(products).get(0).get("id").asText();
+
+        mvc.perform(get("/api/products/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.images").isArray())
+                .andExpect(jsonPath("$.images.length()", greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.imageUrl").isNotEmpty())
+                .andExpect(jsonPath("$.costPrice").doesNotExist())
+                .andExpect(jsonPath("$.supplierId").doesNotExist());
     }
 
     @Test

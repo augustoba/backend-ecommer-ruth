@@ -50,6 +50,7 @@ public final class ProductDtos {
 
     public record DiscontinuedPatch(@NotNull Boolean discontinued) {}
 
+    /** Admin (panel): incluye todo, también `costPrice`/`supplierId` (info interna, ver PROYECTO.md §5). */
     public record ProductResponse(
             String id,
             String name,
@@ -75,18 +76,92 @@ public final class ProductDtos {
             List<SizeStockDto> sizeStocks
     ) {
         public static ProductResponse from(Product p) {
-            Map<String, List<String>> params = new LinkedHashMap<>();
-            for (ProductParam pp : p.getParams()) {
-                params.computeIfAbsent(pp.getGroupId(), k -> new ArrayList<>()).add(pp.getOptionId());
-            }
-            List<SizeStockDto> stocks = p.getSizeStocks().stream()
-                    .map(s -> new SizeStockDto(s.getSize(), s.getStock()))
-                    .toList();
             return new ProductResponse(
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
                     p.getImageUrl(), List.copyOf(p.getImages()), p.getVideoUrl(), p.isActive(), p.isDiscontinued(),
                     p.isDeleted(), p.getCreatedAt(), p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(),
-                    p.getLowStockThreshold(), p.getBarcode(), params, stocks);
+                    p.getLowStockThreshold(), p.getBarcode(), paramsOf(p), stocksOf(p));
         }
+    }
+
+    /**
+     * Detalle público (`GET /api/products/{id}`): sin `costPrice`/`supplierId`
+     * (info interna del admin, no se expone en el catálogo — PROYECTO.md §5),
+     * pero con la galería completa (`images[]`), que la ficha de producto sí
+     * muestra.
+     */
+    public record PublicProductResponse(
+            String id,
+            String name,
+            String description,
+            BigDecimal price,
+            String ageRange,
+            String imageUrl,
+            List<String> images,
+            String videoUrl,
+            boolean active,
+            boolean discontinued,
+            Instant createdAt,
+            String sizeScaleId,
+            Integer lowStockThreshold,
+            String barcode,
+            Map<String, List<String>> params,
+            List<SizeStockDto> sizeStocks
+    ) {
+        public static PublicProductResponse from(Product p) {
+            return new PublicProductResponse(
+                    p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
+                    p.getImageUrl(), List.copyOf(p.getImages()), p.getVideoUrl(), p.isActive(), p.isDiscontinued(),
+                    p.getCreatedAt(), p.getSizeScaleId(), p.getLowStockThreshold(), p.getBarcode(),
+                    paramsOf(p), stocksOf(p));
+        }
+    }
+
+    /**
+     * Listado público (`GET /api/products`, `GET /api/products/best-sellers`):
+     * además de omitir `costPrice`/`supplierId`, tampoco trae `images[]`
+     * completo — sólo `imageUrl` (la portada), que es lo único que usan las
+     * tarjetas del catálogo (`product-card.component.html` sólo lee
+     * `product().imageUrl`). El array completo pesaba ~42% del payload de este
+     * endpoint sin usarse.
+     */
+    public record PublicProductListResponse(
+            String id,
+            String name,
+            String description,
+            BigDecimal price,
+            String ageRange,
+            String imageUrl,
+            String videoUrl,
+            boolean active,
+            boolean discontinued,
+            Instant createdAt,
+            String sizeScaleId,
+            Integer lowStockThreshold,
+            String barcode,
+            Map<String, List<String>> params,
+            List<SizeStockDto> sizeStocks
+    ) {
+        /** `coverImageUrl` se resuelve aparte (en lote) para no disparar el `@ElementCollection` lazy de `images`. */
+        public static PublicProductListResponse from(Product p, String coverImageUrl) {
+            return new PublicProductListResponse(
+                    p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
+                    coverImageUrl, p.getVideoUrl(), p.isActive(), p.isDiscontinued(), p.getCreatedAt(),
+                    p.getSizeScaleId(), p.getLowStockThreshold(), p.getBarcode(), paramsOf(p), stocksOf(p));
+        }
+    }
+
+    private static Map<String, List<String>> paramsOf(Product p) {
+        Map<String, List<String>> params = new LinkedHashMap<>();
+        for (ProductParam pp : p.getParams()) {
+            params.computeIfAbsent(pp.getGroupId(), k -> new ArrayList<>()).add(pp.getOptionId());
+        }
+        return params;
+    }
+
+    private static List<SizeStockDto> stocksOf(Product p) {
+        return p.getSizeStocks().stream()
+                .map(s -> new SizeStockDto(s.getSize(), s.getStock()))
+                .toList();
     }
 }

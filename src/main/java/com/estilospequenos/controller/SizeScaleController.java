@@ -5,11 +5,13 @@ import com.estilospequenos.dto.SizeScaleDtos.ScaleResponse;
 import com.estilospequenos.dto.SizeScaleDtos.ValuesRequest;
 import com.estilospequenos.service.SizeScaleService;
 import jakarta.validation.Valid;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 public class SizeScaleController {
@@ -20,9 +22,13 @@ public class SizeScaleController {
         this.service = service;
     }
 
+    /** Público. Cambia poco: cacheable 5 min. */
     @GetMapping("/api/size-scales")
-    public List<ScaleResponse> publicList() {
-        return service.findAll().stream().map(ScaleResponse::from).toList();
+    public ResponseEntity<List<ScaleResponse>> publicList() {
+        List<ScaleResponse> body = service.findAll().stream().map(ScaleResponse::from).toList();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+                .body(body);
     }
 
     @GetMapping("/api/admin/size-scales")
