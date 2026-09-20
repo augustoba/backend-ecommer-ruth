@@ -103,6 +103,7 @@ ejemplo (ver sección 8). Queda en `http://localhost:8080`.
 | `BREVO_SMTP_HOST`/`_PORT`/`_USER`/`_KEY`, `MARKETING_FROM_EMAIL` | placeholders (`changeme@...`) | sólo **siembran** `platform_mail_settings` la primera vez; después se edita desde el panel (ver §7 y §12 #23/#24) |
 | `CORS_ORIGINS` | `http://localhost:4200,http://localhost:4300` | orígenes permitidos |
 | `SEED_ENABLED` | `true` | cargar datos de ejemplo |
+| `SEED_DEMO_ENABLED` | `false` | cargar los **datos de demo** (~375 pedidos en 12 meses + gastos, proveedores, cupones, turnos, campañas) para probar las pantallas con volumen. **Solo desarrollo** — ver §12 #37 |
 | `SERVER_PORT` | `8080` | |
 
 Alternativa a las env vars: copiar `src/main/resources/application-local.yml.example`
@@ -370,6 +371,7 @@ app no genera duplicados.
 | `schema.sql` | solo las tablas |
 | `seed.sql` | solo la config base (idempotente, `INSERT ... ON DUPLICATE KEY UPDATE`) |
 | `reset.sql` | drop + create de la base vacía |
+| `reset-demo.sql` | borra los datos de **demo** (ver §12 #37). Solo desarrollo |
 
 `setup.sql` = `schema.sql` + `seed.sql` concatenados (hay una nota de cómo
 regenerarlo). **Verificado el 2026-09-20** (ver §12 #36): el esquema coincide
@@ -423,6 +425,16 @@ hace falta el mismo paso.
   dependiendo de OSIV igual que antes.)
 - Perfil `prod` (`application-prod.yml`) + pipeline de deploy.
 - Subida de imágenes a storage en vez de data-URI en la base.
+- **`/actuator/**` queda público**: `SecurityConfig` lo deja `permitAll` y
+  `application.yml` expone `health` + `metrics` con `show-details: always`.
+  Verificado en vivo el 2026-09-20 — responden **sin token**. Restringir antes
+  de cualquier deploy productivo (§12 #37).
+- **Errores de request mal clasificados como 500**: un parámetro obligatorio
+  faltante (ej. `/api/admin/balance` sin `from`) devuelve 500 en vez de 400 —
+  `MissingServletRequestParameterException` no está mapeada en
+  `GlobalExceptionHandler`. Conviene mapear también
+  `HttpMessageNotReadableException` y `MethodArgumentTypeMismatchException`
+  (§12 #37).
 - **Credenciales de Brevo reales**: hoy están cargadas directo en
   `platform_mail_settings` (vía `/admin/config/servicios` o insertadas a mano),
   no dependen de las env vars `BREVO_SMTP_*` salvo la primera vez. Si se
@@ -1100,6 +1112,62 @@ hace falta el mismo paso.
     - **Para que no vuelva a pasar:** correr la app con `ddl-auto=validate`
       contra una base creada con `setup.sql` antes de un deploy — canta
       cualquier columna que falte. Es barato y es lo que destapó todo esto.
+
+37. **Seeder de datos de demo + verificación en navegador (2026-09-20).**
+    - **Por qué:** al probar las pantallas con los datos que había, la base
+      tenía ventas **concentradas en un solo mes** — así que los gráficos de
+      "facturación por mes" y **todas las comparativas** salían en $0 y no
+      había forma de saber si funcionaban o no. No era un bug, era falta de
+      datos. Ver §12 #36 (misma sesión).
+    - **`config/DemoDataSeeder.java`** (nuevo): `@Order(2)` — corre después de
+      `DataSeeder` (que sumó `@Order(1)` para que el orden sea explícito, ahora
+      que hay dos) y **sólo** si `app.seed.demo.enabled=true`
+      (`SEED_DEMO_ENABLED`, default `false`). **No va en producción.**
+    - **Por qué en Java y no en SQL:** los pedidos se crean y confirman con
+      `OrderService` (`create`/`createPos` + `confirm`) —los servicios reales—,
+      así el stock queda descontado, los `StockMovement` registrados y el costo
+      congelado en `OrderLine.costPrice` igual que en producción. Hacerlo con
+      INSERTs obligaría a replicar toda esa lógica a mano, y cualquier desvío
+      se vería como un número raro en métricas o balance.
+    - **Qué carga:** ~375 pedidos repartidos en **12 meses** (con tendencia,
+      los dos canales, los 4 medios de pago, envío/retiro y costos), 4
+      proveedores, gastos de los 12 meses con presupuesto por categoría, 3
+      cupones, turnos, cambios de prenda y 60 envíos de campaña.
+      **~700 líneas de pedido, ~815 movimientos de stock.**
+    - **Fechas:** el servicio las fija con `now()`, así que los pedidos se
+      crean y después se **backdatean** con dos query nativas nuevas
+      (`OrderRepository.backdate` y `ProductRepository.backdateMovementsByReference`),
+      aplicadas todas juntas en **una** transacción al final (vía
+      `TransactionTemplate`). El seeder en sí **no** es transaccional a
+      propósito: cada pedido va en su propia transacción, así una falla no
+      pierde todo.
+    - **Idempotente:** los pedidos de demo llevan mail `@demo.local`; si ya hay
+      alguno, no hace nada. Los proveedores se buscan **por nombre** (una
+      corrida interrumpida no los duplica) y los gastos se referencian por
+      **id de la parametría**, no por etiqueta (las etiquetas son editables
+      desde el panel).
+    - **`database/reset-demo.sql`** (nuevo): saca los datos de demo. Se pensó
+      para desarrollo; en su encabezado está bien dicho qué borra de más
+      (gastos/cambios/turnos van enteros, porque no llevan marcador propio).
+      **Ojo:** la FK que crea Hibernate con `ddl-auto=update` **no** tiene
+      `ON DELETE CASCADE` (aunque sí esté en `schema.sql`), así que las hijas se
+      borran explícitamente — si no, el script fallaba.
+    - **Dos cosas que mordió escribirlo**, las dos el mismo acoplamiento a OSIV
+      que ya marcaba la auditoría: `Product.sizeStocks` y `ParamGroup.options`
+      son colecciones lazy y el seeder no corre dentro de una request, así que
+      tiraban `LazyInitializationException`. Se resolvió usando
+      `findActive()` (que trae `sizeStocks` por `@EntityGraph`) y metiendo la
+      lectura de la parametría dentro de una transacción.
+    - **Verificado en el navegador** (Playwright, back y front levantados):
+      Métricas pasó de "todo en septiembre" a 12 meses con tendencia, con el
+      desglose por proveedor poblado y **las dos comparativas con datos**;
+      Balance pasó de gastos $0 a un P&L real (ventas $1.871.740, costo
+      $927.725, gastos $735.886, neto **+$208.129**). Sin errores de consola.
+    - **Dos hallazgos de esa prueba** (no abordados en esta tanda, ver §11):
+      `/actuator/health` y `/actuator/metrics` responden **sin token**, y un
+      parámetro obligatorio faltante (`/api/admin/balance` sin `from`) devuelve
+      **500 en vez de 400** — `MissingServletRequestParameterException` no está
+      mapeada en `GlobalExceptionHandler`.
 
 ---
 

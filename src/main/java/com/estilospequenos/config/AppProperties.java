@@ -225,6 +225,7 @@ public class AppProperties {
 
     public static class Seed {
         private boolean enabled = true;
+        private Demo demo = new Demo();
 
         public boolean isEnabled() {
             return enabled;
@@ -232,6 +233,32 @@ public class AppProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+
+        public Demo getDemo() {
+            return demo;
+        }
+
+        public void setDemo(Demo demo) {
+            this.demo = demo;
+        }
+
+        /**
+         * Datos de demo para probar las pantallas con volumen real (métricas,
+         * balance, caja, campañas). Escribe mucho y sólo sirve para desarrollo,
+         * así que va aparte de {@code enabled} y apagado por default.
+         * Ver {@code DemoDataSeeder}.
+         */
+        public static class Demo {
+            private boolean enabled = false;
+
+            public boolean isEnabled() {
+                return enabled;
+            }
+
+            public void setEnabled(boolean enabled) {
+                this.enabled = enabled;
+            }
         }
     }
 

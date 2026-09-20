@@ -4,10 +4,34 @@ Scripts SQL para crear y poblar la base **`estilos_pequenos`** (MySQL 8).
 
 | Archivo | Qué hace |
 |---|---|
-| **`setup.sql`** | **Todo junto:** crea la base, las 13 tablas y la config base. Es lo que se corre en un servidor nuevo al desplegar. |
+| **`setup.sql`** | **Todo junto:** crea la base, las 27 tablas y la config base. Es lo que se corre en un servidor nuevo al desplegar. |
 | `schema.sql` | Solo la base + las tablas (sin datos). |
 | `seed.sql` | Solo la config base: parametrías, escalas de talle, descuentos. Necesita la base ya creada. |
 | `reset.sql` | Borra la base entera y la vuelve a crear vacía. |
+| `reset-demo.sql` | Borra los **datos de demo** que carga el `DemoDataSeeder` (pedidos con mail `@demo.local`, gastos, cambios, turnos, campañas). **Solo desarrollo** — ver abajo. |
+
+### Datos de demo
+
+Para probar las pantallas con volumen (métricas, comparativas, balance,
+campañas), el backend trae un seeder de demo en Java
+(`config/DemoDataSeeder.java`) que se activa con **`SEED_DEMO_ENABLED=true`**:
+
+```bash
+SEED_DEMO_ENABLED=true ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+Carga ~375 pedidos repartidos en 12 meses (con clientes, ambos canales de venta,
+medios de pago, descuentos y costos), más proveedores, gastos con presupuesto,
+cupones, turnos, cambios de prenda y campañas enviadas. **No va en producción.**
+
+Para sacarlos:
+
+```bash
+mysql -u root -p estilos_pequenos < database/reset-demo.sql
+```
+
+Es idempotente (si ya hay datos de demo, no vuelve a cargar), así que se puede
+dejar activado mientras desarrollás. Ver `PROYECTO.md` §12 #37.
 
 `setup.sql` es la concatenación de `schema.sql` + `seed.sql`.
 

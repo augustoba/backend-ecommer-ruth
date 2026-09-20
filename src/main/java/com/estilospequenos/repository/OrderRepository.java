@@ -5,6 +5,7 @@ import com.estilospequenos.model.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -50,6 +51,22 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     java.util.Optional<Order> findByNumber(long number);
 
     long countByStatus(OrderStatus status);
+
+    /** ¿Ya se cargaron los datos de demo? (los pedidos de demo usan un dominio de mail propio). */
+    boolean existsByCustomerEmailEndingWith(String suffix);
+
+    /**
+     * Reescribe las fechas de un pedido. <b>Sólo lo usa {@code DemoDataSeeder}</b>
+     * para repartir los pedidos de demo en 12 meses — la app nunca backdatea un
+     * pedido. Va por query nativa porque {@code created_at}/{@code processed_at}
+     * los fija el servicio con {@code now()} y no son editables por la API.
+     */
+    @Modifying
+    @Query(value = "update orders set created_at = :createdAt, processed_at = :processedAt where id = :id",
+            nativeQuery = true)
+    void backdate(@Param("id") String id,
+                  @Param("createdAt") java.time.LocalDateTime createdAt,
+                  @Param("processedAt") java.time.LocalDateTime processedAt);
 
     /** Pedidos de un estado con `processedAt` dentro del rango [from, to). Para métricas. */
     List<Order> findByStatusAndProcessedAtGreaterThanEqualAndProcessedAtLessThan(

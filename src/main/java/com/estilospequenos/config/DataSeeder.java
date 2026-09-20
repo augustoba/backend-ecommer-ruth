@@ -18,6 +18,7 @@ import com.estilospequenos.service.SiteSettingsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -27,8 +28,13 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-/** Carga datos de ejemplo la primera vez (si las tablas están vacías). */
+/**
+ * Carga datos de ejemplo la primera vez (si las tablas están vacías).
+ * <p>{@code @Order(1)}: tiene que correr antes que {@link DemoDataSeeder}
+ * ({@code @Order(2)}), que necesita los productos y parametrías ya cargados.</p>
+ */
 @Component
+@Order(1)
 public class DataSeeder implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);

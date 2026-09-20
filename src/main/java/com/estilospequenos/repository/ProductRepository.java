@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -42,6 +43,18 @@ public interface ProductRepository extends JpaRepository<Product, String> {
         String getProductId();
         String getUrl();
     }
+
+    /**
+     * Reescribe la fecha de los movimientos de stock de una referencia (el id de
+     * un pedido o de un cambio), para que el historial de movimientos acompañe
+     * las fechas backdateadas. <b>Sólo lo usa {@code DemoDataSeeder}</b> — ver
+     * {@link OrderRepository#backdate}.
+     */
+    @Modifying
+    @Query(value = "update stock_movement set created_at = :createdAt where reference_id = :referenceId",
+            nativeQuery = true)
+    void backdateMovementsByReference(@Param("referenceId") String referenceId,
+                                      @Param("createdAt") java.time.LocalDateTime createdAt);
 
     /**
      * Listado del panel con filtros opcionales (todos server-side):
