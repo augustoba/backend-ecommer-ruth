@@ -41,6 +41,8 @@ public class SiteSettingsService {
         s.setStoreAddress(blankToNull(req.storeAddress()));
         s.setHelpText(blankToNull(req.helpText()));
         s.setFaqText(blankToNull(req.faqText()));
+        s.setStorePhotoUrl(blankToNull(req.storePhotoUrl()));
+        s.setAboutPageEnabled(Boolean.TRUE.equals(req.aboutPageEnabled()));
         return repo.save(s);
     }
 

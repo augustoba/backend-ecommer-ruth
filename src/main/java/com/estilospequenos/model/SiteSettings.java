@@ -53,6 +53,14 @@ public class SiteSettings {
     @Column(length = 500)
     private String storeAddress;
 
+    /** Foto del local: URL o data URI. null = el negocio no tiene local físico (o no la cargó). */
+    @Column(length = 5_000_000)
+    private String storePhotoUrl;
+
+    /** El dueño activó la página pública "Quiénes somos" (si no, sólo se ve el resumen del footer). */
+    @Column(nullable = false)
+    private boolean aboutPageEnabled = false;
+
     /**
      * Texto de la página "Cómo comprar" (texto libre, se respeta el salto de
      * línea). `length` grande → Hibernate lo mapea a MEDIUMTEXT (no entra en el
@@ -312,6 +320,22 @@ public class SiteSettings {
 
     public void setStoreAddress(String storeAddress) {
         this.storeAddress = storeAddress;
+    }
+
+    public String getStorePhotoUrl() {
+        return storePhotoUrl;
+    }
+
+    public void setStorePhotoUrl(String storePhotoUrl) {
+        this.storePhotoUrl = storePhotoUrl;
+    }
+
+    public boolean isAboutPageEnabled() {
+        return aboutPageEnabled;
+    }
+
+    public void setAboutPageEnabled(boolean aboutPageEnabled) {
+        this.aboutPageEnabled = aboutPageEnabled;
     }
 
     public String getHelpText() {

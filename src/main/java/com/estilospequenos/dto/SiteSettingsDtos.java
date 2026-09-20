@@ -25,7 +25,10 @@ public final class SiteSettingsDtos {
             @Size(max = 2000) String whatsappClosing,
             @Size(max = 500) String storeAddress,
             @Size(max = 8000) String helpText,
-            @Size(max = 20000) String faqText
+            @Size(max = 20000) String faqText,
+            /** Foto del local: URL o data URI. Vacío = sin local físico / sin foto. */
+            @Size(max = 5_000_000) String storePhotoUrl,
+            Boolean aboutPageEnabled
     ) {}
 
     /** Medios de pago. Editable por el admin normal de la tienda. */
@@ -64,6 +67,8 @@ public final class SiteSettingsDtos {
             String storeAddress,
             String helpText,
             String faqText,
+            String storePhotoUrl,
+            boolean aboutPageEnabled,
             boolean paymentTransferEnabled,
             String paymentTransferAlias,
             boolean paymentQrTransferEnabled,
@@ -95,6 +100,7 @@ public final class SiteSettingsDtos {
                     s.getInstagram(), s.getFacebookUrl(), s.getLogoUrl(),
                     s.getWhatsappIntro(), s.getWhatsappClosing(), s.getStoreAddress(),
                     s.getHelpText(), s.getFaqText(),
+                    s.getStorePhotoUrl(), s.isAboutPageEnabled(),
                     s.isPaymentTransferEnabled(), s.getPaymentTransferAlias(),
                     s.isPaymentQrTransferEnabled(), s.getPaymentQrTransferImage(),
                     s.isPaymentQrCardEnabled(), s.getPaymentQrCardImage(),
