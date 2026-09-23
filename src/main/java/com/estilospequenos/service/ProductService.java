@@ -39,14 +39,17 @@ public class ProductService {
     private final OrderRepository orderRepo;
     private final StockMovementRepository movementRepo;
     private final AdminUserRepository adminUsers;
+    private final CloudinaryAdminService cloudinaryAdminService;
     private final ZoneId zone = ZoneId.systemDefault();
 
     public ProductService(ProductRepository repo, OrderRepository orderRepo,
-                          StockMovementRepository movementRepo, AdminUserRepository adminUsers) {
+                          StockMovementRepository movementRepo, AdminUserRepository adminUsers,
+                          CloudinaryAdminService cloudinaryAdminService) {
         this.repo = repo;
         this.orderRepo = orderRepo;
         this.movementRepo = movementRepo;
         this.adminUsers = adminUsers;
+        this.cloudinaryAdminService = cloudinaryAdminService;
     }
 
     /** Resuelve el nombre a mostrar de un usuario del panel a partir de su DNI (mismo patrón que OrderService). */
@@ -250,6 +253,46 @@ public class ProductService {
         Product p = get(id);
         p.setDeleted(false);
         return repo.save(p);
+    }
+
+    /**
+     * Borra la fila de verdad — a diferencia de {@link #delete}, que archiva
+     * (reversible). Sólo se puede sobre un producto ya archivado (evita
+     * borrar por error algo que todavía estaba publicado). Best-effort: borra
+     * también sus fotos de Cloudinary si hay credenciales cargadas (ver
+     * {@link CloudinaryAdminService}), pero eso nunca bloquea el borrado.
+     */
+    public void permanentlyDelete(String id) {
+        Product p = get(id);
+        if (!p.isDeleted()) {
+            throw new BadRequestException("Sólo se puede eliminar definitivamente un producto ya archivado.");
+        }
+        List<String> images = List.copyOf(p.getImages());
+        repo.delete(p);
+        cloudinaryAdminService.deleteImages(images);
+    }
+
+    /**
+     * Ajuste masivo de precio por porcentaje (ej: +10 = sube 10%, -15 = baja
+     * 15%). {@code ids} vacío/null = todos los productos no archivados.
+     * Sólo toca {@code price}; {@code costPrice} nunca se modifica acá.
+     * Redondea al peso (HALF_UP). Devuelve cuántos productos se ajustaron.
+     */
+    public int bulkAdjustPrice(List<String> ids, BigDecimal percent) {
+        if (percent == null) throw new BadRequestException("Falta el porcentaje de ajuste.");
+        List<Product> targets = (ids == null || ids.isEmpty())
+                ? repo.findByDeletedFalseOrderByCreatedAtDesc()
+                : repo.findAllById(ids).stream().filter(p -> !p.isDeleted()).toList();
+        if (targets.isEmpty()) return 0;
+
+        BigDecimal factor = BigDecimal.ONE.add(percent.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
+        for (Product p : targets) {
+            if (p.getPrice() == null) continue;
+            BigDecimal next = p.getPrice().multiply(factor).setScale(0, RoundingMode.HALF_UP);
+            p.setPrice(next.signum() < 0 ? BigDecimal.ZERO : next);
+        }
+        repo.saveAll(targets);
+        return targets.size();
     }
 
     public Product setActive(String id, boolean active) {

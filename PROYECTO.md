@@ -4,7 +4,7 @@
 > está en `../frontend-ecommerce---ruth/PROYECTO.md`. Este archivo entra en el
 > detalle de la API.
 
-Última actualización: 2026-09-20 (arreglo del esquema de deploy).
+Última actualización: 2026-09-23 (entrega parcial de pedidos, devolución pura en Cambios, ajuste masivo de precio, borrado real en Cloudinary, POSNET).
 
 > **Nota de mantenimiento:** las tablas de las secciones 2-6 se actualizan
 > cuando el cambio es grande (como hoy); para el detalle día a día, la
@@ -463,6 +463,16 @@ hace falta el mismo paso.
 - ~~Recuperación de contraseña con link~~ — hecho (§12 #34).
 - **No abordado todavía** (evaluar si la dueña lo necesita — existe en el
   SaaS, no se portó): ARCA/facturación electrónica + Notas de Crédito.
+- **Falta cargar `cloudinaryApiKey`/`cloudinaryApiSecret`** (Dashboard de
+  Cloudinary → Settings → API Keys, se cargan en
+  `/admin/superadmin/cloudinary`, sólo superadmin) — sin esto, "Eliminar
+  definitivamente" borra el producto de la base pero **no** borra sus fotos de
+  Cloudinary (§12 #38).
+- **Probar en el navegador la tanda del 2026-09-23** (entrega/cancelación
+  parcial de pedidos, devolución pura en Cambios, ajuste masivo de precio,
+  eliminar definitivamente + Cloudinary, banner promocional, WhatsApp
+  flotante, "Coordinar por WhatsApp" post-pago) — sólo se verificó con
+  `mvn test`/`ng build`, no en uso real (§12 #38).
 
 ---
 
@@ -1168,6 +1178,74 @@ hace falta el mismo paso.
       parámetro obligatorio faltante (`/api/admin/balance` sin `from`) devuelve
       **500 en vez de 400** — `MissingServletRequestParameterException` no está
       mapeada en `GlobalExceptionHandler`.
+
+38. **Entrega/cancelación parcial de pedidos + devolución pura en Cambios +
+    ajuste masivo de precio + borrado real en Cloudinary + POSNET (2026-09-23).**
+    - **Contexto:** esta tanda se armó primero sobre una base vieja de la rama
+      (divergida desde el split a SaaS del 2026-09-18) y hubo que descartarla y
+      rehacerla sobre el `origin/develop` real — por eso las fechas de commits
+      cercanos pueden no coincidir con el resto de este historial.
+    - **Entrega/cancelación parcial (lo más grande de la tanda):** antes,
+      confirmar un pedido era todo-o-nada (`OrderService.confirm`/`cancel`
+      sobre **todas** las líneas). Ahora cada `OrderLine` tiene un
+      `OrderLineStatus` (`PENDIENTE`/`ENTREGADA`/`CANCELADA`, columna nueva
+      `status_value`, nullable — sin migración: si es `null` se deriva del
+      estado del pedido + `accepted`, así los pedidos viejos no se rompen).
+      `confirmLines`/`cancelLines` (nuevos) resuelven sólo el subconjunto de
+      líneas pedido; el pedido se queda en `PENDIENTE` mientras quede aunque
+      sea una línea sin resolver, y recién pasa a `PROCESADO` (si algo se
+      entregó) o `CANCELADO` (si todo terminó cancelado) cuando no queda
+      ninguna `PENDIENTE` (`recomputeOrderStatus`). `confirm`/`cancel`
+      (los de siempre) quedaron como atajos que resuelven todo lo pendiente.
+      Se agregó `addLine`/`updateLineQuantity`/`removeLine` para editar un
+      pedido mientras sigue pendiente (agregar un ítem, cambiar cantidad, sacar
+      uno) — recalculan `subtotal`/`total` pero **a propósito no vuelven a
+      correr el motor de descuentos** (el % ya quedó fijado en `create()`).
+      Se sacó el viejo `PUT .../lines` (tildar/destildar todo-o-nada antes de
+      confirmar) porque quedaba inconsistente con el nuevo modelo — endpoints
+      nuevos: `POST .../confirm-lines`, `POST .../cancel-lines`,
+      `POST .../lines`, `PATCH .../lines/{lineId}`, `DELETE .../lines/{lineId}`.
+      Tests: `OrderPartialLifecycleTest` (confirma A y cancela B por separado,
+      con A entregada el pedido termina PROCESADO no CANCELADO; agregar/editar
+      cantidad/sacar línea recalcula totales sin tocar el descuento ya fijado).
+    - **Devolución pura en Cambios:** `CreateExchangeRequest.taken` pasa a ser
+      opcional (antes `@NotEmpty`) — un cambio sin nada que llevarse es una
+      devolución pura, sólo suma stock de lo devuelto. `ExchangeService`
+      generaliza `difference.signum() > 0` a `!= 0` al decidir si guarda
+      `paymentMethod`: ahora también cubre la diferencia negativa (a favor del
+      cliente — el medio de pago pasa a significar "cómo se le devolvió la
+      plata"). Test: `ExchangePureReturnTest`.
+    - **Ajuste masivo de precio:** `ProductService.bulkAdjustPrice(ids, percent)`
+      — `ids` vacío/null = todos los productos no archivados; sólo toca
+      `price` (nunca `costPrice`), redondeo HALF_UP al peso.
+      `PATCH /api/admin/products/bulk-price`. Test en
+      `ProductBulkPriceAndDeleteTest`.
+    - **"Eliminar definitivamente" + borrado real en Cloudinary:** nueva
+      acción `ProductService.permanentlyDelete`, sólo sobre un producto **ya
+      archivado** (no se puede saltear el paso de archivar) — borra la fila y,
+      best-effort, sus fotos de Cloudinary (`CloudinaryAdminService`, nunca
+      bloquea el borrado del producto si falla o no está configurado). El
+      preset de subida es *unsigned* (sólo permite subir), así que borrar de
+      verdad necesita una request firmada a mano (SHA-1 de
+      `public_id=...&timestamp=...` + API Secret — no hay SDK de Java liviano
+      para esto). Hacen falta `cloudinaryApiKey`/`cloudinaryApiSecret` nuevos
+      en `SiteSettings` (mismo criterio que `smtpPassword`: nunca se
+      devuelven, sólo se pueden pisar) — **todavía no están cargados**, así que
+      hoy el borrado en Cloudinary no hace nada (loggea y sigue; el producto sí
+      se borra de la base). `DELETE /api/admin/products/{id}/permanent`.
+      Tests: `CloudinaryAdminServiceTest` (parseo de `public_id` desde la URL,
+      sin red) + `ProductBulkPriceAndDeleteTest`.
+    - **POSNET de vuelta en el enum `PaymentMethod`** (no existía en esta
+      rama): la venta en el local ahora ofrece **posnet, efectivo o
+      transferencia** — nunca Mercado Pago (`createPos` ya lo rechazaba, se
+      dejó igual a propósito).
+    - **Banner promocional + WhatsApp flotante:** `SiteSettings` suma
+      `promoBannerEnabled`/`promoBannerImage`/`promoBannerLink` (mismo patrón
+      que `storePhotoUrl`), editable desde "Configuración → Sobre nosotros".
+    - **Verificación de esta tanda:** `mvn test` completo en verde (38/38,
+      incluidos los tests nuevos) + `ng build` sin errores. **No se verificó en
+      el navegador** (faltaba una base MySQL local levantada en esta sesión) —
+      queda pendiente antes de dar por cerrada la tanda (ver §11).
 
 ---
 

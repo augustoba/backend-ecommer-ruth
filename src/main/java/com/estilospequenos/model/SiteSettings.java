@@ -61,6 +61,18 @@ public class SiteSettings {
     @Column(nullable = false)
     private boolean aboutPageEnabled = false;
 
+    /** El dueño activó el banner promocional (popup) al entrar al catálogo. */
+    @Column(nullable = false)
+    private boolean promoBannerEnabled = false;
+
+    /** Imagen del banner promocional: URL o data URI. */
+    @Column(length = 5_000_000)
+    private String promoBannerImage;
+
+    /** A dónde va si lo tocan (ej: un producto puntual). Vacío = no navega a ningún lado. */
+    @Column(length = 500)
+    private String promoBannerLink;
+
     /**
      * Texto de la página "Cómo comprar" (texto libre, se respeta el salto de
      * línea). `length` grande → Hibernate lo mapea a MEDIUMTEXT (no entra en el
@@ -156,6 +168,18 @@ public class SiteSettings {
     @Column(length = 200)
     private String cloudinaryUploadPreset;
 
+    /**
+     * API Key/Secret de Cloudinary — a diferencia de cloudName/uploadPreset,
+     * SÍ son secretos de verdad: hacen falta para poder borrar imágenes de
+     * verdad (el upload preset unsigned sólo permite subir). Mismo criterio
+     * que smtpPassword: nunca se devuelven, sólo se pueden pisar.
+     */
+    @Column(length = 200)
+    private String cloudinaryApiKey;
+
+    @Column(length = 300)
+    private String cloudinaryApiSecret;
+
     public String getCloudinaryCloudName() {
         return cloudinaryCloudName;
     }
@@ -170,6 +194,22 @@ public class SiteSettings {
 
     public void setCloudinaryUploadPreset(String cloudinaryUploadPreset) {
         this.cloudinaryUploadPreset = cloudinaryUploadPreset;
+    }
+
+    public String getCloudinaryApiKey() {
+        return cloudinaryApiKey;
+    }
+
+    public void setCloudinaryApiKey(String cloudinaryApiKey) {
+        this.cloudinaryApiKey = cloudinaryApiKey;
+    }
+
+    public String getCloudinaryApiSecret() {
+        return cloudinaryApiSecret;
+    }
+
+    public void setCloudinaryApiSecret(String cloudinaryApiSecret) {
+        this.cloudinaryApiSecret = cloudinaryApiSecret;
     }
 
     // --- SMTP (recuperación de cuenta por mail) ---
@@ -336,6 +376,30 @@ public class SiteSettings {
 
     public void setAboutPageEnabled(boolean aboutPageEnabled) {
         this.aboutPageEnabled = aboutPageEnabled;
+    }
+
+    public boolean isPromoBannerEnabled() {
+        return promoBannerEnabled;
+    }
+
+    public void setPromoBannerEnabled(boolean promoBannerEnabled) {
+        this.promoBannerEnabled = promoBannerEnabled;
+    }
+
+    public String getPromoBannerImage() {
+        return promoBannerImage;
+    }
+
+    public void setPromoBannerImage(String promoBannerImage) {
+        this.promoBannerImage = promoBannerImage;
+    }
+
+    public String getPromoBannerLink() {
+        return promoBannerLink;
+    }
+
+    public void setPromoBannerLink(String promoBannerLink) {
+        this.promoBannerLink = promoBannerLink;
     }
 
     public String getHelpText() {

@@ -5,7 +5,6 @@ import com.estilospequenos.common.ResourceNotFoundException;
 import com.estilospequenos.dto.DiscountDtos.CartDiscountResult;
 import com.estilospequenos.dto.OrderDtos.CartItem;
 import com.estilospequenos.dto.OrderDtos.CreateOrderRequest;
-import com.estilospequenos.dto.OrderDtos.LineAcceptance;
 import com.estilospequenos.config.AppProperties;
 import com.estilospequenos.model.DeliveryMethod;
 import com.estilospequenos.model.Order;
@@ -180,7 +179,7 @@ public class OrderService {
             line.setSize(item.size());
             line.setQuantity(item.quantity());
             line.setUnitPrice(p.getPrice());
-            line.setAccepted(true);
+            line.setStatus(com.estilospequenos.model.OrderLineStatus.PENDIENTE);
             order.addLine(line);
 
             discountInput.add(new CartLineInput(p.getPrice(), item.quantity(), paramsOf(p)));
@@ -334,29 +333,15 @@ public class OrderService {
         return repo.save(order);
     }
 
-    /** Tilda/destilda ítems (solo mientras el pedido está pendiente). */
-    public Order setLineAcceptance(String orderId, List<LineAcceptance> changes) {
-        Order order = get(orderId);
-        if (order.getStatus() != OrderStatus.PENDIENTE) {
-            throw new BadRequestException("El pedido ya fue " + order.getStatus().name().toLowerCase() + ".");
-        }
-        Map<String, Boolean> byId = new LinkedHashMap<>();
-        changes.forEach(c -> byId.put(c.lineId(), c.accepted()));
-        for (OrderLine l : order.getLines()) {
-            if (byId.containsKey(l.getId())) l.setAccepted(byId.get(l.getId()));
-        }
-        return repo.save(order);
-    }
-
     /**
-     * Confirma: descuenta stock de las líneas aceptadas y marca PROCESADO.
-     * <b>Estricto</b>: si alguna línea aceptada no tiene stock suficiente, no
-     * confirma nada y devuelve 400 con el detalle de lo que falta. Registra
-     * quién cobró/confirmó (puede ser distinto de quién armó el pedido).
+     * Confirma TODO lo que sigue pendiente del pedido — atajo sobre
+     * {@link #confirmLines} para cuando no hace falta entrega parcial.
+     * Registra quién cobró/confirmó (puede ser distinto de quién armó el
+     * pedido).
      */
     public Order confirm(String orderId, String confirmedByDni) {
         Order order = get(orderId);
-        return doConfirm(order, confirmedByDni, nameByDni(confirmedByDni));
+        return confirmLinesInternal(order, pendingLineIds(order), confirmedByDni);
     }
 
     /**
@@ -369,9 +354,26 @@ public class OrderService {
         Order order = get(orderId);
         order.setMpPaymentId(mpPaymentId);
         order.setPaymentStatus(PaymentStatus.APPROVED);
-        Order confirmed = doConfirm(order, null, "Mercado Pago (pago validado)");
+        Order confirmed = confirmLinesInternal(order, pendingLineIds(order), null);
         orderMailService.sendOrderConfirmation(confirmed);
         return confirmed;
+    }
+
+    /**
+     * Entrega parcial: confirma sólo las líneas indicadas (descuenta su
+     * stock, congela su costo) y deja el resto tal cual. Si con esto no
+     * queda ninguna línea PENDIENTE, el pedido pasa a PROCESADO (si algo se
+     * entregó) o CANCELADO (si todo terminó cancelado). <b>Estricto</b>: si
+     * alguna de las líneas pedidas no tiene stock suficiente, no confirma
+     * ninguna del grupo y devuelve 400 con el detalle.
+     */
+    public Order confirmLines(String orderId, List<String> lineIds, String confirmedByDni) {
+        return confirmLinesInternal(get(orderId), lineIds, confirmedByDni);
+    }
+
+    /** Cancela sólo las líneas indicadas (no tocan stock, nunca lo tocaron). */
+    public Order cancelLines(String orderId, List<String> lineIds) {
+        return cancelLinesInternal(get(orderId), lineIds);
     }
 
     /**
@@ -391,20 +393,49 @@ public class OrderService {
         repo.save(order);
     }
 
-    /**
-     * Confirma: descuenta stock de las líneas aceptadas y marca PROCESADO.
-     * <b>Estricto</b>: si alguna línea aceptada no tiene stock suficiente, no
-     * confirma nada y devuelve 400 con el detalle de lo que falta.
-     */
-    private Order doConfirm(Order order, String confirmedByDni, String confirmedByName) {
+    /** Cancela TODO lo que sigue pendiente — atajo sobre {@link #cancelLines}. */
+    public Order cancel(String orderId) {
+        Order order = get(orderId);
+        return cancelLinesInternal(order, pendingLineIds(order));
+    }
+
+    private static List<String> pendingLineIds(Order order) {
+        return order.getLines().stream()
+                .filter(l -> l.getStatus() == com.estilospequenos.model.OrderLineStatus.PENDIENTE)
+                .map(OrderLine::getId)
+                .toList();
+    }
+
+    private static void requirePending(Order order) {
         if (order.getStatus() != OrderStatus.PENDIENTE) {
             throw new BadRequestException("El pedido ya fue procesado o cancelado.");
         }
+    }
 
-        // Pre-chequeo: no tocar stock hasta saber que alcanza para todo.
+    /** Busca entre las líneas del pedido las que pidieron por id, validando que existan y sigan pendientes. */
+    private static List<OrderLine> pendingTargets(Order order, List<String> lineIds) {
+        List<OrderLine> targets = order.getLines().stream()
+                .filter(l -> lineIds.contains(l.getId()))
+                .toList();
+        if (targets.isEmpty()) {
+            throw new BadRequestException("No se encontraron las líneas indicadas.");
+        }
+        for (OrderLine l : targets) {
+            if (l.getStatus() != com.estilospequenos.model.OrderLineStatus.PENDIENTE) {
+                throw new BadRequestException(l.getProductName() + " (talle " + l.getSize()
+                        + ") ya fue " + l.getStatus().name().toLowerCase() + ".");
+            }
+        }
+        return targets;
+    }
+
+    private Order confirmLinesInternal(Order order, List<String> lineIds, String confirmedByDni) {
+        requirePending(order);
+        List<OrderLine> targets = pendingTargets(order, lineIds);
+
+        // Pre-chequeo: no tocar stock hasta saber que alcanza para todo el grupo.
         List<String> shortages = new ArrayList<>();
-        for (OrderLine l : order.getLines()) {
-            if (!l.isAccepted()) continue;
+        for (OrderLine l : targets) {
             int available = productRepo.findById(l.getProductId())
                     .map(p -> p.getSizeStocks().stream()
                             .filter(s -> s.getSize().equals(l.getSize()))
@@ -417,37 +448,121 @@ public class OrderService {
             }
         }
         if (!shortages.isEmpty()) {
-            throw new BadRequestException("No hay stock suficiente para confirmar. "
-                    + "Ajustá el stock o destildá estos ítems: " + String.join("; ", shortages) + ".");
+            throw new BadRequestException("No hay stock suficiente para entregar. " + String.join("; ", shortages) + ".");
         }
 
-        for (OrderLine l : order.getLines()) {
-            if (l.isAccepted()) {
-                productService.decrementStock(l.getProductId(), l.getSize(), l.getQuantity(),
-                        com.estilospequenos.model.StockMovementReason.VENTA, order.getId(), confirmedByDni);
-                // Congela el costo ACÁ (no en create()): es el momento real en que
-                // el producto sale de stock. Así la ganancia de esta línea no
-                // cambia después si se actualiza el costo del producto (ver
-                // OrderLine.costPrice).
-                productRepo.findById(l.getProductId()).ifPresent(p -> l.setCostPrice(p.getCostPrice()));
-            }
+        for (OrderLine l : targets) {
+            productService.decrementStock(l.getProductId(), l.getSize(), l.getQuantity(),
+                    com.estilospequenos.model.StockMovementReason.VENTA, order.getId(), confirmedByDni);
+            // Congela el costo ACÁ (no en create()): es el momento real en que
+            // el producto sale de stock. Así la ganancia de esta línea no
+            // cambia después si se actualiza el costo del producto (ver
+            // OrderLine.costPrice).
+            productRepo.findById(l.getProductId()).ifPresent(p -> l.setCostPrice(p.getCostPrice()));
+            l.setStatus(com.estilospequenos.model.OrderLineStatus.ENTREGADA);
         }
-        order.setStatus(OrderStatus.PROCESADO);
-        order.setProcessedAt(Instant.now());
         order.setConfirmedByDni(confirmedByDni);
-        order.setConfirmedByName(confirmedByName);
+        order.setConfirmedByName(nameByDni(confirmedByDni));
+        recomputeOrderStatus(order);
         return repo.save(order);
     }
 
-    /** Cancela el pedido completo sin tocar stock. */
-    public Order cancel(String orderId) {
-        Order order = get(orderId);
-        if (order.getStatus() != OrderStatus.PENDIENTE) {
-            throw new BadRequestException("El pedido ya fue procesado o cancelado.");
+    private Order cancelLinesInternal(Order order, List<String> lineIds) {
+        requirePending(order);
+        List<OrderLine> targets = pendingTargets(order, lineIds);
+        for (OrderLine l : targets) {
+            l.setStatus(com.estilospequenos.model.OrderLineStatus.CANCELADA);
         }
-        order.setStatus(OrderStatus.CANCELADO);
-        order.setProcessedAt(Instant.now());
+        recomputeOrderStatus(order);
         return repo.save(order);
+    }
+
+    /**
+     * El pedido resuelve recién cuando ninguna línea sigue PENDIENTE:
+     * PROCESADO si algo se llegó a entregar, CANCELADO si todo terminó
+     * cancelado. Mientras quede aunque sea una línea pendiente, el pedido
+     * sigue PENDIENTE (entrega parcial en curso).
+     */
+    private void recomputeOrderStatus(Order order) {
+        boolean anyPending = order.getLines().stream()
+                .anyMatch(l -> l.getStatus() == com.estilospequenos.model.OrderLineStatus.PENDIENTE);
+        if (anyPending) return;
+        boolean anyDelivered = order.getLines().stream()
+                .anyMatch(l -> l.getStatus() == com.estilospequenos.model.OrderLineStatus.ENTREGADA);
+        order.setStatus(anyDelivered ? OrderStatus.PROCESADO : OrderStatus.CANCELADO);
+        order.setProcessedAt(Instant.now());
+    }
+
+    /**
+     * Agrega un ítem a un pedido pendiente (ej: el cliente llamó a sumar
+     * algo antes de que se lo lleven). Sólo mientras el pedido sigue
+     * PENDIENTE — una vez que hay líneas entregadas/canceladas, para tocar
+     * ese pedido hay que ir por Cambios.
+     */
+    public Order addLine(String orderId, String productId, String size, int quantity) {
+        Order order = get(orderId);
+        requirePending(order);
+        if (quantity <= 0) throw new BadRequestException("La cantidad tiene que ser mayor a 0.");
+        Product p = productRepo.findById(productId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Producto", productId));
+        OrderLine line = new OrderLine();
+        line.setId(UUID.randomUUID().toString());
+        line.setProductId(p.getId());
+        line.setProductName(p.getName());
+        line.setSize(size);
+        line.setQuantity(quantity);
+        line.setUnitPrice(p.getPrice());
+        line.setStatus(com.estilospequenos.model.OrderLineStatus.PENDIENTE);
+        order.addLine(line);
+        recomputeTotals(order);
+        return repo.save(order);
+    }
+
+    /** Cambia la cantidad de una línea todavía pendiente del pedido. */
+    public Order updateLineQuantity(String orderId, String lineId, int quantity) {
+        Order order = get(orderId);
+        requirePending(order);
+        if (quantity <= 0) throw new BadRequestException("La cantidad tiene que ser mayor a 0.");
+        OrderLine line = order.getLines().stream().filter(l -> l.getId().equals(lineId)).findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of("Línea de pedido", lineId));
+        if (line.getStatus() != com.estilospequenos.model.OrderLineStatus.PENDIENTE) {
+            throw new BadRequestException("Esa línea ya fue " + line.getStatus().name().toLowerCase() + ".");
+        }
+        line.setQuantity(quantity);
+        recomputeTotals(order);
+        return repo.save(order);
+    }
+
+    /** Saca una línea todavía pendiente del pedido (no una entregada/cancelada: para eso está Cambios). */
+    public Order removeLine(String orderId, String lineId) {
+        Order order = get(orderId);
+        requirePending(order);
+        OrderLine line = order.getLines().stream().filter(l -> l.getId().equals(lineId)).findFirst()
+                .orElseThrow(() -> ResourceNotFoundException.of("Línea de pedido", lineId));
+        if (order.getLines().size() <= 1) {
+            throw new BadRequestException("El pedido tiene que tener al menos un ítem — cancelalo si no va ninguno.");
+        }
+        order.getLines().remove(line);
+        recomputeTotals(order);
+        return repo.save(order);
+    }
+
+    /**
+     * Recalcula subtotal/total tras editar líneas de un pedido pendiente. A
+     * propósito NO vuelve a correr el motor de descuentos (tiers por monto,
+     * cupón, envío gratis, etc): esos se calcularon una única vez en
+     * {@link #create} contra el carrito original y quedan fijos — recalcularlos
+     * en cada edición podría cambiarle el % de descuento al cliente sin que lo
+     * sepa. El descuento/cupón ya aplicado se resta tal cual quedó.
+     */
+    private void recomputeTotals(Order order) {
+        BigDecimal subtotal = order.getLines().stream()
+                .map(l -> l.getUnitPrice().multiply(BigDecimal.valueOf(l.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        order.setSubtotal(subtotal);
+        BigDecimal discount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
+        BigDecimal coupon = order.getCouponDiscount() != null ? order.getCouponDiscount() : BigDecimal.ZERO;
+        order.setTotal(subtotal.subtract(discount).subtract(coupon).max(BigDecimal.ZERO));
     }
 
     private static String blankToNull(String v) {

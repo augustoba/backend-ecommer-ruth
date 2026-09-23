@@ -28,7 +28,11 @@ public final class SiteSettingsDtos {
             @Size(max = 20000) String faqText,
             /** Foto del local: URL o data URI. Vacío = sin local físico / sin foto. */
             @Size(max = 5_000_000) String storePhotoUrl,
-            Boolean aboutPageEnabled
+            Boolean aboutPageEnabled,
+            Boolean promoBannerEnabled,
+            /** Imagen del banner promocional: URL o data URI. Vacío = sin banner. */
+            @Size(max = 5_000_000) String promoBannerImage,
+            @Size(max = 500) String promoBannerLink
     ) {}
 
     /** Medios de pago. Editable por el admin normal de la tienda. */
@@ -69,6 +73,9 @@ public final class SiteSettingsDtos {
             String faqText,
             String storePhotoUrl,
             boolean aboutPageEnabled,
+            boolean promoBannerEnabled,
+            String promoBannerImage,
+            String promoBannerLink,
             boolean paymentTransferEnabled,
             String paymentTransferAlias,
             boolean paymentQrTransferEnabled,
@@ -101,6 +108,7 @@ public final class SiteSettingsDtos {
                     s.getWhatsappIntro(), s.getWhatsappClosing(), s.getStoreAddress(),
                     s.getHelpText(), s.getFaqText(),
                     s.getStorePhotoUrl(), s.isAboutPageEnabled(),
+                    s.isPromoBannerEnabled(), s.getPromoBannerImage(), s.getPromoBannerLink(),
                     s.isPaymentTransferEnabled(), s.getPaymentTransferAlias(),
                     s.isPaymentQrTransferEnabled(), s.getPaymentQrTransferImage(),
                     s.isPaymentQrCardEnabled(), s.getPaymentQrCardImage(),
@@ -132,15 +140,25 @@ public final class SiteSettingsDtos {
         }
     }
 
-    /** Config de Cloudinary: sólo la puede ver/editar un superadmin. */
+    /**
+     * Config de Cloudinary: sólo la puede ver/editar un superadmin. `apiKey`/
+     * `apiSecret` en blanco = no tocar los que ya están guardados (mismo
+     * criterio que `MailConfigRequest.password`) — hacen falta para poder
+     * borrar imágenes de verdad al eliminar un producto definitivamente.
+     */
     public record CloudinaryConfigRequest(
             @Size(max = 200) String cloudName,
-            @Size(max = 200) String uploadPreset
+            @Size(max = 200) String uploadPreset,
+            @Size(max = 200) String apiKey,
+            @Size(max = 300) String apiSecret
     ) {}
 
-    public record CloudinaryConfigResponse(String cloudName, String uploadPreset) {
+    /** `apiSecret` nunca se devuelve: sólo si hay uno guardado (apiSecretSet). `apiKey` no es secreta. */
+    public record CloudinaryConfigResponse(String cloudName, String uploadPreset, String apiKey, boolean apiSecretSet) {
         public static CloudinaryConfigResponse from(SiteSettings s) {
-            return new CloudinaryConfigResponse(s.getCloudinaryCloudName(), s.getCloudinaryUploadPreset());
+            return new CloudinaryConfigResponse(
+                    s.getCloudinaryCloudName(), s.getCloudinaryUploadPreset(), s.getCloudinaryApiKey(),
+                    s.getCloudinaryApiSecret() != null && !s.getCloudinaryApiSecret().isBlank());
         }
     }
 

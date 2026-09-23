@@ -48,6 +48,11 @@ public final class ProductDtos {
 
     public record ActivePatch(@NotNull Boolean active) {}
 
+    /** Ajuste masivo de precio. {@code ids} vacío/null = todos los productos no archivados. */
+    public record BulkPriceRequest(List<String> ids, @NotNull BigDecimal percent) {}
+
+    public record BulkPriceResponse(int updated) {}
+
     public record DiscontinuedPatch(@NotNull Boolean discontinued) {}
 
     /** Admin (panel): incluye todo, también `costPrice`/`supplierId` (info interna, ver PROYECTO.md §5). */

@@ -43,6 +43,9 @@ public class SiteSettingsService {
         s.setFaqText(blankToNull(req.faqText()));
         s.setStorePhotoUrl(blankToNull(req.storePhotoUrl()));
         s.setAboutPageEnabled(Boolean.TRUE.equals(req.aboutPageEnabled()));
+        s.setPromoBannerEnabled(Boolean.TRUE.equals(req.promoBannerEnabled()));
+        s.setPromoBannerImage(blankToNull(req.promoBannerImage()));
+        s.setPromoBannerLink(blankToNull(req.promoBannerLink()));
         return repo.save(s);
     }
 
@@ -86,11 +89,18 @@ public class SiteSettingsService {
         return s;
     }
 
-    /** Sólo lo puede llamar el controller gateado por la authority SUPERADMIN. */
-    public SiteSettings updateCloudinary(String cloudName, String uploadPreset) {
+    /**
+     * Sólo lo puede llamar el controller gateado por la authority SUPERADMIN.
+     * {@code apiSecret} en blanco = no tocar el que ya está guardado.
+     */
+    public SiteSettings updateCloudinary(String cloudName, String uploadPreset, String apiKey, String apiSecret) {
         SiteSettings s = get();
         s.setCloudinaryCloudName(blankToNull(cloudName));
         s.setCloudinaryUploadPreset(blankToNull(uploadPreset));
+        s.setCloudinaryApiKey(blankToNull(apiKey));
+        if (apiSecret != null && !apiSecret.isBlank()) {
+            s.setCloudinaryApiSecret(apiSecret.trim());
+        }
         return repo.save(s);
     }
 

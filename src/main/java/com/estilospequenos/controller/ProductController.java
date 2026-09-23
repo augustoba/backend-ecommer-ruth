@@ -3,6 +3,8 @@ package com.estilospequenos.controller;
 import com.estilospequenos.common.ResourceNotFoundException;
 import com.estilospequenos.dto.PageResponse;
 import com.estilospequenos.dto.ProductDtos.ActivePatch;
+import com.estilospequenos.dto.ProductDtos.BulkPriceRequest;
+import com.estilospequenos.dto.ProductDtos.BulkPriceResponse;
 import com.estilospequenos.dto.ProductDtos.DiscontinuedPatch;
 import com.estilospequenos.dto.ProductDtos.ProductRequest;
 import com.estilospequenos.dto.ProductDtos.ProductResponse;
@@ -131,6 +133,21 @@ public class ProductController {
     public ResponseEntity<Void> delete(@PathVariable String id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Borra la fila de verdad (+ fotos de Cloudinary si se puede) — sólo sobre un producto ya archivado. */
+    @DeleteMapping("/api/admin/products/{id}/permanent")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
+    public ResponseEntity<Void> permanentlyDelete(@PathVariable String id) {
+        service.permanentlyDelete(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Ajuste masivo de precio por %. `ids` vacío/null = todos los productos no archivados. */
+    @PatchMapping("/api/admin/products/bulk-price")
+    @PreAuthorize("hasAuthority('PRODUCTS_MANAGE')")
+    public BulkPriceResponse bulkPrice(@Valid @RequestBody BulkPriceRequest req) {
+        return new BulkPriceResponse(service.bulkAdjustPrice(req.ids(), req.percent()));
     }
 
     @PatchMapping("/api/admin/products/{id}/active")

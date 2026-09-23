@@ -37,9 +37,23 @@ public class OrderLine {
     @Column(precision = 12, scale = 2)
     private BigDecimal costPrice;
 
-    /** El dueño/a lo tilda para confirmar que hay stock y lo va a entregar. */
+    /**
+     * El dueño/a lo tilda para confirmar que hay stock y lo va a entregar.
+     * Legacy: hoy el estado real de la línea vive en {@link #status}; este
+     * campo se mantiene sincronizado por compatibilidad (nada más lo lee).
+     */
     @Column(nullable = false)
     private boolean accepted = true;
+
+    /**
+     * Estado de esta línea dentro de un pedido con entrega parcial (ver
+     * {@link OrderLineStatus}). Nullable a propósito: las líneas creadas
+     * antes de este campo no tienen valor guardado, así que {@link #getStatus()}
+     * lo deriva del estado del pedido — no hace falta migrar datos viejos.
+     */
+    @Column(name = "status_value", length = 20)
+    @Enumerated(EnumType.STRING)
+    private OrderLineStatus status;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "order_id")
@@ -108,6 +122,24 @@ public class OrderLine {
 
     public void setAccepted(boolean accepted) {
         this.accepted = accepted;
+    }
+
+    /**
+     * Si nunca se guardó (líneas de pedidos creados antes de la entrega
+     * parcial), se deriva del estado del pedido: pendiente → PENDIENTE,
+     * cancelado → CANCELADA, procesado → ENTREGADA si estaba aceptada o
+     * CANCELADA si no.
+     */
+    public OrderLineStatus getStatus() {
+        if (status != null) return status;
+        if (order == null || order.getStatus() == OrderStatus.PENDIENTE) return OrderLineStatus.PENDIENTE;
+        if (order.getStatus() == OrderStatus.CANCELADO) return OrderLineStatus.CANCELADA;
+        return accepted ? OrderLineStatus.ENTREGADA : OrderLineStatus.CANCELADA;
+    }
+
+    public void setStatus(OrderLineStatus status) {
+        this.status = status;
+        if (status != null) this.accepted = status == OrderLineStatus.ENTREGADA;
     }
 
     public Order getOrder() {

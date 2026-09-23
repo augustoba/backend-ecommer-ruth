@@ -1,7 +1,9 @@
 package com.estilospequenos.controller;
 
+import com.estilospequenos.dto.OrderDtos.AddLineRequest;
 import com.estilospequenos.dto.OrderDtos.CreateOrderRequest;
-import com.estilospequenos.dto.OrderDtos.LinesRequest;
+import com.estilospequenos.dto.OrderDtos.LineIdsRequest;
+import com.estilospequenos.dto.OrderDtos.LineQuantityRequest;
 import com.estilospequenos.dto.OrderDtos.OrderResponse;
 import com.estilospequenos.dto.OrderDtos.PublicOrderResponse;
 import com.estilospequenos.dto.PageResponse;
@@ -82,12 +84,6 @@ public class OrderController {
         return OrderResponse.from(service.get(id));
     }
 
-    @PutMapping("/api/admin/orders/{id}/lines")
-    @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
-    public OrderResponse setLines(@PathVariable String id, @Valid @RequestBody LinesRequest req) {
-        return OrderResponse.from(service.setLineAcceptance(id, req.lines()));
-    }
-
     @PostMapping("/api/admin/orders/{id}/confirm")
     @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
     public OrderResponse confirm(@PathVariable String id, Authentication auth) {
@@ -98,5 +94,41 @@ public class OrderController {
     @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
     public OrderResponse cancel(@PathVariable String id) {
         return OrderResponse.from(service.cancel(id));
+    }
+
+    /** Entrega parcial: confirma sólo las líneas indicadas, deja el resto pendiente. */
+    @PostMapping("/api/admin/orders/{id}/confirm-lines")
+    @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
+    public OrderResponse confirmLines(@PathVariable String id, @Valid @RequestBody LineIdsRequest req, Authentication auth) {
+        return OrderResponse.from(service.confirmLines(id, req.lineIds(), auth.getName()));
+    }
+
+    /** Cancela sólo las líneas indicadas, deja el resto pendiente. */
+    @PostMapping("/api/admin/orders/{id}/cancel-lines")
+    @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
+    public OrderResponse cancelLines(@PathVariable String id, @Valid @RequestBody LineIdsRequest req) {
+        return OrderResponse.from(service.cancelLines(id, req.lineIds()));
+    }
+
+    /** Agrega un ítem a un pedido todavía pendiente. */
+    @PostMapping("/api/admin/orders/{id}/lines")
+    @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
+    public OrderResponse addLine(@PathVariable String id, @Valid @RequestBody AddLineRequest req) {
+        return OrderResponse.from(service.addLine(id, req.productId(), req.size(), req.quantity()));
+    }
+
+    /** Cambia la cantidad de una línea todavía pendiente. */
+    @PatchMapping("/api/admin/orders/{id}/lines/{lineId}")
+    @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
+    public OrderResponse updateLineQuantity(@PathVariable String id, @PathVariable String lineId,
+                                             @Valid @RequestBody LineQuantityRequest req) {
+        return OrderResponse.from(service.updateLineQuantity(id, lineId, req.quantity()));
+    }
+
+    /** Saca una línea todavía pendiente del pedido. */
+    @DeleteMapping("/api/admin/orders/{id}/lines/{lineId}")
+    @PreAuthorize("hasAuthority('ORDERS_MANAGE')")
+    public OrderResponse removeLine(@PathVariable String id, @PathVariable String lineId) {
+        return OrderResponse.from(service.removeLine(id, lineId));
     }
 }

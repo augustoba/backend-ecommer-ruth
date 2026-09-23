@@ -97,7 +97,8 @@ public class SiteSettingsController {
     @PutMapping("/api/admin/settings/cloudinary")
     @PreAuthorize("hasAuthority('SUPERADMIN')")
     public CloudinaryConfigResponse updateCloudinaryConfig(@Valid @RequestBody CloudinaryConfigRequest req) {
-        return CloudinaryConfigResponse.from(service.updateCloudinary(req.cloudName(), req.uploadPreset()));
+        return CloudinaryConfigResponse.from(
+                service.updateCloudinary(req.cloudName(), req.uploadPreset(), req.apiKey(), req.apiSecret()));
     }
 
     /**

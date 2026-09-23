@@ -11,5 +11,7 @@ public enum PaymentMethod {
     /** Efectivo al recibir/retirar. */
     CASH,
     /** Pago online real con Mercado Pago (Checkout Pro) — ver MercadoPagoService. */
-    MERCADOPAGO
+    MERCADOPAGO,
+    /** Tarjeta con posnet físico en el local — sólo venta en el local, nunca online. */
+    POSNET
 }

@@ -3,6 +3,7 @@ package com.estilospequenos.dto;
 import com.estilospequenos.model.DeliveryMethod;
 import com.estilospequenos.model.Order;
 import com.estilospequenos.model.OrderLine;
+import com.estilospequenos.model.OrderLineStatus;
 import com.estilospequenos.model.OrderStatus;
 import com.estilospequenos.model.PaymentMethod;
 import com.estilospequenos.model.PaymentStatus;
@@ -10,7 +11,6 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -45,19 +45,28 @@ public final class OrderDtos {
             @Size(max = 40) String couponCode
     ) {}
 
-    public record LineAcceptance(@NotBlank String lineId, @NotNull Boolean accepted) {}
+    /** IDs de las líneas a entregar/cancelar (entrega parcial de un pedido pendiente). */
+    public record LineIdsRequest(@NotEmpty List<String> lineIds) {}
 
-    public record LinesRequest(@NotEmpty List<LineAcceptance> lines) {}
+    /** Agrega un ítem a un pedido todavía pendiente. */
+    public record AddLineRequest(
+            @NotBlank String productId,
+            @NotBlank String size,
+            @Min(1) @Max(999) int quantity
+    ) {}
+
+    /** Cambia la cantidad de una línea todavía pendiente. */
+    public record LineQuantityRequest(@Min(1) @Max(999) int quantity) {}
 
     // --- salida ---
 
     public record OrderLineResponse(
             String id, String productId, String productName, String size,
-            int quantity, BigDecimal unitPrice, boolean accepted
+            int quantity, BigDecimal unitPrice, boolean accepted, OrderLineStatus status
     ) {
         static OrderLineResponse from(OrderLine l) {
             return new OrderLineResponse(l.getId(), l.getProductId(), l.getProductName(), l.getSize(),
-                    l.getQuantity(), l.getUnitPrice(), l.isAccepted());
+                    l.getQuantity(), l.getUnitPrice(), l.isAccepted(), l.getStatus());
         }
     }
 

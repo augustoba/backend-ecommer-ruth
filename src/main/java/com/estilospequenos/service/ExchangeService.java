@@ -62,9 +62,11 @@ public class ExchangeService {
         ex.setProcessedByName(processedByDni == null || processedByDni.isBlank() ? null
                 : adminUsers.findByDni(processedByDni).map(u -> u.getNombre() + " " + u.getApellido()).orElse(null));
 
+        List<ExchangeItem> taken = req.taken() == null ? List.of() : req.taken();
+
         // Pre-chequeo de stock de lo que se lleva (agrupando por producto+talle).
         List<String> shortages = new ArrayList<>();
-        for (ExchangeItem item : req.taken()) {
+        for (ExchangeItem item : taken) {
             Product p = product(item.productId());
             int available = productService.stockOf(p.getId(), item.size());
             if (item.quantity() > available) {
@@ -88,7 +90,7 @@ public class ExchangeService {
         }
 
         BigDecimal takenTotal = BigDecimal.ZERO;
-        for (ExchangeItem item : req.taken()) {
+        for (ExchangeItem item : taken) {
             Product p = product(item.productId());
             BigDecimal line = p.getPrice().multiply(BigDecimal.valueOf(item.quantity()));
             takenTotal = takenTotal.add(line);
@@ -101,8 +103,11 @@ public class ExchangeService {
         ex.setReturnedTotal(returnedTotal);
         ex.setTakenTotal(takenTotal);
         ex.setDifference(difference);
-        // El medio de pago sólo tiene sentido si el local cobra algo.
-        ex.setPaymentMethod(difference.signum() > 0 ? req.paymentMethod() : null);
+        // El medio de pago sólo tiene sentido si hay plata de por medio, sea a
+        // favor del local (diferencia > 0, se lleva algo más caro) o del
+        // cliente (diferencia < 0, devolución pura o cambio por algo más
+        // barato — acá el medio de pago es cómo se le devolvió la plata).
+        ex.setPaymentMethod(difference.signum() != 0 ? req.paymentMethod() : null);
 
         return repo.save(ex);
     }
