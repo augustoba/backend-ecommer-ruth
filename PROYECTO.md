@@ -4,7 +4,7 @@
 > está en `../frontend-ecommerce---ruth/PROYECTO.md`. Este archivo entra en el
 > detalle de la API.
 
-Última actualización: 2026-09-23 (entrega parcial de pedidos, devolución pura en Cambios, ajuste masivo de precio, borrado real en Cloudinary, POSNET).
+Última actualización: 2026-09-28.
 
 > **Nota de mantenimiento:** las tablas de las secciones 2-6 se actualizan
 > cuando el cambio es grande (como hoy); para el detalle día a día, la
@@ -425,16 +425,10 @@ hace falta el mismo paso.
   dependiendo de OSIV igual que antes.)
 - Perfil `prod` (`application-prod.yml`) + pipeline de deploy.
 - Subida de imágenes a storage en vez de data-URI en la base.
-- **`/actuator/**` queda público**: `SecurityConfig` lo deja `permitAll` y
-  `application.yml` expone `health` + `metrics` con `show-details: always`.
-  Verificado en vivo el 2026-09-20 — responden **sin token**. Restringir antes
-  de cualquier deploy productivo (§12 #37).
-- **Errores de request mal clasificados como 500**: un parámetro obligatorio
-  faltante (ej. `/api/admin/balance` sin `from`) devuelve 500 en vez de 400 —
-  `MissingServletRequestParameterException` no está mapeada en
-  `GlobalExceptionHandler`. Conviene mapear también
-  `HttpMessageNotReadableException` y `MethodArgumentTypeMismatchException`
-  (§12 #37).
+- ~~`/actuator/**` queda público~~ — arreglado el 2026-09-28 (§12 #39): sólo
+  `/actuator/health` es público (sin detalle); el resto exige superadmin.
+- ~~Errores de request mal clasificados como 500~~ — arreglado el 2026-09-28
+  (§12 #39): 400/404/405 mapeados, y el 500 ya no filtra `ex.getMessage()`.
 - **Credenciales de Brevo reales**: hoy están cargadas directo en
   `platform_mail_settings` (vía `/admin/config/servicios` o insertadas a mano),
   no dependen de las env vars `BREVO_SMTP_*` salvo la primera vez. Si se
@@ -452,12 +446,25 @@ hace falta el mismo paso.
   Token de prueba/producción real cargado desde el panel, y un túnel (ngrok)
   en local para que el webhook sea alcanzable.
 - ~~Frontend de Gastos/Balance/movimientos de stock~~ — hecho (§12 #31).
-- **Probar Gastos/Balance/movimientos de stock en el navegador** — sólo se
-  verificó por código + `ng build` (la extensión de Chrome estaba
-  desconectada esa sesión), no en uso real.
-- **`punto-de-venta`** (`C:\proyectos\punto-de-venta`, ver §1): sólo tiene un
-  clone completo de este código como semilla — falta recortarlo a sólo el
-  módulo POS/Kiosco.
+- ~~Probar Gastos/Balance/movimientos de stock en el navegador~~ — probado
+  el 2026-09-28 (listado, balance, historial). No se probó el **alta** de un
+  gasto ni una compra a proveedor desde la UI (§12 #39).
+- **`punto-de-venta`** (`C:\proyectos\punto-de-venta`, ver §1): esta nota
+  quedó vieja — ya es un proyecto propio bastante avanzado (`back/` y
+  `front/` con su propio git, 89/127 commits al 2026-09-18). Su estado y
+  pendientes viven en `punto-de-venta/front/docs/PROXIMA_SESION.md`, no acá.
+- **"Parametría" de Productos muestra las categorías de Gastos** (Alquiler,
+  Sueldos, Impuestos…) en el filtro, mezcladas con las de producto (§12 #39).
+- **Ajuste masivo de precio "por categoría"**: hoy se hace filtrando y
+  tildando con el checkbox del encabezado, que sólo tilda la **página
+  actual**. Evaluar un "aplicar a todos los filtrados".
+- **`/api/settings` tiene `Cache-Control: max-age=300`**: los cambios de
+  configuración (banner, WhatsApp, textos) tardan hasta 5 min en verse para
+  quien ya entró al sitio. Es a propósito (performance), pero conviene saberlo.
+- **Descuento fijo al cancelar líneas**: `recomputeTotals` resta el
+  `discountAmount` que quedó fijado en `create()`; si se cancela parte del
+  pedido, ese monto fijo pesa más sobre un subtotal menor (el % efectivo sube).
+  Decidir si se prorratea.
 - ~~Alertas de stock bajo por mail~~ — hecho (§12 #32).
 - ~~Código de barras interno por producto~~ — hecho (§12 #33).
 - ~~Recuperación de contraseña con link~~ — hecho (§12 #34).
@@ -468,11 +475,47 @@ hace falta el mismo paso.
   `/admin/superadmin/cloudinary`, sólo superadmin) — sin esto, "Eliminar
   definitivamente" borra el producto de la base pero **no** borra sus fotos de
   Cloudinary (§12 #38).
-- **Probar en el navegador la tanda del 2026-09-23** (entrega/cancelación
-  parcial de pedidos, devolución pura en Cambios, ajuste masivo de precio,
-  eliminar definitivamente + Cloudinary, banner promocional, WhatsApp
-  flotante, "Coordinar por WhatsApp" post-pago) — sólo se verificó con
-  `mvn test`/`ng build`, no en uso real (§12 #38).
+- ~~Probar en el navegador la tanda del 2026-09-23~~ — probado el 2026-09-28
+  (§12 #39), salvo **"Coordinar por WhatsApp" post-pago** en `/mis-pedidos`,
+  que sigue sin probar (necesita un pedido con `paymentStatus=APPROVED`).
+- **Datos de prueba que quedaron en la base de desarrollo** (sesión del
+  2026-09-28, §12 #39): pedidos **PED-0384** (su total quedó en $67.800
+  porque se canceló con el código viejo, antes del fix) y **PED-0385**
+  (`payment_status` puesto en `APPROVED` a mano), cambio **CAM-0004**
+  (devolución pura), stock movido: zapatillas urbanas velcro T24 23→20,
+  pollera short con volado T4 8→9. Borrar/revertir cuando convenga.
+- Detalles menores: el recibo de una devolución pura muestra el título
+  "SE LLEVA" vacío; al modal de confirmación (`app-confirm-dialog`) le falta
+  `role="dialog"`.
+
+### 11bis. Sugerencias del roadmap todavía sin tomar
+
+Revisado contra el código el 2026-09-28. El roadmap original está en
+`../frontend/PROYECTO.md` §10 (está desactualizado: varias cosas de ahí ya se
+hicieron — duplicar, archivar, cupones, editar pedido pendiente, ajuste masivo,
+"mis pedidos", "cómo comprar" + FAQ, CSV, compras a proveedor, "lo más
+vendido", modal propio). Lo que sigue **sin hacer**:
+
+- **Antes de publicar:** WhatsApp real, contraseñas de Ruth/Augusto,
+  remitente propio en Brevo, fotos reales, headers de seguridad
+  (CSP/HSTS/X-Frame-Options), invalidar el JWT al cambiar la contraseña
+  (`tokenVersion`) + logout global.
+- **Stock:** reservar stock al crear el pedido (hoy baja recién al confirmar
+  → se puede sobrevender la última unidad; además `decrementStock` sigue
+  clampeando a 0 con `Math.max` en vez de lanzar) · modo "tienda cerrada".
+- **Venta:** Open Graph / preview al compartir por WhatsApp (necesita
+  SSR/prerender) · variantes de color (stock por talle+color) · guía de
+  talles · productos relacionados · cotizar envío por zonas · combos/packs ·
+  seña/reserva · precio mayorista · lista de nacimiento · cuidados de la
+  prenda · sellos de confianza.
+- **Pedidos:** notas internas · estados más finos ("pago recibido",
+  "entregado") · limpiar pendientes viejos.
+- **Marketing / analítica:** carrito abandonado · referidos · cuenta
+  regresiva de oferta (`endsAt`) · vistas por producto (vistos vs vendidos) ·
+  ranking de clientes · tasa de conversión.
+- **Técnico:** página 404 real (hoy `**` redirige al inicio) · PWA ·
+  analytics · tests del frontend · sincronizar el carrito entre pestañas ·
+  auditoría de acciones del admin (hoy sólo `StockMovement` para stock).
 
 ---
 
@@ -1246,6 +1289,39 @@ hace falta el mismo paso.
       incluidos los tests nuevos) + `ng build` sin errores. **No se verificó en
       el navegador** (faltaba una base MySQL local levantada en esta sesión) —
       queda pendiente antes de dar por cerrada la tanda (ver §11).
+
+39. **Actuator cerrado + errores 4xx + prueba en navegador de la tanda #38
+    (2026-09-28).**
+    - **Actuator:** `SecurityConfig` deja público sólo `/actuator/health`;
+      `/actuator/**` pide la authority `SUPERADMIN`. `show-details:
+      when-authorized`. Verificado en vivo: health 200, metrics sin token 401,
+      con token de superadmin 200.
+    - **`GlobalExceptionHandler`:** mapea
+      `MissingServletRequestParameterException` /
+      `MethodArgumentTypeMismatchException` / `HttpMessageNotReadableException`
+      → 400, `HttpRequestMethodNotSupportedException` → 405,
+      `NoResourceFoundException` → 404. El handler genérico de 500 ya no
+      devuelve `ex.getMessage()` al cliente (podía traer SQL/clases); lo
+      loggea. Test: `ApiHardeningTest`.
+    - **Bug (encontrado probando):** al cancelar parte de un pedido,
+      `Order.total` seguía sumando lo cancelado — la **Caja** (que suma
+      `Order.total` por medio de pago) quedaba inflada. `recomputeTotals` ya
+      no suma líneas `CANCELADA` y `cancelLinesInternal` lo llama, salvo que
+      el pedido termine `CANCELADO` (conserva su total original como
+      referencia). Test agregado en `OrderPartialLifecycleTest`.
+    - **Bug (encontrado probando):** la Caja ignoraba los cambios con
+      diferencia negativa, así que la plata devuelta en una devolución pura
+      no se restaba. `CashRegisterService` ahora suma la diferencia con
+      signo. Test: `ExchangePureReturnTest.refundOfAPureReturnIsSubtractedFromTheCashRegister`.
+    - **Probado en el navegador (Playwright):** entrega/cancelación parcial,
+      editar cantidad, devolución pura + recibo, ajuste masivo (con
+      confirmación), archivar → eliminar definitivamente (Cloudinary sin
+      credenciales: loggea y sigue), banner promocional (aparece, se cierra y
+      no vuelve en la pestaña), WhatsApp flotante, Gastos (listado), Balance
+      y Movimientos de stock. Detalle estético visto: el recibo de una
+      devolución pura muestra el título "SE LLEVA" vacío. Al modal de
+      confirmación le falta `role="dialog"`.
+    - `mvn test`: 45/45.
 
 ---
 

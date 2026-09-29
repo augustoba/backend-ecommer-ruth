@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -97,15 +98,24 @@ class OrderPartialLifecycleTest {
 
         // Cancela la línea B — con eso ya no queda ninguna pendiente, y como
         // A se entregó, el pedido pasa a PROCESADO (no CANCELADO).
-        mvc.perform(post("/api/admin/orders/" + orderId + "/cancel-lines")
+        BigDecimal discount = new BigDecimal(order.get("discountAmount").asText());
+        String afterCancel = mvc.perform(post("/api/admin/orders/" + orderId + "/cancel-lines")
                         .header("Authorization", "Bearer " + jwt)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"lineIds\":[\"" + lineB + "\"]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PROCESADO"))
-                .andExpect(jsonPath("$.lines[1].status").value("CANCELADA"));
+                .andExpect(jsonPath("$.lines[1].status").value("CANCELADA"))
+                .andReturn().getResponse().getContentAsString();
 
         assert stockOf(productB) == 5; // cancelada: nunca se le tocó el stock
+
+        // Lo cancelado sale del total: se cobra sólo lo entregado (2 x 1000),
+        // que es lo que suma la caja por medio de pago.
+        JsonNode afterCancelNode = mapper.readTree(afterCancel);
+        assertThat(new BigDecimal(afterCancelNode.get("subtotal").asText())).isEqualByComparingTo("2000");
+        assertThat(new BigDecimal(afterCancelNode.get("total").asText()))
+                .isEqualByComparingTo(new BigDecimal("2000").subtract(discount).max(BigDecimal.ZERO));
     }
 
     @Test

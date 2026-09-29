@@ -52,8 +52,10 @@ public class SecurityConfig {
                                 "/api/settings",
                                 "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
                                 "/error",
-                                "/actuator/**"
+                                "/actuator/health"
                         ).permitAll()
+                        // metrics y el resto del actuator: sólo superadmin
+                        .requestMatchers("/actuator/**").hasAuthority("SUPERADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/orders").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/orders/lookup").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/webhooks/mercadopago").permitAll()

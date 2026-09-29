@@ -9,6 +9,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -72,5 +75,35 @@ class ExchangePureReturnTest {
                 .andExpect(jsonPath("$.lines.length()").value(1));
 
         assert stockOf(product) == 4; // 3 + 1 devuelto, nada se llevó
+    }
+
+    /** Lo que figura en la columna "Cambios" de la caja de hoy para ese medio (0 si no hay fila). */
+    private BigDecimal cashRegisterExchanges(String jwt, String method) throws Exception {
+        JsonNode rows = mapper.readTree(mvc.perform(get("/api/admin/cash-register")
+                        .header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("rows");
+        for (JsonNode r : rows) {
+            if (r.get("method").asText().equals(method)) return new BigDecimal(r.get("exchanges").asText());
+        }
+        return BigDecimal.ZERO;
+    }
+
+    @Test
+    void refundOfAPureReturnIsSubtractedFromTheCashRegister() throws Exception {
+        String jwt = token();
+        String product = createProduct(jwt, "Devolucion Caja", 3);
+        BigDecimal before = cashRegisterExchanges(jwt, "CASH");
+
+        String body = "{\"customerName\":\"Devuelve en efectivo\","
+                + "\"returned\":[{\"productId\":\"" + product + "\",\"size\":\"RN\",\"quantity\":1}],"
+                + "\"paymentMethod\":\"CASH\"}";
+        mvc.perform(post("/api/admin/exchanges")
+                        .header("Authorization", "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated());
+
+        // Salieron $1000 en efectivo de la caja para devolverle al cliente.
+        assertThat(cashRegisterExchanges(jwt, "CASH")).isEqualByComparingTo(before.subtract(new BigDecimal("1000")));
     }
 }

@@ -89,7 +89,9 @@ public class CashRegisterService {
         }
 
         for (Exchange e : exchanges) {
-            if (e.getDifference().signum() > 0) {
+            // > 0: el cliente pagó la diferencia. < 0: se le devolvió plata
+            // (devolución pura o se llevó algo más barato) — resta de la caja.
+            if (e.getDifference().signum() != 0) {
                 acc.get(methodKey(e.getPaymentMethod()))[1] =
                         acc.get(methodKey(e.getPaymentMethod()))[1].add(e.getDifference());
             }

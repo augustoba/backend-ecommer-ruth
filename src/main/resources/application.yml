@@ -86,8 +86,8 @@ logging:
   level:
     org.hibernate.SQL: warn
 
-# Solo para pruebas de carga locales (ver PROYECTO.md §13). Antes de crear el
-# perfil prod, restringir esta exposicion (hoy expone metrics/health sin auth).
+# /actuator/health es público (sólo UP/DOWN; el detalle pide token).
+# /actuator/metrics exige token de superadmin (SecurityConfig).
 management:
   endpoints:
     web:
@@ -95,4 +95,4 @@ management:
         include: health,metrics
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized

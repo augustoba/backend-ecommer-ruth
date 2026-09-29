@@ -474,6 +474,9 @@ public class OrderService {
             l.setStatus(com.estilospequenos.model.OrderLineStatus.CANCELADA);
         }
         recomputeOrderStatus(order);
+        // Lo cancelado deja de cobrarse (la caja suma Order.total). Si se canceló
+        // todo, el pedido CANCELADO conserva su total original como referencia.
+        if (order.getStatus() != OrderStatus.CANCELADO) recomputeTotals(order);
         return repo.save(order);
     }
 
@@ -553,10 +556,12 @@ public class OrderService {
      * cupón, envío gratis, etc): esos se calcularon una única vez en
      * {@link #create} contra el carrito original y quedan fijos — recalcularlos
      * en cada edición podría cambiarle el % de descuento al cliente sin que lo
-     * sepa. El descuento/cupón ya aplicado se resta tal cual quedó.
+     * sepa. El descuento/cupón ya aplicado se resta tal cual quedó. Las
+     * líneas CANCELADAS no suman (no se cobran).
      */
     private void recomputeTotals(Order order) {
         BigDecimal subtotal = order.getLines().stream()
+                .filter(l -> l.getStatus() != com.estilospequenos.model.OrderLineStatus.CANCELADA)
                 .map(l -> l.getUnitPrice().multiply(BigDecimal.valueOf(l.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         order.setSubtotal(subtotal);
