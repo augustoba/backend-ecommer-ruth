@@ -1,5 +1,6 @@
 package com.estilospequenos.controller;
 
+import com.estilospequenos.dto.SiteSettingsDtos.AppearanceRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.CloudinaryConfigRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.CloudinaryConfigResponse;
 import com.estilospequenos.dto.SiteSettingsDtos.MailConfigRequest;
@@ -18,8 +19,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.concurrent.TimeUnit;
-
 @RestController
 public class SiteSettingsController {
 
@@ -29,11 +28,16 @@ public class SiteSettingsController {
         this.service = service;
     }
 
-    /** Público: datos del local para el header, footer y el link de WhatsApp. Cambia poco: cacheable 5 min. */
+    /**
+     * Público: datos del local para el header, footer y el link de WhatsApp.
+     * Sin caché de navegador: el dueño puede cambiar el diseño, el nombre o el
+     * logo desde el panel en cualquier momento, y con `max-age` un refresh
+     * seguía mostrando la tienda vieja hasta 5 minutos después de guardar.
+     */
     @GetMapping("/api/settings")
     public ResponseEntity<SettingsResponse> publicSettings() {
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+                .cacheControl(CacheControl.noStore())
                 .body(SettingsResponse.from(service.get()));
     }
 
@@ -48,6 +52,17 @@ public class SiteSettingsController {
     @PreAuthorize("hasAuthority('PLATFORM_SETTINGS_MANAGE')")
     public SettingsResponse updatePlatform(@Valid @RequestBody PlatformSettingsRequest req) {
         return SettingsResponse.from(service.updatePlatform(req));
+    }
+
+    /**
+     * Diseño de la tienda (qué plantilla renderiza la home). Lo puede cambiar el
+     * dueño de la tienda — por eso no pide PLATFORM_SETTINGS_MANAGE (que es sólo
+     * superadmin) sino el mismo permiso con el que ya edita la home: el carrusel.
+     */
+    @PutMapping("/api/admin/settings/apariencia")
+    @PreAuthorize("hasAnyAuthority('PLATFORM_SETTINGS_MANAGE', 'CAROUSEL_MANAGE')")
+    public SettingsResponse updateAppearance(@Valid @RequestBody AppearanceRequest req) {
+        return SettingsResponse.from(service.updateAppearance(req));
     }
 
     /** Medios de pago. Lo edita el admin normal de la tienda. */

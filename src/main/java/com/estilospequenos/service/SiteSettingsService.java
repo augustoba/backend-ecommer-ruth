@@ -1,5 +1,6 @@
 package com.estilospequenos.service;
 
+import com.estilospequenos.dto.SiteSettingsDtos.AppearanceRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.PaymentsSettingsRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.PlatformSettingsRequest;
 import com.estilospequenos.dto.SiteSettingsDtos.StockAlertSettingsRequest;
@@ -67,6 +68,16 @@ public class SiteSettingsService {
         SiteSettings s = get();
         s.setLowStockAlertEnabled(Boolean.TRUE.equals(req.lowStockAlertEnabled()));
         s.setLowStockAlertEmail(blankToNull(req.lowStockAlertEmail()));
+        return repo.save(s);
+    }
+
+    /**
+     * Diseño de la tienda. El {@code @Pattern} del DTO ya descartó cualquier id
+     * que no exista, así que acá sólo se guarda.
+     */
+    public SiteSettings updateAppearance(AppearanceRequest req) {
+        SiteSettings s = get();
+        s.setLayout(req.layout().trim());
         return repo.save(s);
     }
 

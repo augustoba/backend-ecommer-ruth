@@ -88,6 +88,26 @@ public class SiteSettings {
     @Column(length = 500_000)
     private String faqText;
 
+    // --- Apariencia ---
+
+    /**
+     * id del diseño de la tienda que eligió el dueño ("ruth", "editorial",
+     * "pop", ...). El frontend lo escribe como {@code data-layout} en <html> y
+     * renderiza el componente de plantilla que corresponda. Los valores válidos
+     * los fija el {@code @Pattern} de AppearanceRequest, no la base — agregar un
+     * diseño nuevo es tocar el frontend y ese pattern, nunca esta columna.
+     */
+    @Column(nullable = false, length = 40)
+    private String layout = "ruth";
+
+    public String getLayout() {
+        return layout;
+    }
+
+    public void setLayout(String layout) {
+        this.layout = layout;
+    }
+
     // --- Medios de pago (aparece en el checkout si está habilitado Y tiene su dato) ---
 
     @Column(nullable = false)

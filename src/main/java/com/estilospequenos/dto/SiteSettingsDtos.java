@@ -47,6 +47,18 @@ public final class SiteSettingsDtos {
             Boolean paymentCashEnabled
     ) {}
 
+    /**
+     * Diseño de la tienda. Separado de {@link PlatformSettingsRequest} porque lo
+     * puede cambiar el dueño de la tienda, no sólo un superadmin. Al agregar un
+     * diseño nuevo hay que sumarlo acá Y al registro `LAYOUTS` del frontend —
+     * si no está en esta lista el backend lo rechaza con 400 antes de guardarlo.
+     */
+    public record AppearanceRequest(
+            @NotBlank
+            @Pattern(regexp = "ruth|editorial|pop", message = "Diseño desconocido")
+            String layout
+    ) {}
+
     /** Alerta diaria por mail de talles en stock bajo. Editable por PRODUCTS_MANAGE. */
     public record StockAlertSettingsRequest(
             Boolean lowStockAlertEnabled,
@@ -97,7 +109,9 @@ public final class SiteSettingsDtos {
              * Pago" en el carrito. El Access Token en sí NUNCA viaja acá
              * (ver MercadoPagoConfigResponse, mismo criterio que SMTP).
              */
-            boolean mercadoPagoAvailable
+            boolean mercadoPagoAvailable,
+            /** id del diseño elegido ("ruth", "editorial", "pop", ...). */
+            String layout
     ) {
         public static SettingsResponse from(SiteSettings s) {
             boolean mercadoPagoAvailable = s.isMpEnabled()
@@ -114,7 +128,8 @@ public final class SiteSettingsDtos {
                     s.isPaymentQrCardEnabled(), s.getPaymentQrCardImage(),
                     s.getPaymentCardLink(), s.isPaymentCashEnabled(),
                     s.getCloudinaryCloudName(), s.getCloudinaryUploadPreset(),
-                    mercadoPagoAvailable);
+                    mercadoPagoAvailable,
+                    s.getLayout() == null || s.getLayout().isBlank() ? "ruth" : s.getLayout());
         }
     }
 
