@@ -55,7 +55,9 @@ public final class SiteSettingsDtos {
      */
     public record AppearanceRequest(
             @NotBlank
-            @Pattern(regexp = "ruth|editorial|pop", message = "Diseño desconocido")
+            @Pattern(
+                    regexp = "ruth|editorial|pop|vidriera|ofertas|fichero|mosaico|nova|neon|caramelo|cohete|jungla|crayon",
+                    message = "Diseño desconocido")
             String layout
     ) {}
 
