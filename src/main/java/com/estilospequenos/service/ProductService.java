@@ -425,6 +425,7 @@ public class ProductService {
         p.setVideoUrl(blankToNull(req.videoUrl()));
         p.setActive(req.active() == null || req.active());
         p.setDiscontinued(req.discontinued() != null && req.discontinued());
+        p.setFeaturedInPromos(req.featuredInPromos() != null && req.featuredInPromos());
         p.setSizeScaleId(blankToNull(req.sizeScaleId()));
         p.setSupplierId(blankToNull(req.supplierId()));
         p.setCostPrice(req.costPrice() != null && req.costPrice().signum() > 0 ? req.costPrice() : null);

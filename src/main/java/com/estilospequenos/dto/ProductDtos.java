@@ -33,6 +33,8 @@ public final class ProductDtos {
             Boolean active,
             /** true = no se repone más (deja de aparecer en "por reponer"). */
             Boolean discontinued,
+            /** true = destacado en la vista pública `/promos`. */
+            Boolean featuredInPromos,
             String sizeScaleId,
             String supplierId,
             BigDecimal costPrice,
@@ -70,6 +72,8 @@ public final class ProductDtos {
             String videoUrl,
             boolean active,
             boolean discontinued,
+            /** true = destacado en la vista pública `/promos` (selección manual). */
+            boolean featuredInPromos,
             boolean deleted,
             Instant createdAt,
             String sizeScaleId,
@@ -84,7 +88,7 @@ public final class ProductDtos {
             return new ProductResponse(
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
                     p.getImageUrl(), List.copyOf(p.getImages()), p.getVideoUrl(), p.isActive(), p.isDiscontinued(),
-                    p.isDeleted(), p.getCreatedAt(), p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(),
+                    p.isFeaturedInPromos(), p.isDeleted(), p.getCreatedAt(), p.getSizeScaleId(), p.getSupplierId(), p.getCostPrice(),
                     p.getLowStockThreshold(), p.getBarcode(), paramsOf(p), stocksOf(p));
         }
     }
@@ -106,6 +110,8 @@ public final class ProductDtos {
             String videoUrl,
             boolean active,
             boolean discontinued,
+            /** true = destacado en la vista pública `/promos` (selección manual). */
+            boolean featuredInPromos,
             Instant createdAt,
             String sizeScaleId,
             Integer lowStockThreshold,
@@ -117,7 +123,7 @@ public final class ProductDtos {
             return new PublicProductResponse(
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
                     p.getImageUrl(), List.copyOf(p.getImages()), p.getVideoUrl(), p.isActive(), p.isDiscontinued(),
-                    p.getCreatedAt(), p.getSizeScaleId(), p.getLowStockThreshold(), p.getBarcode(),
+                    p.isFeaturedInPromos(), p.getCreatedAt(), p.getSizeScaleId(), p.getLowStockThreshold(), p.getBarcode(),
                     paramsOf(p), stocksOf(p));
         }
     }
@@ -140,6 +146,8 @@ public final class ProductDtos {
             String videoUrl,
             boolean active,
             boolean discontinued,
+            /** true = destacado en la vista pública `/promos` (selección manual). */
+            boolean featuredInPromos,
             Instant createdAt,
             String sizeScaleId,
             Integer lowStockThreshold,
@@ -151,7 +159,7 @@ public final class ProductDtos {
         public static PublicProductListResponse from(Product p, String coverImageUrl) {
             return new PublicProductListResponse(
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getAgeRange(),
-                    coverImageUrl, p.getVideoUrl(), p.isActive(), p.isDiscontinued(), p.getCreatedAt(),
+                    coverImageUrl, p.getVideoUrl(), p.isActive(), p.isDiscontinued(), p.isFeaturedInPromos(), p.getCreatedAt(),
                     p.getSizeScaleId(), p.getLowStockThreshold(), p.getBarcode(), paramsOf(p), stocksOf(p));
         }
     }

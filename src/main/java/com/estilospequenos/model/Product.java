@@ -56,6 +56,15 @@ public class Product {
     private boolean discontinued = false;
 
     /**
+     * true = el dueño/a eligió esta prenda para destacarla en la vista pública
+     * `/promos` (la que puede abrir el banner de promoción). Selección manual:
+     * si no hay ninguna marcada, esa vista cae a las prendas con descuento
+     * vigente. No cambia nada del catálogo normal.
+     */
+    @Column(nullable = false)
+    private boolean featuredInPromos = false;
+
+    /**
      * true = producto archivado (soft-delete). Sale del catálogo y de todos los
      * listados del panel, pero se conserva la fila para no romper el historial
      * de pedidos. Se puede restaurar desde "Productos archivados".
@@ -176,6 +185,14 @@ public class Product {
 
     public void setDiscontinued(boolean discontinued) {
         this.discontinued = discontinued;
+    }
+
+    public boolean isFeaturedInPromos() {
+        return featuredInPromos;
+    }
+
+    public void setFeaturedInPromos(boolean featuredInPromos) {
+        this.featuredInPromos = featuredInPromos;
     }
 
     public boolean isDeleted() {
